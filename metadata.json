@@ -1,0 +1,7 @@
+{
+  "name": "VoxNova AI - Professional TTS",
+  "description": "Professional AI voice generator optimized for long-form narration, documentaries, and storytelling. Features CD-quality output and intelligent speed controls.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
