@@ -73,6 +73,11 @@ const authenticate = async (req: any, res: any, next: any) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  if (admin.apps.length === 0) {
+    console.error("Firebase Admin not initialized. Check environment variables.");
+    return res.status(500).json({ error: 'Authentication service unavailable' });
+  }
+
   const idToken = authHeader.split('Bearer ')[1];
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);

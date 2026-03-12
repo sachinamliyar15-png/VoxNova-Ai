@@ -226,6 +226,10 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth) {
+      setIsAuthLoading(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setIsAuthLoading(false);
@@ -254,6 +258,10 @@ export default function App() {
   };
 
   const handleLogin = async () => {
+    if (!auth || !googleProvider) {
+      setError("Firebase is not configured. Please add your Firebase environment variables to enable login.");
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
@@ -262,6 +270,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    if (!auth) return;
     try {
       await signOut(auth);
     } catch (err) {
