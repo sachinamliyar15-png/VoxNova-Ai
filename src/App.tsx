@@ -15,12 +15,21 @@ import {
   Sparkles,
   Languages,
   Key,
-  Share2
+  Share2,
+  TrendingUp,
+  Globe,
+  DollarSign,
+  LogOut,
+  User,
+  CreditCard,
+  Crown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
-import lamejs from 'lamejs';
 import { VOICES, Voice, Generation } from './types';
+import { AdSlot } from './components/AdSlot';
+import { auth, googleProvider } from './firebase';
+import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 declare global {
   interface Window {
@@ -208,6 +217,85 @@ export default function App() {
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
   const [showShareToast, setShowShareToast] = useState(false);
+  const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setIsAuthLoading(false);
+      if (user) {
+        fetchUserProfile(user);
+      } else {
+        setUserProfile(null);
+        setHistory([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const fetchUserProfile = async (user: FirebaseUser) => {
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/user/profile', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setUserProfile(data);
+      fetchHistory(user);
+    } catch (err) {
+      console.error('Failed to fetch profile', err);
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      console.error('Login failed', err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Logout failed', err);
+    }
+  };
+
+  const purchaseCredits = async (plan: string, credits: number) => {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.getIdToken();
+      const res = await fetch('/api/user/purchase', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ plan, credits })
+      });
+      if (res.ok) {
+        fetchUserProfile(currentUser);
+        setIsPricingModalOpen(false);
+      }
+    } catch (err) {
+      console.error('Purchase failed', err);
+    }
+  };
+
+  const saveApiKey = (key: string) => {
+    localStorage.setItem('voxnova_api_key', key);
+    setUserApiKey(key);
+    setIsKeyModalOpen(false);
+    setError(null);
+  };
 
   const handleShare = async () => {
     const shareData = {
@@ -257,9 +345,14 @@ export default function App() {
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (user?: FirebaseUser) => {
+    const activeUser = user || currentUser;
+    if (!activeUser) return;
     try {
-      const res = await fetch('/api/history');
+      const token = await activeUser.getIdToken();
+      const res = await fetch('/api/history', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const data = await res.json();
       setHistory(data);
     } catch (err) {
@@ -270,7 +363,28 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
+    if (!currentUser) {
+      setError("Please login to generate voiceovers.");
+      return;
+    }
     if (!text.trim()) return;
+
+    // Calculate credit cost (1 credit per 10 characters)
+    const creditCost = Math.ceil(text.length / 10);
+    
+    // Check for premium voice restriction
+    if (selectedVoice.isPremium && (!userProfile || userProfile.plan === 'free')) {
+      setError(`The voice "${selectedVoice.name}" is a Premium feature. Please upgrade your plan to access high-quality cinematic voices.`);
+      setIsPricingModalOpen(true);
+      return;
+    }
+
+    if (userProfile && userProfile.credits < creditCost) {
+      setError(`Insufficient credits. You need ${creditCost} credits but only have ${userProfile.credits}.`);
+      setIsPricingModalOpen(true);
+      return;
+    }
+
     setIsGenerating(true);
     setError(null);
     
@@ -283,9 +397,9 @@ export default function App() {
 
       while (attempt < maxRetries) {
         try {
-          const apiKey = process.env.GEMINI_API_KEY;
+          const apiKey = userApiKey || process.env.GEMINI_API_KEY;
           if (!apiKey) {
-            throw new Error("Gemini API Key is not configured. Please check your environment.");
+            throw new Error("Gemini API Key is not configured. Please enter your API key by clicking the 'Key' icon.");
           }
 
           const ai = new GoogleGenAI({ apiKey });
@@ -510,7 +624,11 @@ export default function App() {
       let finalBlob: Blob;
       if (audioFormat === 'mp3') {
         // MP3 Encoding
-        const mp3Encoder = new (lamejs as any).Mp3Encoder(1, targetSampleRate, 128);
+        const _lamejs = (window as any).lamejs;
+        if (!_lamejs) {
+          throw new Error("MP3 encoder not loaded. Please refresh the page.");
+        }
+        const mp3Encoder = new _lamejs.Mp3Encoder(1, targetSampleRate, 128);
         const mp3Data: any[] = [];
         const sampleBlockSize = 1152;
         const pcmInt16 = new Int16Array(resampledPcm);
@@ -562,20 +680,37 @@ export default function App() {
         finalBase64 = "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY";
       }
 
-      await fetch('/api/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          voice: selectedVoice.name,
-          style,
-          speed,
-          pitch,
-          audioData: finalBase64
-        }),
-      });
-      
-      fetchHistory();
+      // Save to history & Deduct Credits
+      try {
+        const token = await currentUser!.getIdToken();
+        const saveRes = await fetch('/api/save', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            text,
+            voice: selectedVoice.name,
+            style,
+            speed,
+            pitch,
+            audioData: finalBase64,
+            creditCost: Math.ceil(text.length / 10)
+          })
+        });
+        
+        if (!saveRes.ok) {
+          const errData = await saveRes.json();
+          throw new Error(errData.error || "Failed to save generation");
+        }
+        
+        fetchHistory();
+        fetchUserProfile(currentUser!);
+      } catch (saveErr: any) {
+        console.error("Failed to save to history:", saveErr);
+        setError(`Saved locally, but failed to sync: ${saveErr.message}`);
+      }
     } catch (err: any) {
       console.error('Generation failed', err);
       const errStr = err.message || JSON.stringify(err);
@@ -608,7 +743,9 @@ export default function App() {
       
       let finalBlob: Blob;
       if (audioFormat === 'mp3') {
-        const mp3Encoder = new (lamejs as any).Mp3Encoder(1, targetSampleRate, 128);
+        const _lamejs = (window as any).lamejs;
+        if (!_lamejs) throw new Error("MP3 encoder not loaded");
+        const mp3Encoder = new _lamejs.Mp3Encoder(1, targetSampleRate, 128);
         const mp3Data: any[] = [];
         const sampleBlockSize = 1152;
         const pcmInt16 = new Int16Array(resampledPcm);
@@ -660,7 +797,9 @@ export default function App() {
         
         let finalBlob: Blob;
         if (audioFormat === 'mp3') {
-          const mp3Encoder = new (lamejs as any).Mp3Encoder(1, targetSampleRate, 128);
+          const _lamejs = (window as any).lamejs;
+          if (!_lamejs) throw new Error("MP3 encoder not loaded");
+          const mp3Encoder = new _lamejs.Mp3Encoder(1, targetSampleRate, 128);
           const mp3Data: any[] = [];
           const sampleBlockSize = 1152;
           const pcmInt16 = new Int16Array(resampledPcm);
@@ -748,9 +887,73 @@ export default function App() {
             <Share2 size={20} />
             Share App
           </button>
+          <button 
+            onClick={() => setIsKeyModalOpen(true)}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${userApiKey ? 'text-emerald-400' : 'text-zinc-400'} hover:text-white hover:bg-white/5`}
+          >
+            <Key size={20} />
+            API Settings
+          </button>
+          <button 
+            onClick={() => setIsPricingModalOpen(true)}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-yellow-400 hover:text-white hover:bg-yellow-500/10 transition-all border border-yellow-500/20"
+          >
+            <Crown size={20} />
+            Premium Plans
+          </button>
+          <button 
+            onClick={() => setIsDeployModalOpen(true)}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-400 hover:text-white hover:bg-emerald-500/10 transition-all border border-emerald-500/20"
+          >
+            <TrendingUp size={20} />
+            Earn & Deploy
+          </button>
         </nav>
 
+        <div className="mt-4">
+          <AdSlot id="sidebar-ad" className="h-32" label="Sponsor" />
+        </div>
+
         <div className="mt-auto p-4 glass-panel rounded-2xl">
+          {currentUser ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <img src={currentUser.photoURL || ''} alt="" className="w-10 h-10 rounded-full border border-white/10" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold truncate">{currentUser.displayName}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+                    {userProfile?.plan || 'Free'} Plan
+                  </p>
+                </div>
+                <button onClick={handleLogout} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
+                  <LogOut size={18} />
+                </button>
+              </div>
+              <div className="pt-3 border-t border-white/5">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold">Credits</span>
+                  <span className="text-xs font-mono text-emerald-400">{userProfile?.credits?.toLocaleString() || 0}</span>
+                </div>
+                <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 transition-all duration-500" 
+                    style={{ width: `${Math.min(100, ((userProfile?.credits || 0) / 20000) * 100)}%` }} 
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button 
+              onClick={handleLogin}
+              className="w-full flex items-center justify-center gap-2 bg-white text-black font-bold py-3 rounded-xl hover:bg-zinc-200 transition-all"
+            >
+              <User size={18} />
+              Login with Google
+            </button>
+          )}
+        </div>
+
+        <div className="mt-4 p-4 glass-panel rounded-2xl">
           <p className="text-xs text-zinc-500 mb-2">Current Voice</p>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold">
@@ -776,6 +979,233 @@ export default function App() {
             <Check size={18} />
             Link copied to clipboard! (लिंक कॉपी हो गया है!)
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* API Key Modal */}
+      <AnimatePresence>
+        {isKeyModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 space-y-6 shadow-2xl"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-display font-bold">API Settings</h3>
+                <button onClick={() => setIsKeyModalOpen(false)} className="text-zinc-500 hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Enter your Gemini API key to bypass shared limits. Your key is stored locally in your browser.
+                </p>
+                
+                <div className="space-y-2">
+                  <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Gemini API Key</label>
+                  <div className="relative">
+                    <input 
+                      type="password"
+                      value={userApiKey}
+                      onChange={(e) => setUserApiKey(e.target.value)}
+                      placeholder="Paste your API key here..."
+                      className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                    />
+                    <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-700" size={16} />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => saveApiKey(userApiKey)}
+                    className="flex-1 bg-white text-black font-bold py-3 rounded-xl hover:bg-zinc-200 transition-all"
+                  >
+                    Save Key
+                  </button>
+                  <button 
+                    onClick={() => {
+                      localStorage.removeItem('voxnova_api_key');
+                      setUserApiKey('');
+                      setIsKeyModalOpen(false);
+                    }}
+                    className="px-4 py-3 border border-white/10 rounded-xl text-zinc-500 hover:text-white transition-all"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-zinc-600 text-center">
+                  Don't have a key? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline">Get one for free here</a>
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Pricing Modal */}
+      <AnimatePresence>
+        {isPricingModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center">
+                <div className="space-y-1">
+                  <h3 className="text-3xl font-display font-bold">Premium Plans</h3>
+                  <p className="text-zinc-500">Choose the plan that fits your creative needs.</p>
+                </div>
+                <button onClick={() => setIsPricingModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Free Plan */}
+                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-bold">Free</h4>
+                    <div className="text-3xl font-display font-bold">₹0<span className="text-sm text-zinc-500">/mo</span></div>
+                  </div>
+                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 20,000 Credits/mo</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Standard Voices</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Monthly Reset</li>
+                  </ul>
+                  <button disabled className="w-full py-3 rounded-xl bg-zinc-800 text-zinc-500 font-bold text-sm">Current Plan</button>
+                </div>
+
+                {/* Basic Plan */}
+                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-bold">Basic</h4>
+                    <div className="text-3xl font-display font-bold">₹100</div>
+                  </div>
+                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 10,000 Credits</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> No Expiry</li>
+                  </ul>
+                  <button onClick={() => purchaseCredits('basic', 10000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
+                </div>
+
+                {/* Pro Plan */}
+                <div className="p-6 bg-emerald-500/10 rounded-3xl border border-emerald-500/20 space-y-6 flex flex-col relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-emerald-500 text-black text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest">Best Value</div>
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-bold">Pro</h4>
+                    <div className="text-3xl font-display font-bold">₹200</div>
+                  </div>
+                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 25,000 Credits</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
+                  </ul>
+                  <button onClick={() => purchaseCredits('pro', 25000)} className="w-full py-3 rounded-xl bg-emerald-500 text-black font-bold text-sm hover:bg-emerald-400 transition-all">Buy Now</button>
+                </div>
+
+                {/* Ultra Plan */}
+                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-bold">Ultra</h4>
+                    <div className="text-3xl font-display font-bold">₹500</div>
+                  </div>
+                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 75,000 Credits</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Custom Voice Profiles</li>
+                  </ul>
+                  <button onClick={() => purchaseCredits('ultra', 75000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
+                </div>
+              </div>
+
+              <div className="p-6 bg-white/5 rounded-3xl text-center">
+                <p className="text-xs text-zinc-500">
+                  * 1 Credit = ~10 characters of text. Credits are deducted only on successful generation.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Deployment & Monetization Modal */}
+      <AnimatePresence>
+        {isDeployModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400">
+                    <TrendingUp size={24} />
+                  </div>
+                  <h3 className="text-2xl font-display font-bold">Earn & Deploy Guide</h3>
+                </div>
+                <button onClick={() => setIsDeployModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-white/5">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold uppercase text-[10px] tracking-widest">
+                    <Globe size={14} /> Step 1: Go Public
+                  </div>
+                  <h4 className="text-lg font-bold">Free Deployment</h4>
+                  <p className="text-sm text-zinc-400 leading-relaxed">
+                    Use <b>Cloud Run</b> for the best experience. Since this app has a server, static hosts like GitHub Pages won't work.
+                  </p>
+                  <ul className="text-xs text-zinc-500 space-y-2 list-disc pl-4">
+                    <li>Click <b>Deploy</b> in AI Studio menu.</li>
+                    <li>Or use <b>Render.com</b> (Free tier).</li>
+                    <li>Connect your GitHub repo to Render.</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-white/5">
+                  <div className="flex items-center gap-2 text-yellow-400 font-bold uppercase text-[10px] tracking-widest">
+                    <DollarSign size={14} /> Step 2: Monetize
+                  </div>
+                  <h4 className="text-lg font-bold">Start Earning</h4>
+                  <p className="text-sm text-zinc-400 leading-relaxed">
+                    I have already added <b>AdSense Slots</b> to your app. Once you have a domain, apply for AdSense.
+                  </p>
+                  <ul className="text-xs text-zinc-500 space-y-2 list-disc pl-4">
+                    <li>Add your AdSense code to the slots.</li>
+                    <li>Offer "Premium" voices for paid users.</li>
+                    <li>Sell API access to other developers.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-3">
+                <h4 className="font-bold text-emerald-400 flex items-center gap-2">
+                  <Sparkles size={16} /> Pro Tip for Income
+                </h4>
+                <p className="text-sm text-zinc-300">
+                  Create a YouTube channel or Instagram page showing how to use this tool for Hindi/English voiceovers. Put your website link in the bio to drive traffic and increase ad revenue!
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setIsDeployModalOpen(false)}
+                className="w-full bg-white text-black font-bold py-4 rounded-2xl hover:bg-zinc-200 transition-all shadow-xl shadow-white/5"
+              >
+                Got it, let's build!
+              </button>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -892,7 +1322,9 @@ export default function App() {
                       className="w-full bg-transparent text-sm focus:outline-none cursor-pointer"
                     >
                       {VOICES.map(v => (
-                        <option key={v.id} value={v.id} className="bg-zinc-900">{v.name} ({v.gender})</option>
+                        <option key={v.id} value={v.id} className="bg-zinc-900">
+                          {v.name} ({v.gender}) {v.isPremium ? '💎' : ''}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1062,6 +1494,8 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                <AdSlot id="main-content-ad" className="mt-8" />
 
                 {currentAudio && (
                   <audio 

@@ -4,6 +4,7 @@ export interface Voice {
   gender: 'male' | 'female';
   previewUrl?: string;
   description: string;
+  isPremium?: boolean;
 }
 
 export const VOICES: Voice[] = [
@@ -14,20 +15,20 @@ export const VOICES: Voice[] = [
   { id: 'liam', name: 'Liam', gender: 'male', description: 'Warm, empathetic, storytelling' },
   { id: 'michael', name: 'Michael', gender: 'male', description: 'Mature, wise, sophisticated' },
   { id: 'ryan', name: 'Ryan', gender: 'male', description: 'Casual, conversational, upbeat' },
-  { id: 'matthew', name: 'Matthew', gender: 'male', description: 'Deep, cinematic, dramatic' },
-  { id: 'bill', name: 'Bill', gender: 'male', description: 'Gravelly, experienced, rugged' },
-  { id: 'callum', name: 'Callum', gender: 'male', description: 'British accent, refined, polite' },
-  { id: 'frank', name: 'Frank', gender: 'male', description: 'Classic narrator, trustworthy' },
-  { id: 'marcus', name: 'Marcus', gender: 'male', description: 'Strong, motivational, powerful' },
+  { id: 'matthew', name: 'Matthew', gender: 'male', description: 'Deep, cinematic, dramatic', isPremium: true },
+  { id: 'bill', name: 'Bill', gender: 'male', description: 'Gravelly, experienced, rugged', isPremium: true },
+  { id: 'callum', name: 'Callum', gender: 'male', description: 'British accent, refined, polite', isPremium: true },
+  { id: 'frank', name: 'Frank', gender: 'male', description: 'Classic narrator, trustworthy', isPremium: true },
+  { id: 'marcus', name: 'Marcus', gender: 'male', description: 'Strong, motivational, powerful', isPremium: true },
   { id: 'jessica', name: 'Jessica', gender: 'female', description: 'Clear, bright, professional' },
   { id: 'sarah', name: 'Sarah', gender: 'female', description: 'Soft, soothing, gentle' },
   { id: 'matilda', name: 'Matilda', gender: 'female', description: 'Intelligent, articulate, formal' },
   { id: 'emily', name: 'Emily', gender: 'female', description: 'Youthful, cheerful, friendly' },
-  { id: 'bella', name: 'Bella', gender: 'female', description: 'Expressive, emotional, dramatic' },
-  { id: 'rachel', name: 'Rachel', gender: 'female', description: 'Confident, modern, sleek' },
-  { id: 'nicole', name: 'Nicole', gender: 'female', description: 'Warm, maternal, comforting' },
-  { id: 'clara', name: 'Clara', gender: 'female', description: 'Elegant, sophisticated, smooth' },
-  { id: 'doc-pro', name: 'Documentary Pro', gender: 'male', description: 'Deep, cinematic, professional documentary narration' },
+  { id: 'bella', name: 'Bella', gender: 'female', description: 'Expressive, emotional, dramatic', isPremium: true },
+  { id: 'rachel', name: 'Rachel', gender: 'female', description: 'Confident, modern, sleek', isPremium: true },
+  { id: 'nicole', name: 'Nicole', gender: 'female', description: 'Warm, maternal, comforting', isPremium: true },
+  { id: 'clara', name: 'Clara', gender: 'female', description: 'Elegant, sophisticated, smooth', isPremium: true },
+  { id: 'doc-pro', name: 'Documentary Pro', gender: 'male', description: 'Deep, cinematic, professional documentary narration', isPremium: true },
 ];
 
 export interface Generation {
