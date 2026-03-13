@@ -279,23 +279,74 @@ export default function App() {
   };
 
   const purchaseCredits = async (plan: string, credits: number) => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      handleLogin();
+      return;
+    }
+    
     try {
       const token = await currentUser.getIdToken();
-      const res = await fetch('/api/user/purchase', {
+      
+      // 1. Create Order on Server
+      const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ plan, credits })
+        body: JSON.stringify({ plan })
       });
-      if (res.ok) {
-        fetchUserProfile(currentUser);
-        setIsPricingModalOpen(false);
-      }
-    } catch (err) {
+      
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.error || "Order creation failed");
+
+      // 2. Open Razorpay Checkout
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "VoxNova AI",
+        description: `Purchase ${credits.toLocaleString()} Credits`,
+        order_id: orderData.id,
+        handler: async (response: any) => {
+          // 3. Verify Payment on Server
+          const verifyRes = await fetch('/api/payments/verify', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan
+            })
+          });
+
+          if (verifyRes.ok) {
+            fetchUserProfile(currentUser);
+            setIsPricingModalOpen(false);
+            alert("Payment Successful! Credits added to your account.");
+          } else {
+            alert("Payment verification failed. Please contact support.");
+          }
+        },
+        prefill: {
+          name: currentUser.displayName,
+          email: currentUser.email,
+        },
+        theme: {
+          color: "#10b981",
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+      
+    } catch (err: any) {
       console.error('Purchase failed', err);
+      alert(`Payment failed: ${err.message}`);
     }
   };
 
@@ -1134,8 +1185,26 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="p-6 bg-white/5 rounded-3xl text-center">
-                <p className="text-xs text-zinc-500">
+              <div className="p-6 bg-white/5 rounded-3xl text-center space-y-4">
+                <p className="text-xs text-zinc-400 font-medium uppercase tracking-widest">Secure Payments via Razorpay</p>
+                <div className="flex flex-wrap justify-center items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                  <div className="flex flex-col items-center gap-1">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b2/Google_Pay_Logo.svg" alt="Google Pay" className="h-6" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_standalone.svg" alt="Paytm" className="h-4" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon Pay" className="h-5" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-6" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo.png" alt="UPI" className="h-6" referrerPolicy="no-referrer" />
+                  </div>
+                </div>
+                <p className="text-[10px] text-zinc-600">
                   * 1 Credit = ~10 characters of text. Credits are deducted only on successful generation.
                 </p>
               </div>

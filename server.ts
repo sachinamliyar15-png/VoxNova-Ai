@@ -7,8 +7,16 @@ import fs from "fs";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
 import cookieParser from "cookie-parser";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 
 dotenv.config();
+
+// Initialize Razorpay
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || '',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
+});
 
 // Initialize Firebase Admin
 if (process.env.FIREBASE_PROJECT_ID) {
@@ -116,17 +124,62 @@ app.get("/api/user/profile", authenticate, (req: any, res) => {
   res.json(user);
 });
 
-// Purchase Credits (Mock)
-app.post("/api/user/purchase", authenticate, (req: any, res) => {
-  const { plan, credits } = req.body;
-  const userId = req.user.uid;
+// Razorpay: Create Order
+app.post("/api/payments/create-order", authenticate, async (req: any, res) => {
+  const { plan } = req.body;
+  
+  const planPrices: Record<string, number> = {
+    'basic': 100,
+    'pro': 200,
+    'ultra': 500
+  };
+
+  const amount = planPrices[plan];
+  if (!amount) return res.status(400).json({ error: "Invalid plan" });
 
   try {
-    db.prepare("UPDATE users SET plan = ?, credits = credits + ? WHERE id = ?")
-      .run(plan, credits, userId);
-    res.json({ success: true });
+    const options = {
+      amount: amount * 100, // amount in the smallest currency unit (paise)
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+    res.json(order);
   } catch (error: any) {
+    console.error("Razorpay order error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Razorpay: Verify Payment
+app.post("/api/payments/verify", authenticate, async (req: any, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
+  const userId = req.user.uid;
+
+  const body = razorpay_order_id + "|" + razorpay_payment_id;
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || '')
+    .update(body.toString())
+    .digest("hex");
+
+  if (expectedSignature === razorpay_signature) {
+    // Payment is valid
+    const planCredits: Record<string, number> = {
+      'basic': 10000,
+      'pro': 25000,
+      'ultra': 75000
+    };
+
+    try {
+      db.prepare("UPDATE users SET plan = ?, credits = credits + ? WHERE id = ?")
+        .run(plan, planCredits[plan], userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Database update failed" });
+    }
+  } else {
+    res.status(400).json({ error: "Invalid signature" });
   }
 });
 
