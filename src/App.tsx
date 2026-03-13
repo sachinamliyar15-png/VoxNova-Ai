@@ -22,13 +22,20 @@ import {
   LogOut,
   User,
   CreditCard,
-  Crown
+  Crown,
+  Upload,
+  Languages as LangIcon,
+  RefreshCw,
+  Pause,
+  Music,
+  Search,
+  Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { VOICES, Voice, Generation } from './types';
-import { AdSlot } from './components/AdSlot';
-import { auth, googleProvider } from './firebase';
+
+import { auth, googleProvider, analytics, logEvent } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 declare global {
@@ -215,7 +222,7 @@ export default function App() {
     };
   }, [currentAudio]);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'dubbing' | 'voice-changer'>('generate');
   const [showShareToast, setShowShareToast] = useState(false);
   const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -224,6 +231,82 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
+  const isWhitelisted = (email: string | null | undefined) => email ? WHITELISTED_EMAILS.includes(email) : false;
+
+  // Dubbing & Conversion States
+  const [isDubbing, setIsDubbing] = useState(false);
+  const [dubbingFile, setDubbingFile] = useState<File | null>(null);
+  const [targetLanguage, setTargetLanguage] = useState('hi');
+  const [dubbingMode, setDubbingMode] = useState<'convert' | 'dub'>('convert');
+  const [dubbingResult, setDubbingResult] = useState<{ text: string, audioUrl: string } | null>(null);
+  const [voiceSearchTerm, setVoiceSearchTerm] = useState('');
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+
+  const handlePreviewVoice = async (voice: Voice) => {
+    if (previewingVoiceId) return;
+    
+    setPreviewingVoiceId(voice.id);
+    try {
+      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key not configured");
+
+      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+      const activeKey = keys[Math.floor(Math.random() * keys.length)];
+      const ai = new GoogleGenAI({ apiKey: activeKey });
+
+      const voiceMapping: Record<string, string> = {
+        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir'
+      };
+
+      const targetVoice = voiceMapping[voice.name] || 'Puck';
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: `Hello! I am ${voice.name}. I can speak in many languages.` }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+            },
+          },
+        },
+      });
+
+      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64Audio) {
+        const pcmBuffer = base64ToArrayBuffer(base64Audio);
+        const resampledPcm = resamplePCM(pcmBuffer, 24000, 44100);
+        const wavHeader = createWavHeader(resampledPcm, 44100);
+        const combinedBuffer = new Uint8Array(wavHeader.byteLength + resampledPcm.byteLength);
+        combinedBuffer.set(new Uint8Array(wavHeader), 0);
+        combinedBuffer.set(new Uint8Array(resampledPcm), wavHeader.byteLength);
+        const blob = new Blob([combinedBuffer], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => {
+          setPreviewingVoiceId(null);
+          URL.revokeObjectURL(url);
+        };
+        audio.play();
+      } else {
+        setPreviewingVoiceId(null);
+      }
+    } catch (error) {
+      console.error("Preview failed:", error);
+      setPreviewingVoiceId(null);
+    }
+  };
 
   useEffect(() => {
     if (!auth) {
@@ -263,7 +346,13 @@ export default function App() {
       return;
     }
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (analytics) {
+        logEvent(analytics, 'login', {
+          method: 'Google',
+          user_id: result.user.uid
+        });
+      }
     } catch (err) {
       console.error('Login failed', err);
     }
@@ -424,22 +513,30 @@ export default function App() {
 
   const handleGenerate = async () => {
     if (!currentUser) {
-      setError("Please login to generate voiceovers.");
+      handleLogin();
       return;
     }
     if (!text.trim()) return;
+
+    if (analytics) {
+      logEvent(analytics, 'generate_voice_start', {
+        voice_name: selectedVoice.name,
+        text_length: text.length,
+        language: language
+      });
+    }
 
     // Calculate credit cost (1 credit per 10 characters)
     const creditCost = Math.ceil(text.length / 10);
     
     // Check for premium voice restriction
-    if (selectedVoice.isPremium && (!userProfile || userProfile.plan === 'free')) {
+    if (selectedVoice.isPremium && (!userProfile || userProfile.plan === 'free') && !isWhitelisted(currentUser.email)) {
       setError(`The voice "${selectedVoice.name}" is a Premium feature. Please upgrade your plan to access high-quality cinematic voices.`);
       setIsPricingModalOpen(true);
       return;
     }
 
-    if (userProfile && userProfile.credits < creditCost) {
+    if (userProfile && userProfile.credits < creditCost && !isWhitelisted(currentUser.email)) {
       setError(`Insufficient credits. You need ${creditCost} credits but only have ${userProfile.credits}.`);
       setIsPricingModalOpen(true);
       return;
@@ -457,37 +554,41 @@ export default function App() {
 
       while (attempt < maxRetries) {
         try {
-          const apiKey = userApiKey || process.env.GEMINI_API_KEY;
-          if (!apiKey) {
+          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+          if (!baseKey) {
             throw new Error("Gemini API Key is not configured. Please enter your API key by clicking the 'Key' icon.");
           }
+
+          // Load Balancing: Support multiple keys separated by commas
+          const keys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+          const apiKey = keys[Math.floor(Math.random() * keys.length)];
 
           const ai = new GoogleGenAI({ apiKey });
           
           const voiceMapping: Record<string, string> = {
             'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
             'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-            'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Charon', 'Marcus': 'Fenrir',
+            'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
             'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
             'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-            'Documentary Pro': 'Charon'
+            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir'
           };
 
           const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
           
-          let promptPrefix = `You are a world-class professional voice actor. Your task is to provide a highly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
+          let promptPrefix = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
           
           PERFORMANCE GUIDELINES:
-          - Use natural human prosody, intonation, and rhythm.
-          - Incorporate subtle, natural breathing where appropriate.
-          - Avoid a robotic, monotone, or repetitive cadence.
-          - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation and natural flow.
-          - Sound like a real person speaking in a professional studio, not a computer.
+          - Use natural human prosody, complex intonation, and realistic rhythm.
+          - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
+          - Avoid any robotic, monotone, or repetitive cadence.
+          - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
+          - Sound like a real person speaking in a high-end professional studio, not a computer.
           
           TECHNICAL STANDARDS:
           - NO background noise, hums, or digital artifacts.
-          - NO robotic glitches or metallic sounds.
-          - Ensure crystal-clear, studio-quality audio.
+          - NO robotic glitches, metallic sounds, or synthetic "buzzing".
+          - Ensure crystal-clear, 48kHz studio-quality audio.
           `;
           
           if (studioClarity) {
@@ -495,26 +596,26 @@ export default function App() {
           }
           
           const voiceTraits: Record<string, string> = {
-            'Adam': 'Deep, resonant, and authoritative. A voice of power and experience.',
-            'Brian': 'Calm, steady, and trustworthy. Perfect for corporate or educational content.',
-            'Daniel': 'Clear, news-like, and highly articulate. A professional broadcast voice.',
-            'Josh': 'Young, energetic, and friendly. A modern, youthful conversational tone.',
-            'Liam': 'Warm, empathetic, and gentle. A voice that feels like a close friend.',
-            'Michael': 'Mature, wise, and sophisticated. A voice of gravitas and intelligence.',
-            'Ryan': 'Casual, upbeat, and conversational. Natural and relatable.',
-            'Matthew': 'Deep, cinematic, and dramatic. A voice built for movie trailers.',
-            'Bill': 'Gravelly, experienced, and rugged. A voice with character and grit.',
-            'Callum': 'Refined, polite, and sophisticated with a clear professional tone.',
-            'Frank': 'Classic narrator style. Trustworthy, balanced, and clear.',
-            'Marcus': 'Strong, motivational, and powerful. Inspiring and commanding.',
-            'Jessica': 'Clear, bright, and professional. A modern corporate voice.',
-            'Sarah': 'Soft, soothing, and gentle. Perfect for meditation or calm stories.',
-            'Matilda': 'Intelligent, articulate, and formal. A voice of precision.',
-            'Emily': 'Youthful, cheerful, and friendly. High energy and approachable.',
-            'Bella': 'Expressive, emotional, and dramatic. Full of feeling.',
-            'Rachel': 'Confident, modern, and sleek. A voice for the digital age.',
-            'Nicole': 'Warm, maternal, and comforting. A voice of care.',
-            'Clara': 'Elegant, sophisticated, and smooth. A voice of luxury.',
+            'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice.',
+            'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality.',
+            'Daniel': 'Clear, news-like, and highly articulate. Broadcast standard.',
+            'Josh': 'Young, energetic, and friendly. Natural conversational tone.',
+            'Liam': 'Warm, empathetic, and gentle. Realistic and human-like.',
+            'Michael': 'Mature, wise, and sophisticated. Professional narration.',
+            'Ryan': 'Casual, upbeat, and conversational. Relatable and authentic.',
+            'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality.',
+            'Bill': 'Gravelly, experienced, and rugged. Character-rich performance.',
+            'Callum': 'Refined, polite, and sophisticated. Elite professional tone.',
+            'Frank': 'Natural, balanced, and clear. Perfect for long-form narration.',
+            'Marcus': 'Strong, motivational, and powerful. Commanding and inspiring.',
+            'Jessica': 'Clear, bright, and professional. Modern corporate standard.',
+            'Sarah': 'Soft, soothing, and gentle. Ethereal and calm.',
+            'Matilda': 'Intelligent, articulate, and formal. Academic precision.',
+            'Emily': 'Youthful, cheerful, and friendly. High-energy realism.',
+            'Bella': 'Elegant, smooth, and professional. Premium quality.',
+            'Rachel': 'Dynamic, expressive, and clear. Versatile performance.',
+            'Nicole': 'Direct, confident, and professional. Business standard.',
+            'Clara': 'Kind, helpful, and natural. Approachable realism.',
             'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, and cinematic.'
           };
 
@@ -723,22 +824,16 @@ export default function App() {
         }
       }, 100);
 
-      // 4. Save to History (Backend) - Store the first chunk or a combined version if not too large
-      // For history, we'll store the combined base64 if it's under a reasonable limit
-      let finalBase64 = "";
-      if (totalPcmLength < 5 * 1024 * 1024) { // 5MB limit for history storage
-        // Avoid spread operator to prevent "Maximum call stack size exceeded"
-        let binary = '';
-        const bytes = new Uint8Array(mergedPcm.buffer);
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        finalBase64 = window.btoa(binary);
-      } else {
-        // If too large, just store the first chunk's base64 as a placeholder or a message
-        finalBase64 = "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY";
-      }
+      // 4. Save to History (Backend)
+      // Convert the final blob to base64 for history storage
+      const reader = new FileReader();
+      const finalBase64 = await new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          resolve(base64String.split(',')[1]);
+        };
+        reader.readAsDataURL(finalBlob);
+      });
 
       // Save to history & Deduct Credits
       try {
@@ -764,6 +859,13 @@ export default function App() {
           const errData = await saveRes.json();
           throw new Error(errData.error || "Failed to save generation");
         }
+
+        if (analytics) {
+          logEvent(analytics, 'generate_voice_success', {
+            voice_name: selectedVoice.name,
+            language: language
+          });
+        }
         
         fetchHistory();
         fetchUserProfile(currentUser!);
@@ -775,29 +877,219 @@ export default function App() {
       console.error('Generation failed', err);
       const errStr = err.message || JSON.stringify(err);
       if (errStr.includes("API key not valid")) {
-        setError("Invalid API Key (गलत API Key): Please select a valid key using the 'Update API Key' button. (कृपया 'Update API Key' बटन का उपयोग करके एक सही की चुनें।)");
+        setError("Invalid API Key: Please check your API key settings.");
         setHasApiKey(false);
       } else if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota")) {
-        setError("Quota Exceeded (कोटा खत्म हो गया है): Gemini API limit reached. I am retrying with longer delays. To fix this immediately, please use a paid API key by clicking the 'Key' icon at the top right. (Gemini API की लिमिट खत्म हो गई है। मैं फिर से कोशिश कर रहा हूँ, लेकिन इसे तुरंत ठीक करने के लिए कृपया अपना खुद का API Key इस्तेमाल करें।)");
+        setError("Currently, our servers are busy. Please try again after some time.");
       } else if (errStr.includes("500") || errStr.includes("INTERNAL")) {
-        setError("AI Server Error (सर्वर त्रुटि): The AI model encountered a temporary error. Retrying... (AI मॉडल में तकनीकी खराबी आई है, हम फिर se कोशिश कर रहे हैं।)");
+        setError("Currently, our servers are busy. Please try again after some time.");
       } else if (errStr.includes("Rpc failed") || errStr.includes("xhr error")) {
-        setError("Network Error (नेटवर्क समस्या): Please check your internet connection. (कृपया अपना इंटरनेट कनेक्शन चेक करें और फिर से कोशिश करें।)");
+        setError("Network Error: Please check your internet connection.");
       } else {
-        setError(err.message || "An unexpected error occurred (एक अनपेक्षित त्रुटि हुई है।)");
+        setError("Currently, our servers are busy. Please try again after some time.");
       }
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const playFromHistory = (audioData: string) => {
+  const [dubbingStep, setDubbingStep] = useState<string>('');
+  const [dubbingProgress, setDubbingProgress] = useState(0);
+
+  const handleDubbing = async () => {
+    if (!dubbingFile) {
+      setError("Please upload an audio file first.");
+      return;
+    }
+
+    if (dubbingFile.size > 20 * 1024 * 1024) {
+      setError("File size too large. Please upload a file smaller than 20MB.");
+      return;
+    }
+
+    if (!currentUser) {
+      setError("Please login to use this feature.");
+      return;
+    }
+
+    const dubbingCost = 5;
+    if (userProfile && userProfile.credits < dubbingCost && !isWhitelisted(currentUser.email)) {
+      setError(`Insufficient credits. You need ${dubbingCost} credits for dubbing/conversion.`);
+      setIsPricingModalOpen(true);
+      return;
+    }
+
+    if (analytics) {
+      logEvent(analytics, dubbingMode === 'dub' ? 'dubbing_start' : 'voice_changer_start', {
+        target_language: targetLanguage,
+        voice_name: selectedVoice.name
+      });
+    }
+
+    setIsDubbing(true);
+    setError(null);
+    setDubbingResult(null);
+    setDubbingProgress(5);
+    setDubbingStep("Reading file...");
+
     try {
+      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key not configured. Please add your key in API Settings.");
+
+      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+      const activeKey = keys[Math.floor(Math.random() * keys.length)];
+      const ai = new GoogleGenAI({ apiKey: activeKey });
+
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.readAsDataURL(dubbingFile);
+      });
+      const fileBase64 = await base64Promise;
+
+      setDubbingProgress(20);
+      setDubbingStep(dubbingMode === 'dub' ? "Transcribing & Translating..." : "Transcribing audio...");
+
+      const langMap: Record<string, string> = {
+        'hi': 'Hindi', 'bn': 'Bengali', 'mr': 'Marathi', 'te': 'Telugu', 
+        'ta': 'Tamil', 'gu': 'Gujarati', 'kn': 'Kannada', 'en': 'English',
+        'es': 'Spanish', 'fr': 'French', 'de': 'German', 'ja': 'Japanese',
+        'ko': 'Korean', 'zh': 'Chinese'
+      };
+
+      const targetLangName = langMap[targetLanguage] || 'English';
+
+      const prompt = dubbingMode === 'dub' 
+        ? `You are an expert translator. Transcribe the attached audio and translate it into ${targetLangName}. 
+           Maintain the original tone, emotion, and context. 
+           Return ONLY the translated text. Do not include any notes, explanations, or labels like "Translation:".`
+        : `Transcribe the attached audio exactly as it is spoken. 
+           Return ONLY the transcribed text. Do not include any notes, explanations, or speaker labels.`;
+
+      console.log("Starting transcription with model: gemini-3-flash-preview");
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{
+          parts: [
+            { inlineData: { data: fileBase64, mimeType: dubbingFile.type } },
+            { text: prompt }
+          ]
+        }]
+      });
+
+      const processedText = result.text;
+      console.log("Transcription result:", processedText);
+      
+      if (!processedText || processedText.trim().length === 0) {
+        throw new Error("The AI could not hear any speech in the audio. Please try a clearer recording.");
+      }
+
+      setDubbingProgress(60);
+      setDubbingStep("Generating new voice...");
+
+      const voiceMapping: Record<string, string> = {
+        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir'
+      };
+
+      const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
+      
+      console.log(`Generating TTS with voice: ${targetVoice}`);
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: processedText }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+            },
+          },
+        },
+      });
+
+      const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!base64Audio) throw new Error("Voice generation failed. The text might be too complex or the service is temporarily unavailable.");
+
+      setDubbingProgress(90);
+      setDubbingStep("Finalizing audio...");
+
+      const pcmBuffer = base64ToArrayBuffer(base64Audio);
+      const resampledPcm = resamplePCM(pcmBuffer, 24000, targetSampleRate);
+      
+      const wavHeader = createWavHeader(resampledPcm, targetSampleRate);
+      const combinedBuffer = new Uint8Array(wavHeader.byteLength + resampledPcm.byteLength);
+      combinedBuffer.set(new Uint8Array(wavHeader), 0);
+      combinedBuffer.set(new Uint8Array(resampledPcm), wavHeader.byteLength);
+      const finalBlob = new Blob([combinedBuffer], { type: 'audio/wav' });
+
+      const audioUrl = URL.createObjectURL(finalBlob);
+      setDubbingResult({ text: processedText, audioUrl });
+      setDubbingProgress(100);
+      setDubbingStep("Complete!");
+
+      if (analytics) {
+        logEvent(analytics, dubbingMode === 'dub' ? 'dubbing_success' : 'voice_changer_success', {
+          target_language: targetLanguage,
+          voice_name: selectedVoice.name
+        });
+      }
+
+      // Save to history
+      try {
+        const token = await currentUser!.getIdToken();
+        await fetch('/api/save', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            text: processedText,
+            voice: selectedVoice.name,
+            style: dubbingMode === 'dub' ? 'dubbing' : 'voice-changer',
+            speed: 1.0,
+            audioData: base64Audio,
+            creditCost: 5 // Fixed cost for dubbing/conversion for now
+          })
+        });
+        fetchHistory();
+      } catch (e) {
+        console.warn("Failed to save dubbing to history", e);
+      }
+
+    } catch (err: any) {
+      console.error("Dubbing failed:", err);
+      const msg = err.message || "An unexpected error occurred during processing.";
+      setError(`Processing failed: ${msg}`);
+    } finally {
+      setIsDubbing(false);
+    }
+  };
+
+  const playFromHistory = (audioData: string, id: number) => {
+    try {
+      if (playingId === id) {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          setPlayingId(null);
+        }
+        return;
+      }
+
       if (!audioData) throw new Error("No audio data available");
       if (audioData === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
         setError("This audio was too large to be stored in history. Please generate it again.");
         return;
       }
+
       const pcmBuffer = base64ToArrayBuffer(audioData);
       const resampledPcm = resamplePCM(pcmBuffer, 24000, targetSampleRate);
       
@@ -827,16 +1119,23 @@ export default function App() {
       
       const audioUrl = URL.createObjectURL(finalBlob);
       const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      setPlayingId(id);
+
+      audio.onended = () => {
+        setPlayingId(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+
       audio.play().catch(e => {
         console.error("History playback failed:", e);
         setError("Playback failed. Your browser might be blocking auto-play or the audio format is unsupported.");
+        setPlayingId(null);
       });
-      
-      // Cleanup URL after some time
-      setTimeout(() => URL.revokeObjectURL(audioUrl), 60000);
     } catch (err: any) {
       console.error("Error playing from history:", err);
       setError("Failed to process audio for playback.");
+      setPlayingId(null);
     }
   };
 
@@ -908,10 +1207,36 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a] text-zinc-100">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#0f1115] text-zinc-100 relative overflow-hidden">
+      {/* Mobile Header */}
+      <header className="md:hidden flex items-center justify-between p-4 border-b border-white/10 bg-[#0f1115] z-50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+            <Mic className="text-black w-5 h-5" />
+          </div>
+          <h1 className="text-lg font-display font-bold tracking-tight">VoxNova</h1>
+        </div>
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 text-zinc-400 hover:text-white"
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </header>
+
+      {/* Background Mesh Gradient for Professional Look */}
+      <div className="fixed inset-0 pointer-events-none opacity-20">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/20 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
+      </div>
+
       {/* Sidebar */}
-      <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-white/10 p-6 flex flex-col gap-8">
-        <div className="flex items-center gap-3">
+      <aside className={`
+        fixed inset-y-0 left-0 z-40 w-64 bg-[#0f1115] border-r border-white/10 p-6 flex flex-col gap-8 transition-transform duration-300 ease-in-out
+        md:relative md:translate-x-0
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="hidden md:flex items-center gap-3">
           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
             <Mic className="text-black w-6 h-6" />
           </div>
@@ -920,59 +1245,62 @@ export default function App() {
 
         <nav className="flex flex-col gap-2">
           <button 
-            onClick={() => setActiveTab('generate')}
+            onClick={() => { setActiveTab('generate'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'generate' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
           >
             <Sparkles size={20} />
             Generate
           </button>
           <button 
-            onClick={() => setActiveTab('history')}
+            onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'history' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
           >
             <History size={20} />
             History
           </button>
           <button 
-            onClick={() => setShowVoiceLibrary(true)}
+            onClick={() => { setActiveTab('dubbing'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+          >
+            <LangIcon size={20} />
+            AI Dubbing
+          </button>
+          <button 
+            onClick={() => { setActiveTab('voice-changer'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'voice-changer' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+          >
+            <RefreshCw size={20} />
+            Voice Changer
+          </button>
+          <button 
+            onClick={() => { setShowVoiceLibrary(true); setIsMobileMenuOpen(false); }}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
           >
             <Library size={20} />
             Voice Library
           </button>
           <button 
-            onClick={handleShare}
+            onClick={() => { handleShare(); setIsMobileMenuOpen(false); }}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
           >
             <Share2 size={20} />
             Share App
           </button>
           <button 
-            onClick={() => setIsKeyModalOpen(true)}
+            onClick={() => { setIsKeyModalOpen(true); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${userApiKey ? 'text-emerald-400' : 'text-zinc-400'} hover:text-white hover:bg-white/5`}
           >
             <Key size={20} />
             API Settings
           </button>
           <button 
-            onClick={() => setIsPricingModalOpen(true)}
+            onClick={() => { setIsPricingModalOpen(true); setIsMobileMenuOpen(false); }}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-yellow-400 hover:text-white hover:bg-yellow-500/10 transition-all border border-yellow-500/20"
           >
             <Crown size={20} />
             Premium Plans
           </button>
-          <button 
-            onClick={() => setIsDeployModalOpen(true)}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-400 hover:text-white hover:bg-emerald-500/10 transition-all border border-emerald-500/20"
-          >
-            <TrendingUp size={20} />
-            Earn & Deploy
-          </button>
         </nav>
-
-        <div className="mt-4">
-          <AdSlot id="sidebar-ad" className="h-32" label="Sponsor" />
-        </div>
 
         <div className="mt-auto p-4 glass-panel rounded-2xl">
           {currentUser ? (
@@ -982,7 +1310,7 @@ export default function App() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold truncate">{currentUser.displayName}</p>
                   <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
-                    {userProfile?.plan || 'Free'} Plan
+                    {isWhitelisted(currentUser.email) ? 'Owner' : (userProfile?.plan || 'Free')} Plan
                   </p>
                 </div>
                 <button onClick={handleLogout} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
@@ -992,12 +1320,14 @@ export default function App() {
               <div className="pt-3 border-t border-white/5">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] text-zinc-500 uppercase font-bold">Credits</span>
-                  <span className="text-xs font-mono text-emerald-400">{userProfile?.credits?.toLocaleString() || 0}</span>
+                  <span className="text-xs font-mono text-emerald-400">
+                    {isWhitelisted(currentUser.email) ? 'Unlimited' : (userProfile?.credits?.toLocaleString() || 0)}
+                  </span>
                 </div>
                 <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-emerald-500 transition-all duration-500" 
-                    style={{ width: `${Math.min(100, ((userProfile?.credits || 0) / 20000) * 100)}%` }} 
+                    style={{ width: isWhitelisted(currentUser.email) ? '100%' : `${Math.min(100, ((userProfile?.credits || 0) / 20000) * 100)}%` }} 
                   />
                 </div>
               </div>
@@ -1027,6 +1357,14 @@ export default function App() {
         </div>
       </aside>
 
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Share Toast */}
       <AnimatePresence>
         {showShareToast && (
@@ -1037,7 +1375,7 @@ export default function App() {
             className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-emerald-500 text-white rounded-full shadow-2xl flex items-center gap-2 font-medium"
           >
             <Check size={18} />
-            Link copied to clipboard! (लिंक कॉपी हो गया है!)
+            Link copied to clipboard!
           </motion.div>
         )}
       </AnimatePresence>
@@ -1213,80 +1551,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Deployment & Monetization Modal */}
-      <AnimatePresence>
-        {isDeployModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
-            >
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400">
-                    <TrendingUp size={24} />
-                  </div>
-                  <h3 className="text-2xl font-display font-bold">Earn & Deploy Guide</h3>
-                </div>
-                <button onClick={() => setIsDeployModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-                  <X size={24} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-white/5">
-                  <div className="flex items-center gap-2 text-emerald-400 font-bold uppercase text-[10px] tracking-widest">
-                    <Globe size={14} /> Step 1: Go Public
-                  </div>
-                  <h4 className="text-lg font-bold">Free Deployment</h4>
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    Use <b>Cloud Run</b> for the best experience. Since this app has a server, static hosts like GitHub Pages won't work.
-                  </p>
-                  <ul className="text-xs text-zinc-500 space-y-2 list-disc pl-4">
-                    <li>Click <b>Deploy</b> in AI Studio menu.</li>
-                    <li>Or use <b>Render.com</b> (Free tier).</li>
-                    <li>Connect your GitHub repo to Render.</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-4 p-6 bg-white/5 rounded-3xl border border-white/5">
-                  <div className="flex items-center gap-2 text-yellow-400 font-bold uppercase text-[10px] tracking-widest">
-                    <DollarSign size={14} /> Step 2: Monetize
-                  </div>
-                  <h4 className="text-lg font-bold">Start Earning</h4>
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    I have already added <b>AdSense Slots</b> to your app. Once you have a domain, apply for AdSense.
-                  </p>
-                  <ul className="text-xs text-zinc-500 space-y-2 list-disc pl-4">
-                    <li>Add your AdSense code to the slots.</li>
-                    <li>Offer "Premium" voices for paid users.</li>
-                    <li>Sell API access to other developers.</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl space-y-3">
-                <h4 className="font-bold text-emerald-400 flex items-center gap-2">
-                  <Sparkles size={16} /> Pro Tip for Income
-                </h4>
-                <p className="text-sm text-zinc-300">
-                  Create a YouTube channel or Instagram page showing how to use this tool for Hindi/English voiceovers. Put your website link in the bio to drive traffic and increase ad revenue!
-                </p>
-              </div>
-
-              <button 
-                onClick={() => setIsDeployModalOpen(false)}
-                className="w-full bg-white text-black font-bold py-4 rounded-2xl hover:bg-zinc-200 transition-all shadow-xl shadow-white/5"
-              >
-                Got it, let's build!
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6 md:p-12">
         <AnimatePresence mode="wait">
@@ -1377,13 +1641,13 @@ export default function App() {
                       <X size={16} className="shrink-0" />
                       <span className="flex-1 leading-relaxed">{error}</span>
                     </div>
-                    {(error.includes("Quota") || error.includes("API key") || error.includes("कोटा")) && (
+                    {(error.includes("Quota") || error.includes("API key")) && (
                       <button 
                         onClick={openKeyDialog}
                         className="w-fit px-4 py-2 bg-red-500 text-white rounded-lg text-xs font-bold hover:bg-red-600 transition-colors flex items-center gap-2 shadow-lg shadow-red-500/20"
                       >
                         <Key size={14} />
-                        Update API Key (API Key अपडेट करें)
+                        Update API Key
                       </button>
                     )}
                   </motion.div>
@@ -1391,20 +1655,29 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="glass-panel p-4 rounded-2xl space-y-3">
-                    <label className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                      <Volume2 size={14} /> Voice
-                    </label>
-                    <select 
-                      value={selectedVoice.id}
-                      onChange={(e) => setSelectedVoice(VOICES.find(v => v.id === e.target.value) || VOICES[0])}
-                      className="w-full bg-transparent text-sm focus:outline-none cursor-pointer"
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                        <Volume2 size={14} /> Voice
+                      </label>
+                      <button 
+                        onClick={() => setShowVoiceLibrary(true)}
+                        className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1"
+                      >
+                        <Library size={12} /> Browse
+                      </button>
+                    </div>
+                    <div 
+                      onClick={() => setShowVoiceLibrary(true)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all"
                     >
-                      {VOICES.map(v => (
-                        <option key={v.id} value={v.id} className="bg-zinc-900">
-                          {v.name} ({v.gender}) {v.isPremium ? '💎' : ''}
-                        </option>
-                      ))}
-                    </select>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-zinc-800 flex items-center justify-center text-[10px] font-bold">
+                          {selectedVoice.name[0]}
+                        </div>
+                        <span className="text-sm font-medium">{selectedVoice.name}</span>
+                      </div>
+                      <ChevronDown size={14} className="text-zinc-500" />
+                    </div>
                   </div>
 
                   <div className="glass-panel p-4 rounded-2xl space-y-3">
@@ -1535,6 +1808,7 @@ export default function App() {
 
                 <div className="flex flex-col md:flex-row gap-4 pt-4">
                   <button 
+                    id="generate-btn"
                     onClick={handleGenerate}
                     disabled={isGenerating || !text.trim()}
                     className="flex-1 btn-primary h-14"
@@ -1558,10 +1832,18 @@ export default function App() {
                   {currentAudio && (
                     <div className="flex gap-2">
                       <button 
-                        onClick={() => audioRef.current?.play()}
-                        className="w-14 h-14 glass-panel rounded-xl flex items-center justify-center hover:bg-white/5 transition-all"
+                        onClick={() => {
+                          if (isPlaying) {
+                            audioRef.current?.pause();
+                            setIsPlaying(false);
+                          } else {
+                            audioRef.current?.play();
+                            setIsPlaying(true);
+                          }
+                        }}
+                        className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all ${isPlaying ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'glass-panel hover:bg-white/5'}`}
                       >
-                        <Play size={24} />
+                        {isPlaying ? <Pause size={24} /> : <Play size={24} />}
                       </button>
                       <button 
                         onClick={() => downloadAudio(currentAudio, 'generated-voice')}
@@ -1573,16 +1855,346 @@ export default function App() {
                   )}
                 </div>
 
-                <AdSlot id="main-content-ad" className="mt-8" />
 
                 {currentAudio && (
                   <audio 
                     ref={audioRef} 
                     src={currentAudio} 
                     className="hidden" 
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={() => setIsPlaying(false)}
                   />
                 )}
               </div>
+            </motion.div>
+          ) : activeTab === 'dubbing' ? (
+            <motion.div 
+              key="dubbing"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto space-y-8"
+            >
+              <div className="space-y-2">
+                <h2 className="text-3xl font-display font-bold">AI Dubbing</h2>
+                <p className="text-zinc-400">Translate and dub your audio into different languages with professional AI voices.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload File</label>
+                    <div 
+                      onClick={() => document.getElementById('audio-upload')?.click()}
+                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}
+                    >
+                      <input 
+                        type="file" id="audio-upload" hidden accept="audio/*,video/*" 
+                        onChange={(e) => {
+                          setDubbingFile(e.target.files?.[0] || null);
+                          setDubbingResult(null);
+                        }}
+                      />
+                      {dubbingFile ? (
+                        <>
+                          <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400">
+                            <Music size={32} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-emerald-400">{dubbingFile.name}</p>
+                            <p className="text-xs text-zinc-500">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const url = URL.createObjectURL(dubbingFile);
+                              const audio = new Audio(url);
+                              audio.play();
+                            }}
+                            className="mt-2 px-4 py-1 bg-white/10 rounded-full text-[10px] hover:bg-white/20 transition-all flex items-center gap-2"
+                          >
+                            <Play size={10} /> Preview Upload
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-4 bg-white/5 rounded-2xl text-zinc-500">
+                            <Upload size={32} />
+                          </div>
+                          <p className="text-sm text-zinc-500">Click to upload</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Target Language</label>
+                    <select 
+                      value={targetLanguage}
+                      onChange={(e) => setTargetLanguage(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:border-white/20"
+                    >
+                      <option value="hi" className="bg-zinc-900">Hindi</option>
+                      <option value="bn" className="bg-zinc-900">Bengali</option>
+                      <option value="mr" className="bg-zinc-900">Marathi</option>
+                      <option value="te" className="bg-zinc-900">Telugu</option>
+                      <option value="ta" className="bg-zinc-900">Tamil</option>
+                      <option value="gu" className="bg-zinc-900">Gujarati</option>
+                      <option value="kn" className="bg-zinc-900">Kannada</option>
+                      <option value="en" className="bg-zinc-900">English</option>
+                      <option value="es" className="bg-zinc-900">Spanish</option>
+                      <option value="fr" className="bg-zinc-900">French</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">3. Select Voice</label>
+                    <div 
+                      onClick={() => setShowVoiceLibrary(true)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold">
+                          {selectedVoice.name[0]}
+                        </div>
+                        <span className="text-sm font-medium">{selectedVoice.name}</span>
+                      </div>
+                      <ChevronDown size={16} className="text-zinc-500" />
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      if (!dubbingFile) {
+                        setError("Please upload an audio or video file first to start dubbing.");
+                        return;
+                      }
+                      handleDubbing();
+                    }}
+                    disabled={isDubbing}
+                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-400' : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-emerald-500/20'}`}
+                  >
+                    {isDubbing ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="animate-spin" size={24} />
+                          <span className="font-bold">Processing...</span>
+                        </div>
+                        <span className="text-[10px] opacity-70 animate-pulse">{dubbingStep}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <LangIcon size={24} />
+                        Start Dubbing
+                      </>
+                    )}
+                  </button>
+
+                  {isDubbing && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] text-zinc-500">
+                        <span>{dubbingStep}</span>
+                        <span>{dubbingProgress}%</span>
+                      </div>
+                      <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${dubbingProgress}%` }}
+                          className="h-full bg-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {dubbingResult && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="glass-panel p-8 rounded-[2.5rem] border-emerald-500/20 bg-emerald-500/5 space-y-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Sparkles className="text-emerald-400" /> Result
+                    </h3>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = dubbingResult.audioUrl;
+                          a.download = `dubbed-${Date.now()}.wav`;
+                          a.click();
+                        }}
+                        className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all"
+                      >
+                        <Download size={20} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-black/20 rounded-2xl">
+                    <p className="text-sm text-zinc-400 italic mb-4">"{dubbingResult.text}"</p>
+                    <audio src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
+                  </div>
+                </motion.div>
+              )}
+
+              <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
+                <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                  <Sparkles size={16} className="text-emerald-400" /> How it works
+                </h4>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Our AI will analyze your uploaded audio, transcribe the content, and then re-generate it using your selected target voice. For dubbing, it will also translate the content into your chosen language while maintaining the original meaning.
+                </p>
+              </div>
+            </motion.div>
+          ) : activeTab === 'voice-changer' ? (
+            <motion.div 
+              key="voice-changer"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto space-y-8"
+            >
+              <div className="space-y-2">
+                <h2 className="text-3xl font-display font-bold">Voice Changer</h2>
+                <p className="text-zinc-400">Transform your voice into any of our professional AI characters while maintaining emotion and tone.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload File</label>
+                    <div 
+                      onClick={() => document.getElementById('audio-upload-vc')?.click()}
+                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}
+                    >
+                      <input 
+                        type="file" id="audio-upload-vc" hidden accept="audio/*,video/*" 
+                        onChange={(e) => {
+                          setDubbingFile(e.target.files?.[0] || null);
+                          setDubbingResult(null);
+                          setDubbingMode('convert');
+                        }}
+                      />
+                      {dubbingFile ? (
+                        <>
+                          <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400">
+                            <Music size={32} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-emerald-400">{dubbingFile.name}</p>
+                            <p className="text-xs text-zinc-500">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-4 bg-white/5 rounded-2xl text-zinc-500">
+                            <Upload size={32} />
+                          </div>
+                          <p className="text-sm text-zinc-500">Click to upload</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Select Target Voice</label>
+                    <div 
+                      onClick={() => setShowVoiceLibrary(true)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold">
+                          {selectedVoice.name[0]}
+                        </div>
+                        <span className="text-sm font-medium">{selectedVoice.name}</span>
+                      </div>
+                      <ChevronDown size={16} className="text-zinc-500" />
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      if (!dubbingFile) {
+                        setError("Please upload an audio or video file first to change voice.");
+                        return;
+                      }
+                      handleDubbing();
+                    }}
+                    disabled={isDubbing}
+                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-400' : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-emerald-500/20'}`}
+                  >
+                    {isDubbing ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="animate-spin" size={24} />
+                          <span className="font-bold">Processing...</span>
+                        </div>
+                        <span className="text-[10px] opacity-70 animate-pulse">{dubbingStep}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <RefreshCw size={24} />
+                        Change Voice
+                      </>
+                    )}
+                  </button>
+
+                  {isDubbing && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] text-zinc-500">
+                        <span>{dubbingStep}</span>
+                        <span>{dubbingProgress}%</span>
+                      </div>
+                      <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${dubbingProgress}%` }}
+                          className="h-full bg-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {dubbingResult && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="glass-panel p-8 rounded-[2.5rem] border-emerald-500/20 bg-emerald-500/5 space-y-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      <Sparkles className="text-emerald-400" /> Result
+                    </h3>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = dubbingResult.audioUrl;
+                          a.download = `voice-change-${Date.now()}.wav`;
+                          a.click();
+                        }}
+                        className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all"
+                      >
+                        <Download size={20} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-black/20 rounded-2xl">
+                    <audio src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           ) : (
             <motion.div 
@@ -1617,10 +2229,19 @@ export default function App() {
                       
                       <div className="flex items-center gap-2 shrink-0">
                         <button 
-                          onClick={() => playFromHistory(item.audio_data)}
-                          className="p-3 hover:bg-white/5 rounded-xl transition-all text-zinc-400 hover:text-white"
+                          onClick={() => playFromHistory(item.audio_data, item.id)}
+                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`}
                         >
-                          <Play size={20} />
+                          {playingId === item.id ? (
+                            <div className="flex items-center gap-1">
+                              <div className="w-1 h-3 bg-white animate-pulse" />
+                              <div className="w-1 h-4 bg-white animate-pulse delay-75" />
+                              <div className="w-1 h-2 bg-white animate-pulse delay-150" />
+                              <Pause size={18} />
+                            </div>
+                          ) : (
+                            <Play size={20} />
+                          )}
                         </button>
                         <button 
                           onClick={() => downloadAudio(item.audio_data, `voice-${item.id}`)}
@@ -1661,42 +2282,80 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-5xl max-h-[80vh] bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col"
             >
-              <div className="p-8 border-b border-white/5 flex items-center justify-between">
+              <div className="p-8 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                   <h3 className="text-2xl font-display font-bold">Voice Library</h3>
-                  <p className="text-zinc-500 text-sm">Explore and preview 20 professional AI voices.</p>
+                  <p className="text-zinc-500 text-sm">Explore and preview professional AI voices.</p>
                 </div>
-                <button 
-                  onClick={() => setShowVoiceLibrary(false)}
-                  className="p-2 hover:bg-white/5 rounded-full transition-all"
-                >
-                  <X size={24} />
-                </button>
+                
+                <div className="flex items-center gap-4 flex-1 max-w-md">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="Search voices by name..."
+                      value={voiceSearchTerm}
+                      onChange={(e) => setVoiceSearchTerm(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-emerald-500/50 transition-all"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => setShowVoiceLibrary(false)}
+                    className="p-2 hover:bg-white/5 rounded-full transition-all shrink-0"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {VOICES.map((voice) => (
+                {VOICES.filter(v => v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase())).map((voice) => (
                   <div 
                     key={voice.id}
-                    onClick={() => {
-                      setSelectedVoice(voice);
-                      setShowVoiceLibrary(false);
-                    }}
-                    className={`p-6 rounded-2xl border transition-all cursor-pointer group ${selectedVoice.id === voice.id ? 'bg-white/10 border-white/20' : 'bg-zinc-800/50 border-white/5 hover:border-white/10'}`}
+                    className={`p-6 rounded-2xl border transition-all group relative ${selectedVoice.id === voice.id ? 'bg-white/10 border-white/20' : 'bg-zinc-800/50 border-white/5 hover:border-white/10'}`}
                   >
-                    <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className="absolute inset-0 cursor-pointer z-0"
+                      onClick={() => {
+                        setSelectedVoice(voice);
+                        setShowVoiceLibrary(false);
+                      }}
+                    />
+                    <div className="flex items-center justify-between mb-4 relative z-10">
                       <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center font-display font-bold text-xl group-hover:scale-110 transition-transform">
                         {voice.name[0]}
                       </div>
-                      {selectedVoice.id === voice.id && (
-                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                          <Check size={14} className="text-black" />
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePreviewVoice(voice);
+                          }}
+                          disabled={previewingVoiceId === voice.id}
+                          className={`p-2 rounded-xl transition-all ${previewingVoiceId === voice.id ? 'bg-emerald-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+                        >
+                          {previewingVoiceId === voice.id ? <Loader2 className="animate-spin" size={18} /> : <Volume2 size={18} />}
+                        </button>
+                        {selectedVoice.id === voice.id && (
+                          <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-black">
+                            <Check size={16} />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <h4 className="font-bold text-lg">{voice.name}</h4>
-                    <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3">{voice.gender}</p>
-                    <p className="text-sm text-zinc-400 line-clamp-2">{voice.description}</p>
+                    
+                    <div className="relative z-10">
+                      <h4 className="font-bold text-lg mb-1">{voice.name}</h4>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 px-2 py-0.5 bg-zinc-900 rounded">{voice.gender}</span>
+                        {voice.isPremium && (
+                          <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 px-2 py-0.5 bg-emerald-500/10 rounded flex items-center gap-1">
+                            <Crown size={10} /> Pro
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-zinc-500 line-clamp-2">{voice.description}</p>
+                    </div>
                   </div>
                 ))}
               </div>

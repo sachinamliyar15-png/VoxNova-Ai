@@ -101,9 +101,25 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
+// Blocked temp email domains
+const BLOCKED_DOMAINS = [
+  'temp-mail.org', 'guerrillamail.com', '10minutemail.com', 'mailinator.com', 
+  'dispostable.com', 'getnada.com', 'tempmail.com', 'throwawaymail.com',
+  'yopmail.com', 'maildrop.cc', 'sharklasers.com', 'guerrillamail.info',
+  'guerrillamail.biz', 'guerrillamail.com', 'guerrillamail.de', 'guerrillamail.net',
+  'guerrillamail.org', 'guerrillamailblock.com', 'pokemail.net', 'spam4.me'
+];
+
 // User Profile & Credit Reset Logic
 app.get("/api/user/profile", authenticate, (req: any, res) => {
   const userId = req.user.uid;
+  const email = req.user.email || '';
+  const domain = email.split('@')[1]?.toLowerCase();
+
+  if (domain && BLOCKED_DOMAINS.includes(domain)) {
+    return res.status(403).json({ error: 'Temporary email addresses are not allowed. Please use a permanent email.' });
+  }
+
   let user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
 
   if (!user) {
