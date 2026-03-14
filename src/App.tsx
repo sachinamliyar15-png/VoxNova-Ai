@@ -36,6 +36,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { VOICES, Voice, Generation } from './types';
+import emailjs from 'emailjs-com';
 
 const AdBox = ({ className = "", label = "" }: { className?: string, label?: string }) => (
   <div className={`glass-panel p-4 rounded-2xl flex flex-col items-center justify-center min-h-[120px] border-dashed border-white/10 bg-white/5 ${className}`}>
@@ -526,6 +527,43 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<'rate-limit' | 'network' | 'auth' | 'general' | null>(null);
 
+  const [showAbout, setShowAbout] = useState(false);
+  const [showContact, setShowContact] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+
+  const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
+  const [isSending, setIsSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+
+  const handleContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSending(true);
+    
+    // EmailJS logic - Using placeholders for ServiceID, TemplateID, and UserID
+    // User will need to configure these in their EmailJS dashboard
+    emailjs.send(
+      'service_52isgcx', // Your EmailJS Service ID
+      'template_id', // Replace with your Template ID
+      {
+        from_name: contactForm.name,
+        from_email: contactForm.email,
+        message: contactForm.message,
+        to_email: 'robotlinkan@gmail.com'
+      },
+      'user_id' // Replace with your Public Key (User ID)
+    ).then(() => {
+      setSendSuccess(true);
+      setContactForm({ name: '', email: '', message: '' });
+      setTimeout(() => setSendSuccess(false), 5000);
+    }).catch((err) => {
+      console.error('EmailJS Error:', err);
+      setError("Failed to send message. Please try the Google Form or Mailto link.");
+    }).finally(() => {
+      setIsSending(false);
+    });
+  };
+
   const handleGenerate = async () => {
     if (!currentUser) {
       handleLogin();
@@ -587,7 +625,7 @@ export default function App() {
             'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
             'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
             'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
+            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Charon'
           };
 
           const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
@@ -612,27 +650,28 @@ export default function App() {
           }
           
           const voiceTraits: Record<string, string> = {
-            'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice.',
-            'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality.',
-            'Daniel': 'Clear, news-like, and highly articulate. Broadcast standard.',
-            'Josh': 'Young, energetic, and friendly. Natural conversational tone.',
-            'Liam': 'Warm, empathetic, and gentle. Realistic and human-like.',
-            'Michael': 'Mature, wise, and sophisticated. Professional narration.',
-            'Ryan': 'Casual, upbeat, and conversational. Relatable and authentic.',
-            'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality.',
-            'Bill': 'Gravelly, experienced, and rugged. Character-rich performance.',
-            'Callum': 'Refined, polite, and sophisticated. Elite professional tone.',
-            'Frank': 'Natural, balanced, and clear. Perfect for long-form narration.',
-            'Marcus': 'Strong, motivational, and powerful. Commanding and inspiring.',
-            'Jessica': 'Clear, bright, and professional. Modern corporate standard.',
-            'Sarah': 'Soft, soothing, and gentle. Ethereal and calm.',
-            'Matilda': 'Intelligent, articulate, and formal. Academic precision.',
-            'Emily': 'Youthful, cheerful, and friendly. High-energy realism.',
-            'Bella': 'Elegant, smooth, and professional. Premium quality.',
-            'Rachel': 'Dynamic, expressive, and clear. Versatile performance.',
-            'Nicole': 'Direct, confident, and professional. Business standard.',
-            'Clara': 'Kind, helpful, and natural. Approachable realism.',
-            'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, and cinematic.'
+            'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.',
+            'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.',
+            'Daniel': 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.',
+            'Josh': 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.',
+            'Liam': 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.',
+            'Michael': 'Mature, wise, and sophisticated. Slow, deliberate professional narration.',
+            'Ryan': 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.',
+            'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
+            'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
+            'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
+            'Frank': 'Natural, balanced, and clear. Perfect for long-form narration with consistent energy.',
+            'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
+            'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
+            'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
+            'Matilda': 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.',
+            'Emily': 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.',
+            'Bella': 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.',
+            'Rachel': 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.',
+            'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
+            'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
+            'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
+            'Virat Best Voice': 'Extremely powerful, deep, and authoritative masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
           };
 
           promptPrefix += `${voiceTraits[selectedVoice.name] || ''} `;
@@ -2301,15 +2340,294 @@ export default function App() {
         </AnimatePresence>
 
         {/* Bottom Ads Section */}
-        <div className="mt-12 pt-12 border-t border-white/5 max-w-4xl mx-auto pb-24">
+        <div className="mt-12 pt-12 border-t border-white/5 max-w-4xl mx-auto pb-12">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <AdBox label="B" />
             <AdBox label="C" />
           </div>
         </div>
+
+        {/* SEO Content Section */}
+        <section className="max-w-4xl mx-auto py-16 px-6 space-y-12">
+          <div className="text-center space-y-4">
+            <h2 className="text-4xl font-display font-bold text-white">Why Choose VoxNova AI?</h2>
+            <p className="text-zinc-400 max-w-2xl mx-auto">VoxNova is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="glass-panel p-8 rounded-3xl space-y-4 border-white/5 hover:border-emerald-500/20 transition-all group">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                <Sparkles size={24} />
+              </div>
+              <h3 className="text-xl font-bold">Ultra-Realistic Voices</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">Our neural networks are trained on thousands of hours of professional studio recordings to capture the subtle nuances of human speech, including breath, rhythm, and emotion.</p>
+            </div>
+
+            <div className="glass-panel p-8 rounded-3xl space-y-4 border-white/5 hover:border-emerald-500/20 transition-all group">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                <Globe size={24} />
+              </div>
+              <h3 className="text-xl font-bold">Multilingual Support</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">Generate high-quality voiceovers in English and Hindi with perfect native accents. Our AI understands cultural nuances and provides localized performances for global audiences.</p>
+            </div>
+
+            <div className="glass-panel p-8 rounded-3xl space-y-4 border-white/5 hover:border-emerald-500/20 transition-all group">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                <Mic size={24} />
+              </div>
+              <h3 className="text-xl font-bold">Cinematic Narration</h3>
+              <p className="text-sm text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
+            </div>
+          </div>
+
+          <div className="glass-panel p-10 rounded-[3rem] border-white/5 bg-white/2 space-y-6">
+            <h3 className="text-2xl font-bold text-center">Professional Grade AI Tools</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <h4 className="font-bold text-emerald-400">AI Voice Cloning</h4>
+                <p className="text-sm text-zinc-500">Clone any voice with just a few seconds of audio. Perfect for maintaining consistency across long-running series or dubbing content into multiple languages while keeping the original actor's essence.</p>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-bold text-emerald-400">Advanced Style Modulation</h4>
+                <p className="text-sm text-zinc-500">Go beyond simple pitch and speed. Our AI allows you to control the emotional intensity, gravitas, and storytelling style of every generation, giving you full creative control.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-8">
+            <h3 className="text-3xl font-display font-bold text-center">How VoxNova Works</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {[
+                { step: '01', title: 'Input Text', desc: 'Paste your script into our advanced editor. We support long-form content up to 10,000 characters.' },
+                { step: '02', title: 'Select Voice', desc: 'Browse our library of 20+ professional AI voices, each with unique traits and characteristics.' },
+                { step: '03', title: 'Fine-Tune', desc: 'Adjust pitch, speed, and emotional style to get the perfect performance for your project.' },
+                { step: '04', title: 'Generate', desc: 'Our neural engines process your request in seconds, delivering studio-quality 48kHz audio.' }
+              ].map((item, i) => (
+                <div key={i} className="p-6 space-y-3">
+                  <div className="text-4xl font-display font-bold text-emerald-500/20">{item.step}</div>
+                  <h4 className="font-bold">{item.title}</h4>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="max-w-6xl mx-auto py-12 px-6 border-t border-white/5">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
+                <Mic className="text-white" size={18} />
+              </div>
+              <span className="text-xl font-display font-bold tracking-tighter">VOXNOVA</span>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-6 text-sm text-zinc-500">
+              <button onClick={() => setShowAbout(true)} className="hover:text-white transition-colors">About Us</button>
+              <button onClick={() => setShowContact(true)} className="hover:text-white transition-colors">Contact Us</button>
+              <button onClick={() => setShowPrivacy(true)} className="hover:text-white transition-colors">Privacy Policy</button>
+              <button onClick={() => setShowTerms(true)} className="hover:text-white transition-colors">Terms of Service</button>
+            </div>
+
+            <div className="text-xs text-zinc-600">
+              © 2026 VoxNova AI. All rights reserved.
+            </div>
+          </div>
+        </footer>
       </main>
 
       <StickyFooterAd />
+
+      {/* Legal & Info Modals */}
+      <AnimatePresence>
+        {showAbout && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowAbout(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[80vh] overflow-y-auto"
+            >
+              <button onClick={() => setShowAbout(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <div className="space-y-6">
+                <h2 className="text-3xl font-display font-bold">About VoxNova</h2>
+                <div className="space-y-4 text-zinc-400 leading-relaxed">
+                  <p>VoxNova is a cutting-edge AI research lab dedicated to pushing the boundaries of synthetic speech and neural audio generation. Our mission is to democratize high-end cinematic voice production for creators worldwide.</p>
+                  <p>Founded by a team of audio engineers and AI researchers, we believe that the future of storytelling is multimodal. By combining advanced deep learning with professional audio standards, we provide tools that were once only available to major film studios.</p>
+                  <p>Our platform is built on the latest Gemini 2.5 architecture, optimized for emotional resonance, natural prosody, and crystal-clear studio fidelity.</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showContact && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowContact(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[90vh] overflow-y-auto"
+            >
+              <button onClick={() => setShowContact(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <div className="space-y-8">
+                <div className="space-y-2">
+                  <h2 className="text-3xl font-display font-bold">Contact Us</h2>
+                  <p className="text-zinc-400">Have questions or feedback? We'd love to hear from you.</p>
+                </div>
+
+                <form onSubmit={handleContactSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-zinc-500 uppercase tracking-widest">Name</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={contactForm.name}
+                        onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/50 transition-all"
+                        placeholder="Your Name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-zinc-500 uppercase tracking-widest">Email</label>
+                      <input 
+                        required
+                        type="email" 
+                        value={contactForm.email}
+                        onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/50 transition-all"
+                        placeholder="your@email.com"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-zinc-500 uppercase tracking-widest">Message</label>
+                    <textarea 
+                      required
+                      rows={4}
+                      value={contactForm.message}
+                      onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/50 transition-all resize-none"
+                      placeholder="How can we help you?"
+                    />
+                  </div>
+                  <button 
+                    disabled={isSending}
+                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                  >
+                    {isSending ? <Loader2 className="animate-spin" /> : 'Send Message'}
+                  </button>
+                  {sendSuccess && (
+                    <p className="text-center text-emerald-400 text-sm font-bold animate-bounce">Message sent successfully!</p>
+                  )}
+                </form>
+
+                <div className="pt-8 border-t border-white/5 space-y-4">
+                  <p className="text-sm text-zinc-500 text-center">Alternatively, you can reach us via:</p>
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+                    <a href="mailto:robotlinkan@gmail.com" className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full hover:bg-white/10 transition-all text-sm">
+                      <HelpCircle size={16} /> Direct Email
+                    </a>
+                    <a href="https://forms.gle/your-google-form-link" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full hover:bg-white/10 transition-all text-sm">
+                      <Sparkles size={16} /> Google Form
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showPrivacy && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowPrivacy(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-3xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[80vh] overflow-y-auto"
+            >
+              <button onClick={() => setShowPrivacy(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <div className="space-y-8">
+                <h2 className="text-3xl font-display font-bold">Privacy Policy</h2>
+                <div className="space-y-6 text-zinc-400 text-sm leading-relaxed">
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">1. Data Collection</h3>
+                    <p>We collect minimal data necessary to provide our AI services. This includes your email address for authentication and the text scripts you provide for voice generation.</p>
+                  </section>
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">2. Audio Data</h3>
+                    <p>Generated audio files are stored temporarily to allow you to download them. We do not use your generated audio or input text to train our base models without explicit consent.</p>
+                  </section>
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">3. Third-Party Services</h3>
+                    <p>We use Google Firebase for authentication and database services, and Google Gemini API for AI processing. Your data is handled according to their respective privacy policies.</p>
+                  </section>
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">4. Cookies</h3>
+                    <p>We use essential cookies to maintain your session and preferences. We do not use tracking cookies for advertising purposes.</p>
+                  </section>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showTerms && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowTerms(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-3xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[80vh] overflow-y-auto"
+            >
+              <button onClick={() => setShowTerms(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <div className="space-y-8">
+                <h2 className="text-3xl font-display font-bold">Terms of Service</h2>
+                <div className="space-y-6 text-zinc-400 text-sm leading-relaxed">
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">1. Acceptable Use</h3>
+                    <p>You agree not to use VoxNova to generate content that is illegal, harmful, threatening, abusive, harassing, defamatory, or otherwise objectionable. This includes generating deepfakes for malicious purposes.</p>
+                  </section>
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">2. Intellectual Property</h3>
+                    <p>You retain ownership of the text scripts you provide. VoxNova grants you a non-exclusive license to use the generated audio for personal or commercial purposes, provided you comply with these terms.</p>
+                  </section>
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">3. Service Availability</h3>
+                    <p>We strive for 100% uptime but do not guarantee uninterrupted service. We reserve the right to modify or discontinue features at any time.</p>
+                  </section>
+                  <section className="space-y-2">
+                    <h3 className="text-lg font-bold text-white">4. Credits & Payments</h3>
+                    <p>Credits purchased are non-refundable. Premium features are subject to active subscription status.</p>
+                  </section>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Voice Library Modal */}
       <AnimatePresence>
