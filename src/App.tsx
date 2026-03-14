@@ -29,11 +29,41 @@ import {
   Pause,
   Music,
   Search,
-  Menu
+  Menu,
+  HelpCircle,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { VOICES, Voice, Generation } from './types';
+
+const AdBox = ({ className = "", label = "" }: { className?: string, label?: string }) => (
+  <div className={`glass-panel p-4 rounded-2xl flex flex-col items-center justify-center min-h-[120px] border-dashed border-white/10 bg-white/5 ${className}`}>
+    <div className="w-full h-full flex items-center justify-center text-zinc-700 font-display font-bold text-2xl opacity-20">
+      {label}
+    </div>
+  </div>
+);
+
+const StickyFooterAd = () => {
+  const [isVisible, setIsVisible] = useState(true);
+  if (!isVisible) return null;
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-[100] bg-black/90 backdrop-blur-md border-t border-white/10 p-2 flex items-center justify-center animate-in slide-in-from-bottom duration-500">
+      <div className="max-w-5xl w-full flex items-center justify-between gap-4 px-4">
+        <div className="flex-1 h-14 glass-panel rounded-xl flex items-center justify-center text-zinc-700 font-bold text-lg opacity-20 border-emerald-500/10">
+          D
+        </div>
+        <button 
+          onClick={() => setIsVisible(false)}
+          className="p-1.5 hover:bg-white/10 rounded-full text-zinc-500 transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 import { auth, googleProvider, analytics, logEvent } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -225,8 +255,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'dubbing' | 'voice-changer'>('generate');
   const [showShareToast, setShowShareToast] = useState(false);
   const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
-  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
-  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
@@ -265,7 +293,7 @@ export default function App() {
         'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
         'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
         'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir'
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
       };
 
       const targetVoice = voiceMapping[voice.name] || 'Puck';
@@ -439,13 +467,6 @@ export default function App() {
     }
   };
 
-  const saveApiKey = (key: string) => {
-    localStorage.setItem('voxnova_api_key', key);
-    setUserApiKey(key);
-    setIsKeyModalOpen(false);
-    setError(null);
-  };
-
   const handleShare = async () => {
     const shareData = {
       title: 'VoxNova AI - Professional Voice Generator',
@@ -487,13 +508,6 @@ export default function App() {
     }
   };
 
-  const openKeyDialog = async () => {
-    if (window.aistudio?.openSelectKey) {
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
-    }
-  };
-
   const fetchHistory = async (user?: FirebaseUser) => {
     const activeUser = user || currentUser;
     if (!activeUser) return;
@@ -510,6 +524,7 @@ export default function App() {
   };
 
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<'rate-limit' | 'network' | 'auth' | 'general' | null>(null);
 
   const handleGenerate = async () => {
     if (!currentUser) {
@@ -544,6 +559,7 @@ export default function App() {
 
     setIsGenerating(true);
     setError(null);
+    setErrorType(null);
     
     const maxRetries = 3;
     let attempt = 0;
@@ -571,7 +587,7 @@ export default function App() {
             'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
             'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
             'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir'
+            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
           };
 
           const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
@@ -720,6 +736,7 @@ export default function App() {
             
             if (isRateLimit) {
               setError(`Rate limit reached. Waiting ${Math.round(delay/1000)}s before retrying part ${attempt + 1}...`);
+              setErrorType('rate-limit');
             }
             
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -878,15 +895,20 @@ export default function App() {
       const errStr = err.message || JSON.stringify(err);
       if (errStr.includes("API key not valid")) {
         setError("Invalid API Key: Please check your API key settings.");
+        setErrorType('auth');
         setHasApiKey(false);
       } else if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota")) {
-        setError("Currently, our servers are busy. Please try again after some time.");
+        setError("Our AI servers are currently at capacity due to high demand. Please try again in a few minutes.");
+        setErrorType('rate-limit');
       } else if (errStr.includes("500") || errStr.includes("INTERNAL")) {
-        setError("Currently, our servers are busy. Please try again after some time.");
+        setError("The AI server is temporarily unavailable. We're working to restore it. Please try again shortly.");
+        setErrorType('general');
       } else if (errStr.includes("Rpc failed") || errStr.includes("xhr error")) {
-        setError("Network Error: Please check your internet connection.");
+        setError("Network connection lost. Please check your internet and try again.");
+        setErrorType('network');
       } else {
-        setError("Currently, our servers are busy. Please try again after some time.");
+        setError("Something went wrong while generating your voice. Please try again later.");
+        setErrorType('general');
       }
     } finally {
       setIsGenerating(false);
@@ -909,12 +931,14 @@ export default function App() {
 
     if (!currentUser) {
       setError("Please login to use this feature.");
+      setErrorType('auth');
       return;
     }
 
     const dubbingCost = 5;
     if (userProfile && userProfile.credits < dubbingCost && !isWhitelisted(currentUser.email)) {
       setError(`Insufficient credits. You need ${dubbingCost} credits for dubbing/conversion.`);
+      setErrorType('general');
       setIsPricingModalOpen(true);
       return;
     }
@@ -928,6 +952,7 @@ export default function App() {
 
     setIsDubbing(true);
     setError(null);
+    setErrorType(null);
     setDubbingResult(null);
     setDubbingProgress(5);
     setDubbingStep("Reading file...");
@@ -996,7 +1021,7 @@ export default function App() {
         'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
         'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
         'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir'
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
       };
 
       const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
@@ -1035,12 +1060,22 @@ export default function App() {
       setDubbingProgress(100);
       setDubbingStep("Complete!");
 
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.play().catch(e => console.error("Auto-play failed:", e));
+        }
+      }, 100);
+
       if (analytics) {
         logEvent(analytics, dubbingMode === 'dub' ? 'dubbing_success' : 'voice_changer_success', {
           target_language: targetLanguage,
           voice_name: selectedVoice.name
         });
       }
+
+      // Calculate duration and credit cost (700 credits per minute)
+      const durationInSeconds = (pcmBuffer.byteLength / 2) / 24000;
+      const creditCost = Math.max(1, Math.ceil((durationInSeconds / 60) * 700));
 
       // Save to history
       try {
@@ -1057,7 +1092,7 @@ export default function App() {
             style: dubbingMode === 'dub' ? 'dubbing' : 'voice-changer',
             speed: 1.0,
             audioData: base64Audio,
-            creditCost: 5 // Fixed cost for dubbing/conversion for now
+            creditCost: creditCost
           })
         });
         fetchHistory();
@@ -1067,10 +1102,41 @@ export default function App() {
 
     } catch (err: any) {
       console.error("Dubbing failed:", err);
-      const msg = err.message || "An unexpected error occurred during processing.";
-      setError(`Processing failed: ${msg}`);
+      const errStr = err.message || JSON.stringify(err);
+      
+      if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota")) {
+        setError("Our AI servers are currently at capacity. Please try again in a few minutes.");
+        setErrorType('rate-limit');
+      } else if (errStr.includes("500") || errStr.includes("INTERNAL")) {
+        setError("The AI server is temporarily busy. Please try again shortly.");
+        setErrorType('general');
+      } else if (errStr.includes("Rpc failed") || errStr.includes("xhr error")) {
+        setError("Network connection lost. Please check your internet and try again.");
+        setErrorType('network');
+      } else {
+        setError(`Processing failed: ${err.message || "An unexpected error occurred."}`);
+        setErrorType('general');
+      }
     } finally {
       setIsDubbing(false);
+    }
+  };
+
+  const deleteHistoryItem = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this generation from your history?")) return;
+    try {
+      const token = await currentUser!.getIdToken();
+      const res = await fetch(`/api/history/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        setHistory(prev => prev.filter(item => item.id !== id));
+      }
+    } catch (err) {
+      console.error("Failed to delete history item:", err);
     }
   };
 
@@ -1249,7 +1315,7 @@ export default function App() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'generate' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
           >
             <Sparkles size={20} />
-            Generate
+            Text to Speech Voice
           </button>
           <button 
             onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
@@ -1285,13 +1351,6 @@ export default function App() {
           >
             <Share2 size={20} />
             Share App
-          </button>
-          <button 
-            onClick={() => { setIsKeyModalOpen(true); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${userApiKey ? 'text-emerald-400' : 'text-zinc-400'} hover:text-white hover:bg-white/5`}
-          >
-            <Key size={20} />
-            API Settings
           </button>
           <button 
             onClick={() => { setIsPricingModalOpen(true); setIsMobileMenuOpen(false); }}
@@ -1380,70 +1439,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* API Key Modal */}
-      <AnimatePresence>
-        {isKeyModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-8 space-y-6 shadow-2xl"
-            >
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-display font-bold">API Settings</h3>
-                <button onClick={() => setIsKeyModalOpen(false)} className="text-zinc-500 hover:text-white">
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                <p className="text-sm text-zinc-400 leading-relaxed">
-                  Enter your Gemini API key to bypass shared limits. Your key is stored locally in your browser.
-                </p>
-                
-                <div className="space-y-2">
-                  <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Gemini API Key</label>
-                  <div className="relative">
-                    <input 
-                      type="password"
-                      value={userApiKey}
-                      onChange={(e) => setUserApiKey(e.target.value)}
-                      placeholder="Paste your API key here..."
-                      className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                    />
-                    <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-700" size={16} />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button 
-                    onClick={() => saveApiKey(userApiKey)}
-                    className="flex-1 bg-white text-black font-bold py-3 rounded-xl hover:bg-zinc-200 transition-all"
-                  >
-                    Save Key
-                  </button>
-                  <button 
-                    onClick={() => {
-                      localStorage.removeItem('voxnova_api_key');
-                      setUserApiKey('');
-                      setIsKeyModalOpen(false);
-                    }}
-                    className="px-4 py-3 border border-white/10 rounded-xl text-zinc-500 hover:text-white transition-all"
-                  >
-                    Clear
-                  </button>
-                </div>
-
-                <p className="text-[10px] text-zinc-600 text-center">
-                  Don't have a key? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-emerald-500 hover:underline">Get one for free here</a>
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Pricing Modal */}
       <AnimatePresence>
         {isPricingModalOpen && (
@@ -1486,11 +1481,11 @@ export default function App() {
                     <div className="text-3xl font-display font-bold">₹100</div>
                   </div>
                   <ul className="text-xs text-zinc-400 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 10,000 Credits</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 6,000 Credits</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> No Expiry</li>
                   </ul>
-                  <button onClick={() => purchaseCredits('basic', 10000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
+                  <button onClick={() => purchaseCredits('basic', 6000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
                 </div>
 
                 {/* Pro Plan */}
@@ -1501,11 +1496,25 @@ export default function App() {
                     <div className="text-3xl font-display font-bold">₹200</div>
                   </div>
                   <ul className="text-xs text-zinc-400 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 25,000 Credits</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 15,000 Credits</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
                   </ul>
-                  <button onClick={() => purchaseCredits('pro', 25000)} className="w-full py-3 rounded-xl bg-emerald-500 text-black font-bold text-sm hover:bg-emerald-400 transition-all">Buy Now</button>
+                  <button onClick={() => purchaseCredits('pro', 15000)} className="w-full py-3 rounded-xl bg-emerald-500 text-black font-bold text-sm hover:bg-emerald-400 transition-all">Buy Now</button>
+                </div>
+
+                {/* Advanced Plan */}
+                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-bold">Advanced</h4>
+                    <div className="text-3xl font-display font-bold">₹400</div>
+                  </div>
+                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 30,000 Credits</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
+                  </ul>
+                  <button onClick={() => purchaseCredits('advanced', 30000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
                 </div>
 
                 {/* Ultra Plan */}
@@ -1515,11 +1524,11 @@ export default function App() {
                     <div className="text-3xl font-display font-bold">₹500</div>
                   </div>
                   <ul className="text-xs text-zinc-400 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 75,000 Credits</li>
+                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 40,000 Credits</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Custom Voice Profiles</li>
                   </ul>
-                  <button onClick={() => purchaseCredits('ultra', 75000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
+                  <button onClick={() => purchaseCredits('ultra', 40000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
                 </div>
               </div>
 
@@ -1635,21 +1644,38 @@ export default function App() {
                   <motion.div 
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex flex-col gap-3"
+                    className={`p-4 rounded-xl text-sm flex flex-col gap-3 ${
+                      errorType === 'rate-limit' 
+                        ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' 
+                        : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <X size={16} className="shrink-0" />
-                      <span className="flex-1 leading-relaxed">{error}</span>
-                    </div>
-                    {(error.includes("Quota") || error.includes("API key")) && (
+                    <div className="flex items-start gap-3">
+                      {errorType === 'rate-limit' ? (
+                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                      ) : (
+                        <X size={18} className="shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 space-y-2">
+                        <p className="font-bold leading-tight">
+                          {errorType === 'rate-limit' ? 'Server Busy (Rate Limit)' : 'Generation Error'}
+                        </p>
+                        <p className="leading-relaxed opacity-90">{error}</p>
+                        
+                        {errorType === 'rate-limit' && (
+                          <div className="pt-2 mt-2 border-t border-amber-500/10 flex items-start gap-2 text-[11px] italic opacity-70">
+                            <HelpCircle size={12} className="shrink-0 mt-0.5" />
+                            <p>Rate limiting occurs when many users generate voices simultaneously. Our AI models have a maximum capacity to ensure high quality for everyone. Trying again in a few minutes usually resolves this.</p>
+                          </div>
+                        )}
+                      </div>
                       <button 
-                        onClick={openKeyDialog}
-                        className="w-fit px-4 py-2 bg-red-500 text-white rounded-lg text-xs font-bold hover:bg-red-600 transition-colors flex items-center gap-2 shadow-lg shadow-red-500/20"
+                        onClick={() => { setError(null); setErrorType(null); }}
+                        className="p-1 hover:bg-white/5 rounded-full transition-colors"
                       >
-                        <Key size={14} />
-                        Update API Key
+                        <X size={14} />
                       </button>
-                    )}
+                    </div>
                   </motion.div>
                 )}
 
@@ -1817,7 +1843,7 @@ export default function App() {
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center gap-2">
                           <Loader2 className="animate-spin" size={18} />
-                          <span className="font-bold">Generating...</span>
+                          <span className="font-bold">Generating Voice...</span>
                         </div>
                         <span className="text-[10px] opacity-70 animate-pulse">{loadingMessages[loadingStep]}</span>
                       </div>
@@ -1854,6 +1880,8 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
+                <AdBox className="mt-16" label="A" />
 
 
                 {currentAudio && (
@@ -2189,6 +2217,14 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
+                  {dubbingResult.text && (
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <p className="text-sm text-zinc-400 leading-relaxed italic">
+                        "{dubbingResult.text}"
+                      </p>
+                    </div>
+                  )}
                   
                   <div className="p-4 bg-black/20 rounded-2xl">
                     <audio src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
@@ -2263,7 +2299,17 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Bottom Ads Section */}
+        <div className="mt-12 pt-12 border-t border-white/5 max-w-4xl mx-auto pb-24">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <AdBox label="B" />
+            <AdBox label="C" />
+          </div>
+        </div>
       </main>
+
+      <StickyFooterAd />
 
       {/* Voice Library Modal */}
       <AnimatePresence>
@@ -2367,11 +2413,9 @@ export default function App() {
       {/* Footer / Status */}
       <footer className="fixed bottom-0 left-0 right-0 md:left-64 p-4 border-t border-white/5 bg-[#0a0a0a]/80 backdrop-blur-md flex items-center justify-between text-[10px] text-zinc-600 uppercase tracking-[0.2em]">
         <div className="flex items-center gap-4">
-          <span>Status: Online</span>
-          <span>Model: Gemini 2.5 TTS</span>
         </div>
         <div className="hidden md:block">
-          © 2026 VoxNova AI • Professional Voice Synthesis
+          VoxNova AI &copy; 2026
         </div>
       </footer>
     </div>

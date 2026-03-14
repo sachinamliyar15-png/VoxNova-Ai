@@ -30,6 +30,7 @@ export const VOICES: Voice[] = [
   { id: 'clara', name: 'Clara', gender: 'female', description: 'Kind, helpful, approachable realism', isPremium: true },
   { id: 'doc-pro', name: 'Documentary Pro', gender: 'male', description: 'Deep, cinematic, elite documentary narration', isPremium: true },
   { id: 'atlas-do', name: 'Atlas (Do)', gender: 'male', description: 'Ultra-high quality cinematic documentary voice', isPremium: true },
+  { id: 'virat-best', name: 'Virat Best Voice', gender: 'male', description: 'The world\'s #1 AI voice - ultra-realistic, emotive, and professional', isPremium: true },
 ];
 
 export interface Generation {
