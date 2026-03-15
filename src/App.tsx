@@ -18,6 +18,7 @@ import {
   Share2,
   TrendingUp,
   Globe,
+  Monitor,
   DollarSign,
   LogOut,
   User,
@@ -72,12 +73,12 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden"
+      className="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center overflow-hidden"
     >
       {/* Professional Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full animate-pulse delay-700" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/5 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full animate-pulse delay-700" />
       </div>
 
       <motion.div 
@@ -86,15 +87,15 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
         transition={{ duration: 1, ease: "easeOut" }}
         className="relative z-10 flex flex-col items-center gap-8"
       >
-        <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-500/20">
-          <Mic className="text-black w-12 h-12" />
+        <div className="w-24 h-24 bg-zinc-900 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-500/10">
+          <Mic className="text-white w-12 h-12" />
         </div>
         
         <div className="text-center space-y-2">
-          <h1 className="text-6xl font-display font-bold tracking-tighter text-white">
+          <h1 className="text-6xl font-display font-bold tracking-tighter text-zinc-900">
             VOX<span className="text-emerald-500">NOVA</span>
           </h1>
-          <p className="text-zinc-500 font-medium tracking-[0.3em] uppercase text-xs">The Future of AI Voice</p>
+          <p className="text-zinc-400 font-medium tracking-[0.3em] uppercase text-xs">The Future of AI Voice</p>
         </div>
 
         <motion.div 
@@ -102,11 +103,11 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
           animate={{ width: 200 }}
           transition={{ duration: 2, ease: "easeInOut" }}
           onAnimationComplete={() => setTimeout(onComplete, 500)}
-          className="h-1 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+          className="h-1 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.3)]"
         />
       </motion.div>
 
-      <div className="absolute bottom-12 text-zinc-600 text-[10px] uppercase tracking-widest font-bold">
+      <div className="absolute bottom-12 text-zinc-400 text-[10px] uppercase tracking-widest font-bold">
         Professional Studio Grade TTS
       </div>
     </motion.div>
@@ -117,14 +118,14 @@ const StickyFooterAd = () => {
   const [isVisible, setIsVisible] = useState(true);
   if (!isVisible) return null;
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[100] bg-black/90 backdrop-blur-md border-t border-white/10 p-2 flex items-center justify-center animate-in slide-in-from-bottom duration-500">
+    <div className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-md border-t border-zinc-200 p-2 flex items-center justify-center animate-in slide-in-from-bottom duration-500">
       <div className="max-w-5xl w-full flex items-center justify-between gap-4 px-4">
-        <div className="flex-1 h-14 glass-panel rounded-xl flex items-center justify-center text-zinc-700 font-bold text-lg opacity-20 border-emerald-500/10">
-          D
+        <div className="flex-1 h-14 glass-panel rounded-xl flex items-center justify-center text-zinc-300 font-bold text-lg opacity-20 border-emerald-500/10">
+          ADVERTISEMENT
         </div>
         <button 
           onClick={() => setIsVisible(false)}
-          className="p-1.5 hover:bg-white/10 rounded-full text-zinc-500 transition-colors"
+          className="p-1.5 hover:bg-zinc-100 rounded-full text-zinc-400 transition-colors"
         >
           <X size={16} />
         </button>
@@ -607,35 +608,52 @@ export default function App() {
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const resetSettings = () => {
+    setSpeed(1.0);
+    setPitch(1.0);
+    setPause(0.5);
+    setAudioFormat('wav');
+    setTargetSampleRate(44100);
+    setStudioClarity(true);
+    setStyle('normal');
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSending(true);
-    
-    // EmailJS logic - Using environment variables for security
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_52isgcx';
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '__ejs-test-mail-service__';
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'IDmeLxswf1eiQFsde';
+    setSendSuccess(false);
 
-    emailjs.send(
-      serviceId,
-      templateId,
-      {
-        from_name: contactForm.name,
-        from_email: contactForm.email,
-        message: contactForm.message,
-        to_email: 'robotlinkan@gmail.com'
-      },
-      publicKey
-    ).then(() => {
-      setSendSuccess(true);
-      setContactForm({ name: '', email: '', message: '' });
-      setTimeout(() => setSendSuccess(false), 5000);
-    }).catch((err) => {
+    try {
+      // Use the environment variables for EmailJS
+      const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_52isgcx';
+      const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '__ejs-test-mail-service__';
+      const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'IDmeLxswf1eiQFsde';
+
+      const result = await emailjs.send(
+        serviceId,
+        templateId,
+        {
+          from_name: contactForm.name,
+          from_email: contactForm.email,
+          message: contactForm.message,
+          to_name: 'VoxNova Support',
+        },
+        publicKey
+      );
+
+      if (result.status === 200) {
+        setSendSuccess(true);
+        setContactForm({ name: '', email: '', message: '' });
+        setTimeout(() => setSendSuccess(false), 5000);
+      } else {
+        throw new Error('Failed to send');
+      }
+    } catch (err) {
       console.error('EmailJS Error:', err);
       setError("Failed to send message. Please use the Google Form link in the contact section below.");
-    }).finally(() => {
+    } finally {
       setIsSending(false);
-    });
+    }
   };
 
   const handleGenerate = async () => {
@@ -1330,7 +1348,7 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowSettings(false)}
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-white/80 backdrop-blur-sm"
           />
           <motion.div 
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -1343,111 +1361,97 @@ export default function App() {
                 <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
                   <Settings2 size={24} />
                 </div>
-                <h2 className="text-2xl font-display font-bold">Voice Settings</h2>
+                <h2 className="text-2xl font-display font-bold">Settings</h2>
               </div>
               <button 
                 onClick={() => setShowSettings(false)}
-                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
               >
                 <X size={24} />
               </button>
             </div>
 
-            <div className="space-y-8">
-              {/* Speed Control */}
+            <div className="space-y-6">
+              {/* Account Section */}
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-                    <Zap size={14} className="text-emerald-500" />
-                    Speaking Speed
-                  </label>
-                  <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-emerald-500">
-                    {speed.toFixed(1)}x
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.0"
-                  step="0.1"
-                  value={speed}
-                  onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
-                <div className="flex justify-between text-[10px] text-zinc-600 font-mono uppercase tracking-wider">
-                  <span>Slow</span>
-                  <span>Normal</span>
-                  <span>Fast</span>
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Account</h3>
+                {currentUser ? (
+                  <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img src={currentUser.photoURL || ''} alt="" className="w-10 h-10 rounded-full border border-zinc-200" />
+                      <div>
+                        <p className="text-sm font-bold">{currentUser.displayName}</p>
+                        <p className="text-xs text-zinc-500">{currentUser.email}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleLogout}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    >
+                      <LogOut size={20} />
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={handleLogin}
+                    className="w-full btn-primary"
+                  >
+                    <User size={20} />
+                    Sign In with Google
+                  </button>
+                )}
+              </div>
+
+              {/* System Section */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">System</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                        <Monitor size={18} />
+                      </div>
+                      <span className="text-sm font-medium">Theme</span>
+                    </div>
+                    <span className="text-xs font-bold text-zinc-400 uppercase">Light</span>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                        <Globe size={18} />
+                      </div>
+                      <span className="text-sm font-medium">Language</span>
+                    </div>
+                    <span className="text-xs font-bold text-zinc-400 uppercase">English</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Pitch Control */}
+              {/* Support Section */}
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-                    <Music size={14} className="text-emerald-500" />
-                    Voice Pitch
-                  </label>
-                  <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-emerald-500">
-                    {pitch.toFixed(1)}x
-                  </span>
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Support</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => { setShowSettings(false); setShowAbout(true); }}
+                    className="p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 text-xs font-medium transition-all"
+                  >
+                    About Us
+                  </button>
+                  <button 
+                    onClick={() => { setShowSettings(false); setShowContact(true); }}
+                    className="p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 text-xs font-medium transition-all"
+                  >
+                    Contact
+                  </button>
                 </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.5"
-                  step="0.1"
-                  value={pitch}
-                  onChange={(e) => setPitch(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
-                <div className="flex justify-between text-[10px] text-zinc-600 font-mono uppercase tracking-wider">
-                  <span>Deep</span>
-                  <span>Normal</span>
-                  <span>High</span>
-                </div>
-              </div>
-
-              {/* Pause Control */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-                    <Clock size={14} className="text-emerald-500" />
-                    Pause Gap
-                  </label>
-                  <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-emerald-500">
-                    {pause.toFixed(1)}s
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="3.0"
-                  step="0.1"
-                  value={pause}
-                  onChange={(e) => setPause(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
-                <div className="flex justify-between text-[10px] text-zinc-600 font-mono uppercase tracking-wider">
-                  <span>None</span>
-                  <span>Short</span>
-                  <span>Long</span>
-                </div>
-              </div>
-
-              <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
-                <p className="text-xs text-emerald-500/70 leading-relaxed">
-                  Tip: Use lower pitch and slower speed for a more cinematic, dramatic documentary feel.
-                </p>
               </div>
             </div>
 
-            <button 
-              onClick={() => setShowSettings(false)}
-              className="w-full btn-primary bg-emerald-500 hover:bg-emerald-400 text-white py-4 rounded-2xl font-bold"
-            >
-              Apply Settings
-            </button>
+            <div className="pt-4 border-t border-zinc-100 text-center">
+              <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">
+                VoxNova Text to Speech v2.1.0
+              </p>
+            </div>
           </motion.div>
         </div>
       )}
@@ -1463,84 +1467,84 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowHistoryModal(false)}
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-white/80 backdrop-blur-sm"
           />
           <motion.div 
             initial={{ scale: 0.9, opacity: 0, x: 50 }}
             animate={{ scale: 1, opacity: 1, x: 0 }}
             exit={{ scale: 0.9, opacity: 0, x: 50 }}
-            className="relative w-full max-w-2xl h-[80vh] glass-panel p-8 rounded-3xl flex flex-col"
+            className="relative w-full max-w-2xl h-[80vh] bg-white p-8 rounded-3xl flex flex-col border border-zinc-200 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
+                <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-600">
                   <History size={24} />
                 </div>
-                <h2 className="text-2xl font-display font-bold">Generation History</h2>
+                <h2 className="text-2xl font-display font-bold text-zinc-900">Generation History</h2>
               </div>
               <button 
                 onClick={() => setShowHistoryModal(false)}
-                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900"
               >
                 <X size={24} />
               </button>
             </div>
 
             <div className="relative mb-6">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
               <input 
                 type="text"
                 placeholder="Search history by text or voice..."
                 value={historySearchTerm}
                 onChange={(e) => setHistorySearchTerm(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:border-emerald-500 transition-all text-zinc-900"
               />
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
               {filteredHistory.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4">
+                <div className="flex flex-col items-center justify-center h-full text-zinc-400 space-y-4">
                   <History size={48} className="opacity-20" />
                   <p>No matching history found.</p>
                 </div>
               ) : (
                 filteredHistory.map((item) => (
-                  <div key={item.id} className="p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group">
+                  <div key={item.id} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">
+                          <span className="text-xs font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
                             {item.voice_name}
                           </span>
-                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                          <span className="text-[10px] text-zinc-400 uppercase tracking-wider">
                             {new Date(item.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className="text-sm text-zinc-300 line-clamp-2 italic">"{item.text}"</p>
+                        <p className="text-sm text-zinc-600 line-clamp-2 italic">"{item.text}"</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => playFromHistory(item.audio_data, item.id)}
-                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white' : 'bg-white/5 hover:bg-white/10 text-zinc-300'}`}
+                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white' : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600'}`}
                         >
                           {playingId === item.id ? <Pause size={18} /> : <Play size={18} />}
                         </button>
                         <button 
                           onClick={() => handleRestoreScript(item)}
                           title="Restore Script & Settings"
-                          className="p-3 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-xl transition-all"
+                          className="p-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
                         >
                           <RefreshCw size={18} />
                         </button>
                         <button 
                           onClick={() => downloadAudio(item.audio_data, `voxnova-${item.voice_name.toLowerCase()}-${item.id}.wav`)}
-                          className="p-3 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-xl transition-all"
+                          className="p-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
                         >
                           <Download size={18} />
                         </button>
                         <button 
                           onClick={() => deleteHistoryItem(item.id)}
-                          className="p-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                          className="p-3 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all border border-red-100"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -1628,27 +1632,27 @@ export default function App() {
       {showWelcome ? (
         <WelcomeScreen onComplete={() => setShowWelcome(false)} />
       ) : (
-        <div key="app" className="min-h-screen flex flex-col md:flex-row bg-[#0f1115] text-zinc-100 relative overflow-hidden">
+        <div key="app" className="min-h-screen flex flex-col md:flex-row bg-white text-zinc-900 relative overflow-hidden">
           {/* Mobile Header */}
-          <header className="md:hidden flex items-center justify-between p-4 border-b border-white/10 bg-[#0f1115] z-50">
+          <header className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 bg-white z-50">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                <Mic className="text-black w-5 h-5" />
+              <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center">
+                <Mic className="text-white w-5 h-5" />
               </div>
               <h1 className="text-lg font-display font-bold tracking-tight">VoxNova</h1>
             </div>
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-zinc-400 hover:text-white"
+              className="p-2 text-zinc-500 hover:text-zinc-900"
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </header>
 
           {/* Background Mesh Gradient */}
-          <div className="fixed inset-0 pointer-events-none opacity-20">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/20 blur-[120px] rounded-full" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
+          <div className="fixed inset-0 pointer-events-none opacity-40">
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full" />
           </div>
 
           <SettingsModal />
@@ -1657,13 +1661,13 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-64 bg-[#0f1115] border-r border-white/10 p-6 flex flex-col gap-8 transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-zinc-200 p-6 flex flex-col gap-8 transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="hidden md:flex items-center gap-3">
-          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-            <Mic className="text-black w-6 h-6" />
+          <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
+            <Mic className="text-white w-6 h-6" />
           </div>
           <h1 className="text-xl font-display font-bold tracking-tight">VoxNova</h1>
         </div>
@@ -1671,78 +1675,85 @@ export default function App() {
         <nav className="flex flex-col gap-2">
           <button 
             onClick={() => { setActiveTab('generate'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'generate' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'generate' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <Sparkles size={20} />
             Text to Speech Voice
           </button>
           <button 
             onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'history' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'history' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <History size={20} />
             History
           </button>
           <button 
             onClick={() => { setActiveTab('dubbing'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <LangIcon size={20} />
             AI Dubbing
           </button>
           <button 
             onClick={() => { setActiveTab('voice-changer'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'voice-changer' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'voice-changer' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <RefreshCw size={20} />
             Voice Changer
           </button>
           <button 
             onClick={() => { setShowVoiceLibrary(true); setIsMobileMenuOpen(false); }}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
           >
             <Library size={20} />
             Voice Library
           </button>
           <button 
+            onClick={() => { setShowSettings(true); setIsMobileMenuOpen(false); }}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
+          >
+            <Settings2 size={20} />
+            Settings
+          </button>
+          <button 
             onClick={() => { handleShare(); setIsMobileMenuOpen(false); }}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
           >
             <Share2 size={20} />
             Share App
           </button>
           <button 
             onClick={() => { setIsPricingModalOpen(true); setIsMobileMenuOpen(false); }}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-yellow-400 hover:text-white hover:bg-yellow-500/10 transition-all border border-yellow-500/20"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-all border border-emerald-100"
           >
             <Crown size={20} />
             Premium Plans
           </button>
         </nav>
 
-        <div className="mt-auto p-4 glass-panel rounded-2xl">
+        <div className="mt-auto p-4 glass-panel rounded-2xl border-zinc-100">
           {currentUser ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <img src={currentUser.photoURL || ''} alt="" className="w-10 h-10 rounded-full border border-white/10" />
+                <img src={currentUser.photoURL || ''} alt="" className="w-10 h-10 rounded-full border border-zinc-200" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold truncate">{currentUser.displayName}</p>
                   <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                     {isWhitelisted(currentUser.email) ? 'Owner' : (userProfile?.plan || 'Free')} Plan
                   </p>
                 </div>
-                <button onClick={handleLogout} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
+                <button onClick={handleLogout} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
                   <LogOut size={18} />
                 </button>
               </div>
-              <div className="pt-3 border-t border-white/5">
+              <div className="pt-3 border-t border-zinc-100">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] text-zinc-500 uppercase font-bold">Credits</span>
-                  <span className="text-xs font-mono text-emerald-400">
+                  <span className="text-xs font-mono text-emerald-600">
                     {isWhitelisted(currentUser.email) ? 'Unlimited' : (userProfile?.credits?.toLocaleString() || 0)}
                   </span>
                 </div>
-                <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-emerald-500 transition-all duration-500" 
                     style={{ width: isWhitelisted(currentUser.email) ? '100%' : `${Math.min(100, ((userProfile?.credits || 0) / 20000) * 100)}%` }} 
@@ -1753,7 +1764,7 @@ export default function App() {
           ) : (
             <button 
               onClick={handleLogin}
-              className="w-full flex items-center justify-center gap-2 bg-white text-black font-bold py-3 rounded-xl hover:bg-zinc-200 transition-all"
+              className="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white font-bold py-3 rounded-xl hover:bg-zinc-800 transition-all"
             >
               <User size={18} />
               Login with Google
@@ -1761,10 +1772,10 @@ export default function App() {
           )}
         </div>
 
-        <div className="mt-4 p-4 glass-panel rounded-2xl">
+        <div className="mt-4 p-4 glass-panel rounded-2xl border-zinc-100">
           <p className="text-xs text-zinc-500 mb-2">Current Voice</p>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold">
+            <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-bold">
               {selectedVoice.name[0]}
             </div>
             <div>
@@ -1801,98 +1812,98 @@ export default function App() {
       {/* Pricing Modal */}
       <AnimatePresence>
         {isPricingModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/80 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+              className="w-full max-w-4xl bg-white border border-zinc-200 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
             >
               <div className="flex justify-between items-center">
                 <div className="space-y-1">
-                  <h3 className="text-3xl font-display font-bold">Premium Plans</h3>
+                  <h3 className="text-3xl font-display font-bold text-zinc-900">Premium Plans</h3>
                   <p className="text-zinc-500">Choose the plan that fits your creative needs.</p>
                 </div>
-                <button onClick={() => setIsPricingModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
+                <button onClick={() => setIsPricingModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900">
                   <X size={24} />
                 </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {/* Free Plan */}
-                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
                   <div className="space-y-2">
-                    <h4 className="text-lg font-bold">Free</h4>
-                    <div className="text-3xl font-display font-bold">₹0<span className="text-sm text-zinc-500">/mo</span></div>
+                    <h4 className="text-lg font-bold text-zinc-900">Free</h4>
+                    <div className="text-3xl font-display font-bold text-zinc-900">₹0<span className="text-sm text-zinc-500">/mo</span></div>
                   </div>
-                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 20,000 Credits/mo</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Standard Voices</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Monthly Reset</li>
                   </ul>
-                  <button disabled className="w-full py-3 rounded-xl bg-zinc-800 text-zinc-500 font-bold text-sm">Current Plan</button>
+                  <button disabled className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-400 font-bold text-sm">Current Plan</button>
                 </div>
 
                 {/* Basic Plan */}
-                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
                   <div className="space-y-2">
-                    <h4 className="text-lg font-bold">Basic</h4>
-                    <div className="text-3xl font-display font-bold">₹100</div>
+                    <h4 className="text-lg font-bold text-zinc-900">Basic</h4>
+                    <div className="text-3xl font-display font-bold text-zinc-900">₹100</div>
                   </div>
-                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 6,000 Credits</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> No Expiry</li>
                   </ul>
-                  <button onClick={() => purchaseCredits('basic', 6000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
+                  <button onClick={() => purchaseCredits('basic', 6000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
                 </div>
 
                 {/* Pro Plan */}
-                <div className="p-6 bg-emerald-500/10 rounded-3xl border border-emerald-500/20 space-y-6 flex flex-col relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-emerald-500 text-black text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest">Best Value</div>
+                <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-6 flex flex-col relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest">Best Value</div>
                   <div className="space-y-2">
-                    <h4 className="text-lg font-bold">Pro</h4>
-                    <div className="text-3xl font-display font-bold">₹200</div>
+                    <h4 className="text-lg font-bold text-emerald-700">Pro</h4>
+                    <div className="text-3xl font-display font-bold text-emerald-700">₹200</div>
                   </div>
-                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                  <ul className="text-xs text-emerald-600 space-y-3 flex-1">
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 15,000 Credits</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
                   </ul>
-                  <button onClick={() => purchaseCredits('pro', 15000)} className="w-full py-3 rounded-xl bg-emerald-500 text-black font-bold text-sm hover:bg-emerald-400 transition-all">Buy Now</button>
+                  <button onClick={() => purchaseCredits('pro', 15000)} className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-all">Buy Now</button>
                 </div>
 
                 {/* Advanced Plan */}
-                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
                   <div className="space-y-2">
-                    <h4 className="text-lg font-bold">Advanced</h4>
-                    <div className="text-3xl font-display font-bold">₹400</div>
+                    <h4 className="text-lg font-bold text-zinc-900">Advanced</h4>
+                    <div className="text-3xl font-display font-bold text-zinc-900">₹400</div>
                   </div>
-                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 30,000 Credits</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
                   </ul>
-                  <button onClick={() => purchaseCredits('advanced', 30000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
+                  <button onClick={() => purchaseCredits('advanced', 30000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
                 </div>
 
                 {/* Ultra Plan */}
-                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-6 flex flex-col">
+                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
                   <div className="space-y-2">
-                    <h4 className="text-lg font-bold">Ultra</h4>
-                    <div className="text-3xl font-display font-bold">₹500</div>
+                    <h4 className="text-lg font-bold text-zinc-900">Ultra</h4>
+                    <div className="text-3xl font-display font-bold text-zinc-900">₹500</div>
                   </div>
-                  <ul className="text-xs text-zinc-400 space-y-3 flex-1">
+                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 40,000 Credits</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
                     <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Custom Voice Profiles</li>
                   </ul>
-                  <button onClick={() => purchaseCredits('ultra', 40000)} className="w-full py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-zinc-200 transition-all">Buy Now</button>
+                  <button onClick={() => purchaseCredits('ultra', 40000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
                 </div>
               </div>
 
-              <div className="p-6 bg-white/5 rounded-3xl text-center space-y-4">
-                <p className="text-xs text-zinc-400 font-medium uppercase tracking-widest">Secure Payments via Razorpay</p>
+              <div className="p-6 bg-zinc-50 rounded-3xl text-center space-y-4">
+                <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest">Secure Payments via Razorpay</p>
                 <div className="flex flex-wrap justify-center items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
                   <div className="flex flex-col items-center gap-1">
                     <img src="https://upload.wikimedia.org/wikipedia/commons/b/b2/Google_Pay_Logo.svg" alt="Google Pay" className="h-6" referrerPolicy="no-referrer" />
@@ -1910,7 +1921,7 @@ export default function App() {
                     <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo.png" alt="UPI" className="h-6" referrerPolicy="no-referrer" />
                   </div>
                 </div>
-                <p className="text-[10px] text-zinc-600">
+                <p className="text-[10px] text-zinc-400">
                   * 1 Credit = ~10 characters of text. Credits are deducted only on successful generation.
                 </p>
               </div>
@@ -1939,37 +1950,30 @@ export default function App() {
                 <div className="flex items-center gap-4">
                    <button 
                      onClick={() => setShowHistoryModal(true)}
-                     className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-white/10 rounded-xl text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                     className="flex items-center gap-2 px-4 py-2 bg-zinc-100 border border-zinc-200 rounded-xl text-sm text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200 transition-all"
                    >
                      <History size={16} />
                      History
                    </button>
-                   <button 
-                     onClick={() => setShowSettings(true)}
-                     className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-white/10 rounded-xl text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
-                   >
-                     <Settings2 size={16} />
-                     Settings
-                   </button>
-                   <div className="flex items-center gap-2 bg-zinc-900 border border-white/10 rounded-xl p-1">
+                   <div className="flex items-center gap-2 bg-zinc-100 border border-zinc-200 rounded-xl p-1">
                       <button 
                         onClick={() => setStudioClarity(!studioClarity)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${studioClarity ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-500 border border-transparent'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${studioClarity ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
                       >
                         <Sparkles size={14} />
                         Studio Clarity
                       </button>
                    </div>
-                   <div className="flex items-center gap-2 bg-zinc-900 border border-white/10 rounded-xl p-1">
+                   <div className="flex items-center gap-2 bg-zinc-100 border border-zinc-200 rounded-xl p-1">
                       <button 
                         onClick={() => setLanguage('en')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-all ${language === 'en' ? 'bg-white/10 text-white' : 'text-zinc-500'}`}
+                        className={`px-3 py-1.5 rounded-lg text-sm transition-all ${language === 'en' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
                       >
                         English
                       </button>
                       <button 
                         onClick={() => setLanguage('hi')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-all ${language === 'hi' ? 'bg-white/10 text-white' : 'text-zinc-500'}`}
+                        className={`px-3 py-1.5 rounded-lg text-sm transition-all ${language === 'hi' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
                       >
                         Hindi
                       </button>
@@ -1984,9 +1988,9 @@ export default function App() {
                     onChange={(e) => setText(e.target.value)}
                     placeholder="Enter your script here... (up to 10,000 characters)"
                     maxLength={10000}
-                    className="w-full h-64 bg-zinc-900/50 border border-white/10 rounded-2xl p-6 text-lg resize-none focus:outline-none focus:ring-2 focus:ring-white/10 transition-all placeholder:text-zinc-700"
+                    className="w-full h-64 bg-zinc-50 border border-zinc-200 rounded-2xl p-6 text-lg resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900/5 transition-all placeholder:text-zinc-400 text-zinc-900"
                   />
-                  <div className="absolute bottom-4 right-6 text-xs text-zinc-600 flex items-center gap-4">
+                  <div className="absolute bottom-4 right-6 text-xs text-zinc-400 flex items-center gap-4">
                     <button 
                       onClick={() => setText('')}
                       className="hover:text-white transition-colors"
@@ -2003,7 +2007,7 @@ export default function App() {
                       <span>{loadingMessages[loadingStep]}</span>
                       <span>{generationProgress}%</span>
                     </div>
-                    <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                    <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${generationProgress}%` }}
@@ -2088,12 +2092,12 @@ export default function App() {
                       onChange={(e) => setStyle(e.target.value)}
                       className="w-full bg-transparent text-sm focus:outline-none cursor-pointer"
                     >
-                      <option value="normal" className="bg-zinc-900">Normal</option>
-                      <option value="documentary" className="bg-zinc-900">Documentary</option>
-                      <option value="doc-pro" className="bg-zinc-900">Professional Documentary</option>
-                      <option value="emotional" className="bg-zinc-900">Emotional</option>
-                      <option value="storytelling" className="bg-zinc-900">Storytelling</option>
-                      <option value="motivational" className="bg-zinc-900">Motivational</option>
+                      <option value="normal" className="bg-white">Normal</option>
+                      <option value="documentary" className="bg-white">Documentary</option>
+                      <option value="doc-pro" className="bg-white">Professional Documentary</option>
+                      <option value="emotional" className="bg-white">Emotional</option>
+                      <option value="storytelling" className="bg-white">Storytelling</option>
+                      <option value="motivational" className="bg-white">Motivational</option>
                     </select>
                   </div>
 
@@ -2207,6 +2211,13 @@ export default function App() {
 
                 <div className="flex flex-col md:flex-row gap-4 pt-4">
                   <button 
+                    onClick={resetSettings}
+                    className="md:w-32 h-14 glass-panel flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-900 transition-all"
+                  >
+                    <RefreshCw size={18} />
+                    Reset
+                  </button>
+                  <button 
                     id="generate-btn"
                     onClick={handleGenerate}
                     disabled={isGenerating || !text.trim()}
@@ -2275,17 +2286,17 @@ export default function App() {
               className="max-w-4xl mx-auto space-y-8"
             >
               <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold">AI Dubbing</h2>
-                <p className="text-zinc-400">Translate and dub your audio into different languages with professional AI voices.</p>
+                <h2 className="text-3xl font-display font-bold text-zinc-900">AI Dubbing</h2>
+                <p className="text-zinc-500">Translate and dub your audio into different languages with professional AI voices.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload File</label>
                     <div 
                       onClick={() => document.getElementById('audio-upload')?.click()}
-                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}
+                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
                     >
                       <input 
                         type="file" id="audio-upload" hidden accept="audio/*,video/*" 
@@ -2296,11 +2307,11 @@ export default function App() {
                       />
                       {dubbingFile ? (
                         <>
-                          <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400">
+                          <div className="p-4 bg-emerald-100 rounded-2xl text-emerald-600">
                             <Music size={32} />
                           </div>
                           <div className="text-center">
-                            <p className="text-sm font-bold text-emerald-400">{dubbingFile.name}</p>
+                            <p className="text-sm font-bold text-emerald-600">{dubbingFile.name}</p>
                             <p className="text-xs text-zinc-500">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
                           </div>
                           <button 
@@ -2310,14 +2321,14 @@ export default function App() {
                               const audio = new Audio(url);
                               audio.play();
                             }}
-                            className="mt-2 px-4 py-1 bg-white/10 rounded-full text-[10px] hover:bg-white/20 transition-all flex items-center gap-2"
+                            className="mt-2 px-4 py-1 bg-zinc-100 rounded-full text-[10px] hover:bg-zinc-200 transition-all flex items-center gap-2 text-zinc-600"
                           >
                             <Play size={10} /> Preview Upload
                           </button>
                         </>
                       ) : (
                         <>
-                          <div className="p-4 bg-white/5 rounded-2xl text-zinc-500">
+                          <div className="p-4 bg-zinc-100 rounded-2xl text-zinc-400">
                             <Upload size={32} />
                           </div>
                           <p className="text-sm text-zinc-500">Click to upload</p>
@@ -2331,36 +2342,34 @@ export default function App() {
                     <select 
                       value={targetLanguage}
                       onChange={(e) => setTargetLanguage(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:border-white/20"
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm focus:outline-none focus:border-emerald-500 transition-all text-zinc-900"
                     >
-                      <option value="hi" className="bg-zinc-900">Hindi</option>
-                      <option value="bn" className="bg-zinc-900">Bengali</option>
-                      <option value="mr" className="bg-zinc-900">Marathi</option>
-                      <option value="te" className="bg-zinc-900">Telugu</option>
-                      <option value="ta" className="bg-zinc-900">Tamil</option>
-                      <option value="gu" className="bg-zinc-900">Gujarati</option>
-                      <option value="kn" className="bg-zinc-900">Kannada</option>
-                      <option value="en" className="bg-zinc-900">English</option>
-                      <option value="es" className="bg-zinc-900">Spanish</option>
-                      <option value="fr" className="bg-zinc-900">French</option>
+                      <option value="hi" className="bg-white">Hindi</option>
+                      <option value="bn" className="bg-white">Bengali</option>
+                      <option value="mr" className="bg-white">Marathi</option>
+                      <option value="te" className="bg-white">Telugu</option>
+                      <option value="ta" className="bg-white">Tamil</option>
+                      <option value="gu" className="bg-white">Gujarati</option>
+                      <option value="kn" className="bg-white">Kannada</option>
+                      <option value="en" className="bg-white">English</option>
+                      <option value="es" className="bg-white">Spanish</option>
+                      <option value="fr" className="bg-white">French</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">3. Select Voice</label>
                     <div 
                       onClick={() => setShowVoiceLibrary(true)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all"
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold">
+                        <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-700">
                           {selectedVoice.name[0]}
                         </div>
-                        <span className="text-sm font-medium">{selectedVoice.name}</span>
+                        <span className="text-sm font-medium text-zinc-900">{selectedVoice.name}</span>
                       </div>
-                      <ChevronDown size={16} className="text-zinc-500" />
+                      <ChevronDown size={16} className="text-zinc-400" />
                     </div>
                   </div>
 
@@ -2373,7 +2382,7 @@ export default function App() {
                       handleDubbing();
                     }}
                     disabled={isDubbing}
-                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-400' : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-emerald-500/20'}`}
+                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20'}`}
                   >
                     {isDubbing ? (
                       <div className="flex flex-col items-center gap-1">
@@ -2397,7 +2406,7 @@ export default function App() {
                         <span>{dubbingStep}</span>
                         <span>{dubbingProgress}%</span>
                       </div>
-                      <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                      <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${dubbingProgress}%` }}
@@ -2413,11 +2422,11 @@ export default function App() {
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="glass-panel p-8 rounded-[2.5rem] border-emerald-500/20 bg-emerald-500/5 space-y-6"
+                  className="glass-panel p-8 rounded-[2.5rem] border-emerald-500/20 bg-emerald-50 space-y-6"
                 >
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold flex items-center gap-2">
-                      <Sparkles className="text-emerald-400" /> Result
+                    <h3 className="text-xl font-bold flex items-center gap-2 text-zinc-900">
+                      <Sparkles className="text-emerald-500" /> Result
                     </h3>
                     <div className="flex gap-2">
                       <button 
@@ -2427,23 +2436,23 @@ export default function App() {
                           a.download = `dubbed-${Date.now()}.wav`;
                           a.click();
                         }}
-                        className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all"
+                        className="p-3 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-all text-zinc-600"
                       >
                         <Download size={20} />
                       </button>
                     </div>
                   </div>
                   
-                  <div className="p-4 bg-black/20 rounded-2xl">
-                    <p className="text-sm text-zinc-400 italic mb-4">"{dubbingResult.text}"</p>
+                  <div className="p-4 bg-zinc-100 rounded-2xl">
+                    <p className="text-sm text-zinc-600 italic mb-4">"{dubbingResult.text}"</p>
                     <audio src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
                   </div>
                 </motion.div>
               )}
 
-              <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
-                <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
-                  <Sparkles size={16} className="text-emerald-400" /> How it works
+              <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-zinc-900">
+                  <Sparkles size={16} className="text-emerald-500" /> How it works
                 </h4>
                 <p className="text-xs text-zinc-500 leading-relaxed">
                   Our AI will analyze your uploaded audio, transcribe the content, and then re-generate it using your selected target voice. For dubbing, it will also translate the content into your chosen language while maintaining the original meaning.
@@ -2459,17 +2468,17 @@ export default function App() {
               className="max-w-4xl mx-auto space-y-8"
             >
               <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold">Voice Changer</h2>
-                <p className="text-zinc-400">Transform your voice into any of our professional AI characters while maintaining emotion and tone.</p>
+                <h2 className="text-3xl font-display font-bold text-zinc-900">Voice Changer</h2>
+                <p className="text-zinc-500">Transform your voice into any of our professional AI characters while maintaining emotion and tone.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload File</label>
                     <div 
                       onClick={() => document.getElementById('audio-upload-vc')?.click()}
-                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}
+                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
                     >
                       <input 
                         type="file" id="audio-upload-vc" hidden accept="audio/*,video/*" 
@@ -2481,17 +2490,17 @@ export default function App() {
                       />
                       {dubbingFile ? (
                         <>
-                          <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400">
+                          <div className="p-4 bg-emerald-100 rounded-2xl text-emerald-600">
                             <Music size={32} />
                           </div>
                           <div className="text-center">
-                            <p className="text-sm font-bold text-emerald-400">{dubbingFile.name}</p>
+                            <p className="text-sm font-bold text-emerald-600">{dubbingFile.name}</p>
                             <p className="text-xs text-zinc-500">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
                           </div>
                         </>
                       ) : (
                         <>
-                          <div className="p-4 bg-white/5 rounded-2xl text-zinc-500">
+                          <div className="p-4 bg-zinc-100 rounded-2xl text-zinc-400">
                             <Upload size={32} />
                           </div>
                           <p className="text-sm text-zinc-500">Click to upload</p>
@@ -2501,20 +2510,20 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Select Target Voice</label>
                     <div 
                       onClick={() => setShowVoiceLibrary(true)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all"
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold">
+                        <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-700">
                           {selectedVoice.name[0]}
                         </div>
-                        <span className="text-sm font-medium">{selectedVoice.name}</span>
+                        <span className="text-sm font-medium text-zinc-900">{selectedVoice.name}</span>
                       </div>
-                      <ChevronDown size={16} className="text-zinc-500" />
+                      <ChevronDown size={16} className="text-zinc-400" />
                     </div>
                   </div>
 
@@ -2527,7 +2536,7 @@ export default function App() {
                       handleDubbing();
                     }}
                     disabled={isDubbing}
-                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-800/50 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-400' : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-emerald-500/20'}`}
+                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20'}`}
                   >
                     {isDubbing ? (
                       <div className="flex flex-col items-center gap-1">
@@ -2551,7 +2560,7 @@ export default function App() {
                         <span>{dubbingStep}</span>
                         <span>{dubbingProgress}%</span>
                       </div>
-                      <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                      <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${dubbingProgress}%` }}
@@ -2567,11 +2576,11 @@ export default function App() {
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="glass-panel p-8 rounded-[2.5rem] border-emerald-500/20 bg-emerald-500/5 space-y-6"
+                  className="glass-panel p-8 rounded-[2.5rem] border-emerald-500/20 bg-emerald-50 space-y-6"
                 >
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold flex items-center gap-2">
-                      <Sparkles className="text-emerald-400" /> Result
+                    <h3 className="text-xl font-bold flex items-center gap-2 text-zinc-900">
+                      <Sparkles className="text-emerald-500" /> Result
                     </h3>
                     <div className="flex gap-2">
                       <button 
@@ -2581,7 +2590,7 @@ export default function App() {
                           a.download = `voice-change-${Date.now()}.wav`;
                           a.click();
                         }}
-                        className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all"
+                        className="p-3 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-all text-zinc-600"
                       >
                         <Download size={20} />
                       </button>
@@ -2589,14 +2598,14 @@ export default function App() {
                   </div>
 
                   {dubbingResult.text && (
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <p className="text-sm text-zinc-400 leading-relaxed italic">
+                    <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                      <p className="text-sm text-zinc-600 leading-relaxed italic">
                         "{dubbingResult.text}"
                       </p>
                     </div>
                   )}
                   
-                  <div className="p-4 bg-black/20 rounded-2xl">
+                  <div className="p-4 bg-zinc-100 rounded-2xl">
                     <audio src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
                   </div>
                 </motion.div>
@@ -2611,32 +2620,32 @@ export default function App() {
               className="max-w-4xl mx-auto space-y-8"
             >
               <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold">Generation History</h2>
-                <p className="text-zinc-400">Access and download your previously generated audio files.</p>
+                <h2 className="text-3xl font-display font-bold text-zinc-900">Generation History</h2>
+                <p className="text-zinc-500">Access and download your previously generated audio files.</p>
               </div>
 
               <div className="space-y-4">
                 {history.length === 0 ? (
-                  <div className="text-center py-20 glass-panel rounded-3xl border-dashed">
-                    <History size={48} className="mx-auto text-zinc-700 mb-4" />
+                  <div className="text-center py-20 glass-panel rounded-3xl border-dashed border-zinc-200">
+                    <History size={48} className="mx-auto text-zinc-300 mb-4" />
                     <p className="text-zinc-500">No generations yet. Start by creating some audio!</p>
                   </div>
                 ) : (
                   history.map((item) => (
-                    <div key={item.id} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center">
+                    <div key={item.id} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
-                          <span className="px-2 py-0.5 bg-white/10 rounded text-[10px] font-bold uppercase tracking-wider">{item.voice_name}</span>
-                          <span className="px-2 py-0.5 bg-white/5 rounded text-[10px] text-zinc-500 uppercase tracking-wider">{item.style}</span>
-                          <span className="text-[10px] text-zinc-600">{new Date(item.created_at).toLocaleDateString()}</span>
+                          <span className="px-2 py-0.5 bg-zinc-100 rounded text-[10px] font-bold uppercase tracking-wider text-zinc-600">{item.voice_name}</span>
+                          <span className="px-2 py-0.5 bg-zinc-50 rounded text-[10px] text-zinc-400 uppercase tracking-wider">{item.style}</span>
+                          <span className="text-[10px] text-zinc-500">{new Date(item.created_at).toLocaleDateString()}</span>
                         </div>
-                        <p className="text-sm text-zinc-300 line-clamp-2 italic">"{item.text}"</p>
+                        <p className="text-sm text-zinc-600 line-clamp-2 italic">"{item.text}"</p>
                       </div>
                       
                       <div className="flex items-center gap-2 shrink-0">
                         <button 
                           onClick={() => playFromHistory(item.audio_data, item.id)}
-                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600'}`}
                         >
                           {playingId === item.id ? (
                             <div className="flex items-center gap-1">
@@ -2651,13 +2660,13 @@ export default function App() {
                         </button>
                         <button 
                           onClick={() => downloadAudio(item.audio_data, `voice-${item.id}`)}
-                          className="p-3 hover:bg-white/5 rounded-xl transition-all text-zinc-400 hover:text-white"
+                          className="p-3 hover:bg-zinc-100 rounded-xl transition-all text-zinc-400 hover:text-zinc-600"
                         >
                           <Download size={20} />
                         </button>
                         <button 
                           onClick={() => handleDeleteHistory(item.id)}
-                          className="p-3 hover:bg-red-500/10 rounded-xl transition-all text-zinc-600 hover:text-red-400"
+                          className="p-3 hover:bg-red-50 rounded-xl transition-all text-zinc-400 hover:text-red-500"
                         >
                           <Trash2 size={20} />
                         </button>
@@ -2676,36 +2685,36 @@ export default function App() {
 
         {/* Contact Section - Above Why Choose VoxNova */}
         <section className="max-w-4xl mx-auto py-16 px-6">
-          <div className="glass-panel p-10 rounded-[3rem] border-white/5 bg-white/2 space-y-8">
+          <div className="glass-panel p-10 rounded-[3rem] border-zinc-100 bg-zinc-50/50 space-y-8">
             <div className="text-center space-y-4">
-              <h2 className="text-3xl font-display font-bold">Get in Touch</h2>
-              <p className="text-zinc-400">Have questions or need support? We're here to help you create amazing content.</p>
+              <h2 className="text-3xl font-display font-bold text-zinc-900">Get in Touch</h2>
+              <p className="text-zinc-500">Have questions or need support? We're here to help you create amazing content.</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-emerald-400">
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center text-emerald-600">
                     <Mail size={24} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold">Email Support</p>
+                    <p className="text-sm font-bold text-zinc-900">Email Support</p>
                     <p className="text-xs text-zinc-500">Response within 24 hours</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400">
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center text-blue-600">
                     <Globe size={24} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold">Community</p>
+                    <p className="text-sm font-bold text-zinc-900">Community</p>
                     <p className="text-xs text-zinc-500">Join our creator network</p>
                   </div>
                 </div>
                 <div className="pt-6">
                   <button 
                     onClick={() => setShowContact(true)}
-                    className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-zinc-900 text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
                   >
                     <Mail size={18} />
                     Open Contact Form
@@ -2714,14 +2723,14 @@ export default function App() {
               </div>
 
               <div className="space-y-4">
-                <p className="text-sm text-zinc-400 leading-relaxed">
+                <p className="text-sm text-zinc-500 leading-relaxed">
                   For technical issues, please include your account email and generation ID if applicable. You can also reach us directly via our Google Form for faster processing of feature requests.
                 </p>
                 <a 
                   href="https://forms.gle/your-google-form-id" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-emerald-400 hover:text-emerald-300 text-sm font-bold transition-colors"
+                  className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-500 text-sm font-bold transition-colors"
                 >
                   Submit via Google Form <ExternalLink size={14} />
                 </a>
@@ -2735,52 +2744,52 @@ export default function App() {
           {/* Ad Section - Top of SEO */}
           <AdBox slot="5425662273" />
           <div className="text-center space-y-4">
-            <h2 className="text-4xl font-display font-bold text-white">Why Choose VoxNova AI?</h2>
-            <p className="text-zinc-400 max-w-2xl mx-auto">VoxNova is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
+            <h2 className="text-4xl font-display font-bold text-zinc-900">Why Choose VoxNova AI?</h2>
+            <p className="text-zinc-500 max-w-2xl mx-auto">VoxNova is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="glass-panel p-8 rounded-3xl space-y-4 border-white/5 hover:border-emerald-500/20 transition-all group">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+            <div className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
                 <Sparkles size={24} />
               </div>
-              <h3 className="text-xl font-bold">Ultra-Realistic Voices</h3>
+              <h3 className="text-xl font-bold text-zinc-900">Ultra-Realistic Voices</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">Our neural networks are trained on thousands of hours of professional studio recordings to capture the subtle nuances of human speech, including breath, rhythm, and emotion.</p>
             </div>
 
-            <div className="glass-panel p-8 rounded-3xl space-y-4 border-white/5 hover:border-emerald-500/20 transition-all group">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+            <div className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
                 <Globe size={24} />
               </div>
-              <h3 className="text-xl font-bold">Multilingual Support</h3>
+              <h3 className="text-xl font-bold text-zinc-900">Multilingual Support</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">Generate high-quality voiceovers in English and Hindi with perfect native accents. Our AI understands cultural nuances and provides localized performances for global audiences.</p>
             </div>
 
-            <div className="glass-panel p-8 rounded-3xl space-y-4 border-white/5 hover:border-emerald-500/20 transition-all group">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+            <div className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
                 <Mic size={24} />
               </div>
-              <h3 className="text-xl font-bold">Cinematic Narration</h3>
+              <h3 className="text-xl font-bold text-zinc-900">Cinematic Narration</h3>
               <p className="text-sm text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
             </div>
           </div>
 
-          <div className="glass-panel p-10 rounded-[3rem] border-white/5 bg-white/2 space-y-6">
-            <h3 className="text-2xl font-bold text-center">Professional Grade AI Tools</h3>
+          <div className="glass-panel p-10 rounded-[3rem] border-zinc-100 bg-zinc-50/50 space-y-6">
+            <h3 className="text-2xl font-bold text-center text-zinc-900">Professional Grade AI Tools</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
-                <h4 className="font-bold text-emerald-400">AI Voice Cloning</h4>
+                <h4 className="font-bold text-emerald-600">AI Voice Cloning</h4>
                 <p className="text-sm text-zinc-500">Clone any voice with just a few seconds of audio. Perfect for maintaining consistency across long-running series or dubbing content into multiple languages while keeping the original actor's essence.</p>
               </div>
               <div className="space-y-2">
-                <h4 className="font-bold text-emerald-400">Advanced Style Modulation</h4>
+                <h4 className="font-bold text-emerald-600">Advanced Style Modulation</h4>
                 <p className="text-sm text-zinc-500">Go beyond simple pitch and speed. Our AI allows you to control the emotional intensity, gravitas, and storytelling style of every generation, giving you full creative control.</p>
               </div>
             </div>
           </div>
 
           <div className="space-y-8">
-            <h3 className="text-3xl font-display font-bold text-center">How VoxNova Works</h3>
+            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">How VoxNova Works</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[
                 { step: '01', title: 'Input Text', desc: 'Paste your script into our advanced editor. We support long-form content up to 10,000 characters.' },
@@ -2789,8 +2798,8 @@ export default function App() {
                 { step: '04', title: 'Generate', desc: 'Our neural engines process your request in seconds, delivering studio-quality 48kHz audio.' }
               ].map((item, i) => (
                 <div key={i} className="p-6 space-y-3">
-                  <div className="text-4xl font-display font-bold text-emerald-500/20">{item.step}</div>
-                  <h4 className="font-bold">{item.title}</h4>
+                  <div className="text-4xl font-display font-bold text-zinc-100">{item.step}</div>
+                  <h4 className="font-bold text-zinc-900">{item.title}</h4>
                   <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
                 </div>
               ))}
@@ -2805,24 +2814,24 @@ export default function App() {
         </section>
 
         {/* Footer */}
-        <footer className="max-w-6xl mx-auto py-12 px-6 border-t border-white/5">
+        <footer className="max-w-6xl mx-auto py-12 px-6 border-t border-zinc-100">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
                 <Mic className="text-white" size={18} />
               </div>
-              <span className="text-xl font-display font-bold tracking-tighter">VOXNOVA</span>
+              <span className="text-xl font-display font-bold tracking-tighter text-zinc-900">VOXNOVA</span>
             </div>
             
             <div className="flex flex-wrap justify-center gap-6 text-sm text-zinc-500">
-              <button onClick={() => setShowAbout(true)} className="hover:text-white transition-colors">About Us</button>
-              <button onClick={() => setShowContact(true)} className="hover:text-white transition-colors">Contact Us</button>
-              <button onClick={() => setShowPrivacy(true)} className="hover:text-white transition-colors">Privacy Policy</button>
-              <button onClick={() => setShowTerms(true)} className="hover:text-white transition-colors">Terms of Service</button>
+              <button onClick={() => setShowAbout(true)} className="hover:text-zinc-900 transition-colors">About Us</button>
+              <button onClick={() => setShowContact(true)} className="hover:text-zinc-900 transition-colors">Contact Us</button>
+              <button onClick={() => setShowPrivacy(true)} className="hover:text-zinc-900 transition-colors">Privacy Policy</button>
+              <button onClick={() => setShowTerms(true)} className="hover:text-zinc-900 transition-colors">Terms of Service</button>
             </div>
 
-            <div className="text-xs text-zinc-600">
-              © 2026 VoxNova AI. All rights reserved.
+            <div className="text-xs text-zinc-400">
+              © 2026 VoxNova Text to Speech. All rights reserved.
             </div>
           </div>
         </footer>
@@ -2837,18 +2846,18 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowAbout(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-white/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[80vh] overflow-y-auto"
+              className="relative w-full max-w-2xl bg-white p-8 md:p-12 rounded-[2.5rem] border border-zinc-200 shadow-2xl max-h-[80vh] overflow-y-auto"
             >
-              <button onClick={() => setShowAbout(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <button onClick={() => setShowAbout(false)} className="absolute top-6 right-6 p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900"><X size={20} /></button>
               <div className="space-y-6">
-                <h2 className="text-3xl font-display font-bold">About VoxNova</h2>
-                <div className="space-y-4 text-zinc-400 leading-relaxed">
+                <h2 className="text-3xl font-display font-bold text-zinc-900">About VoxNova</h2>
+                <div className="space-y-4 text-zinc-500 leading-relaxed">
                   <p>VoxNova is a cutting-edge AI research lab dedicated to pushing the boundaries of synthetic speech and neural audio generation. Our mission is to democratize high-end cinematic voice production for creators worldwide.</p>
                   <p>Founded by a team of audio engineers and AI researchers, we believe that the future of storytelling is multimodal. By combining advanced deep learning with professional audio standards, we provide tools that were once only available to major film studios.</p>
                   <p>Our platform is built on the latest Gemini 2.5 architecture, optimized for emotional resonance, natural prosody, and crystal-clear studio fidelity.</p>
@@ -2863,19 +2872,19 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowContact(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-white/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-2xl bg-white p-8 md:p-12 rounded-[2.5rem] border border-zinc-200 shadow-2xl max-h-[90vh] overflow-y-auto"
             >
-              <button onClick={() => setShowContact(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <button onClick={() => setShowContact(false)} className="absolute top-6 right-6 p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900"><X size={20} /></button>
               <div className="space-y-8">
                 <div className="space-y-2">
-                  <h2 className="text-3xl font-display font-bold">Contact Us</h2>
-                  <p className="text-zinc-400">Have questions or feedback? We'd love to hear from you.</p>
+                  <h2 className="text-3xl font-display font-bold text-zinc-900">Contact Us</h2>
+                  <p className="text-zinc-500">Have questions or feedback? We'd love to hear from you.</p>
                 </div>
 
                 <form onSubmit={handleContactSubmit} className="space-y-4">
@@ -2887,7 +2896,7 @@ export default function App() {
                         type="text" 
                         value={contactForm.name}
                         onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/50 transition-all"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 transition-all text-zinc-900"
                         placeholder="Your Name"
                       />
                     </div>
@@ -2898,7 +2907,7 @@ export default function App() {
                         type="email" 
                         value={contactForm.email}
                         onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/50 transition-all"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 transition-all text-zinc-900"
                         placeholder="your@email.com"
                       />
                     </div>
@@ -2910,7 +2919,7 @@ export default function App() {
                       rows={4}
                       value={contactForm.message}
                       onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:outline-none focus:border-emerald-500/50 transition-all resize-none"
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 transition-all resize-none text-zinc-900"
                       placeholder="How can we help you?"
                     />
                   </div>
@@ -2921,14 +2930,14 @@ export default function App() {
                     {isSending ? <Loader2 className="animate-spin" /> : 'Send Message'}
                   </button>
                   {sendSuccess && (
-                    <p className="text-center text-emerald-400 text-sm font-bold animate-bounce">Message sent successfully!</p>
+                    <p className="text-center text-emerald-600 text-sm font-bold animate-bounce">Message sent successfully!</p>
                   )}
                 </form>
 
-                <div className="pt-8 border-t border-white/5 space-y-4">
+                <div className="pt-8 border-t border-zinc-100 space-y-4">
                   <p className="text-sm text-zinc-500 text-center">Alternatively, you can reach us via:</p>
                   <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-                    <a href="https://forms.gle/your-google-form-link" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full hover:bg-white/10 transition-all text-sm">
+                    <a href="https://forms.gle/your-google-form-link" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-zinc-50 rounded-full hover:bg-zinc-100 transition-all text-sm text-zinc-600">
                       <Sparkles size={16} /> Google Form
                     </a>
                   </div>
@@ -2943,32 +2952,32 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowPrivacy(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-white/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-3xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[80vh] overflow-y-auto"
+              className="relative w-full max-w-3xl bg-white p-8 md:p-12 rounded-[2.5rem] border border-zinc-200 shadow-2xl max-h-[80vh] overflow-y-auto"
             >
-              <button onClick={() => setShowPrivacy(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <button onClick={() => setShowPrivacy(false)} className="absolute top-6 right-6 p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900"><X size={20} /></button>
               <div className="space-y-8">
-                <h2 className="text-3xl font-display font-bold">Privacy Policy</h2>
-                <div className="space-y-6 text-zinc-400 text-sm leading-relaxed">
+                <h2 className="text-3xl font-display font-bold text-zinc-900">Privacy Policy</h2>
+                <div className="space-y-6 text-zinc-500 text-sm leading-relaxed">
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">1. Data Collection</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">1. Data Collection</h3>
                     <p>We collect minimal data necessary to provide our AI services. This includes your email address for authentication and the text scripts you provide for voice generation.</p>
                   </section>
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">2. Audio Data</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">2. Audio Data</h3>
                     <p>Generated audio files are stored temporarily to allow you to download them. We do not use your generated audio or input text to train our base models without explicit consent.</p>
                   </section>
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">3. Third-Party Services</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">3. Third-Party Services</h3>
                     <p>We use Google Firebase for authentication and database services, and Google Gemini API for AI processing. Your data is handled according to their respective privacy policies.</p>
                   </section>
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">4. Cookies</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">4. Cookies</h3>
                     <p>We use essential cookies to maintain your session and preferences. We do not use tracking cookies for advertising purposes.</p>
                   </section>
                 </div>
@@ -2982,32 +2991,32 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowTerms(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-white/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-3xl glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/10 max-h-[80vh] overflow-y-auto"
+              className="relative w-full max-w-3xl bg-white p-8 md:p-12 rounded-[2.5rem] border border-zinc-200 shadow-2xl max-h-[80vh] overflow-y-auto"
             >
-              <button onClick={() => setShowTerms(false)} className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20} /></button>
+              <button onClick={() => setShowTerms(false)} className="absolute top-6 right-6 p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900"><X size={20} /></button>
               <div className="space-y-8">
-                <h2 className="text-3xl font-display font-bold">Terms of Service</h2>
-                <div className="space-y-6 text-zinc-400 text-sm leading-relaxed">
+                <h2 className="text-3xl font-display font-bold text-zinc-900">Terms of Service</h2>
+                <div className="space-y-6 text-zinc-500 text-sm leading-relaxed">
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">1. Acceptable Use</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">1. Acceptable Use</h3>
                     <p>You agree not to use VoxNova to generate content that is illegal, harmful, threatening, abusive, harassing, defamatory, or otherwise objectionable. This includes generating deepfakes for malicious purposes.</p>
                   </section>
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">2. Intellectual Property</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">2. Intellectual Property</h3>
                     <p>You retain ownership of the text scripts you provide. VoxNova grants you a non-exclusive license to use the generated audio for personal or commercial purposes, provided you comply with these terms.</p>
                   </section>
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">3. Service Availability</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">3. Service Availability</h3>
                     <p>We strive for 100% uptime but do not guarantee uninterrupted service. We reserve the right to modify or discontinue features at any time.</p>
                   </section>
                   <section className="space-y-2">
-                    <h3 className="text-lg font-bold text-white">4. Credits & Payments</h3>
+                    <h3 className="text-lg font-bold text-zinc-900">4. Credits & Payments</h3>
                     <p>Credits purchased are non-refundable. Premium features are subject to active subscription status.</p>
                   </section>
                 </div>
@@ -3026,34 +3035,34 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowVoiceLibrary(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-white/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-5xl max-h-[80vh] bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col"
+              className="relative w-full max-w-5xl max-h-[80vh] bg-white border border-zinc-200 rounded-3xl overflow-hidden flex flex-col shadow-2xl"
             >
-              <div className="p-8 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="p-8 border-b border-zinc-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                  <h3 className="text-2xl font-display font-bold">Voice Library</h3>
+                  <h3 className="text-2xl font-display font-bold text-zinc-900">Voice Library</h3>
                   <p className="text-zinc-500 text-sm">Explore and preview professional AI voices.</p>
                 </div>
                 
                 <div className="flex items-center gap-4 flex-1 max-w-md">
                   <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
                     <input 
                       type="text"
                       placeholder="Search voices by name..."
                       value={voiceSearchTerm}
                       onChange={(e) => setVoiceSearchTerm(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-emerald-500/50 transition-all"
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-emerald-500 transition-all text-zinc-900"
                     />
                   </div>
                   <button 
                     onClick={() => setShowVoiceLibrary(false)}
-                    className="p-2 hover:bg-white/5 rounded-full transition-all shrink-0"
+                    className="p-2 hover:bg-zinc-100 rounded-full transition-all shrink-0 text-zinc-900"
                   >
                     <X size={24} />
                   </button>
@@ -3064,7 +3073,7 @@ export default function App() {
                 {VOICES.filter(v => v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase())).map((voice) => (
                   <div 
                     key={voice.id}
-                    className={`p-6 rounded-2xl border transition-all group relative ${selectedVoice.id === voice.id ? 'bg-white/10 border-white/20' : 'bg-zinc-800/50 border-white/5 hover:border-white/10'}`}
+                    className={`p-6 rounded-2xl border transition-all group relative ${selectedVoice.id === voice.id ? 'bg-zinc-50 border-zinc-900' : 'bg-white border-zinc-100 hover:border-zinc-300'}`}
                   >
                     <div 
                       className="absolute inset-0 cursor-pointer z-0"
@@ -3074,7 +3083,7 @@ export default function App() {
                       }}
                     />
                     <div className="flex items-center justify-between mb-4 relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center font-display font-bold text-xl group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center font-display font-bold text-xl text-zinc-900 group-hover:scale-110 transition-transform">
                         {voice.name[0]}
                       </div>
                       <div className="flex items-center gap-2">
@@ -3084,12 +3093,12 @@ export default function App() {
                             handlePreviewVoice(voice);
                           }}
                           disabled={previewingVoiceId === voice.id}
-                          className={`p-2 rounded-xl transition-all ${previewingVoiceId === voice.id ? 'bg-emerald-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+                          className={`p-2 rounded-xl transition-all ${previewingVoiceId === voice.id ? 'bg-emerald-500 text-white' : 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900'}`}
                         >
                           {previewingVoiceId === voice.id ? <Loader2 className="animate-spin" size={18} /> : <Volume2 size={18} />}
                         </button>
                         {selectedVoice.id === voice.id && (
-                          <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-black">
+                          <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white">
                             <Check size={16} />
                           </div>
                         )}
@@ -3097,11 +3106,11 @@ export default function App() {
                     </div>
                     
                     <div className="relative z-10">
-                      <h4 className="font-bold text-lg mb-1">{voice.name}</h4>
+                      <h4 className="font-bold text-lg mb-1 text-zinc-900">{voice.name}</h4>
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 px-2 py-0.5 bg-zinc-900 rounded">{voice.gender}</span>
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 px-2 py-0.5 bg-zinc-100 rounded">{voice.gender}</span>
                         {voice.isPremium && (
-                          <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 px-2 py-0.5 bg-emerald-500/10 rounded flex items-center gap-1">
+                          <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded flex items-center gap-1">
                             <Crown size={10} /> Pro
                           </span>
                         )}
@@ -3117,11 +3126,11 @@ export default function App() {
       </AnimatePresence>
 
       {/* Footer / Status */}
-      <footer className="fixed bottom-0 left-0 right-0 md:left-64 p-4 border-t border-white/5 bg-[#0a0a0a]/80 backdrop-blur-md flex items-center justify-between text-[10px] text-zinc-600 uppercase tracking-[0.2em]">
+      <footer className="fixed bottom-0 left-0 right-0 md:left-64 p-4 border-t border-zinc-100 bg-white/80 backdrop-blur-md flex items-center justify-between text-[10px] text-zinc-400 uppercase tracking-[0.2em] z-40">
         <div className="flex items-center gap-4">
         </div>
         <div className="hidden md:block">
-          VoxNova AI &copy; 2026
+          VoxNova Text to Speech &copy; 2026
         </div>
       </footer>
 
