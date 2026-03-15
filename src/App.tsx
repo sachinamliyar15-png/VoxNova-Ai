@@ -31,20 +31,87 @@ import {
   Search,
   Menu,
   HelpCircle,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Clock,
+  Mail,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { VOICES, Voice, Generation } from './types';
 import emailjs from 'emailjs-com';
 
-const AdBox = ({ className = "", label = "" }: { className?: string, label?: string }) => (
-  <div className={`glass-panel p-4 rounded-2xl flex flex-col items-center justify-center min-h-[120px] border-dashed border-white/10 bg-white/5 ${className}`}>
-    <div className="w-full h-full flex items-center justify-center text-zinc-700 font-display font-bold text-2xl opacity-20">
-      {label}
+const AdBox = ({ className = "", slot = "5425662273" }: { className?: string, slot?: string }) => {
+  useEffect(() => {
+    try {
+      // @ts-ignore
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {
+      // console.error("Adsbygoogle error:", e);
+    }
+  }, []);
+
+  return (
+    <div className={`glass-panel p-2 rounded-2xl flex flex-col items-center justify-center min-h-[180px] border-white/10 bg-white/5 overflow-hidden ${className}`}>
+      <ins
+        className="adsbygoogle"
+        style={{ display: 'block', width: '100%', height: '100%', minWidth: '300px', minHeight: '50px' }}
+        data-ad-client="ca-pub-6725485605608054"
+        data-ad-slot={slot}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      ></ins>
     </div>
-  </div>
-);
+  );
+};
+
+const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center overflow-hidden"
+    >
+      {/* Professional Animated Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full animate-pulse delay-700" />
+      </div>
+
+      <motion.div 
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 1, ease: "easeOut" }}
+        className="relative z-10 flex flex-col items-center gap-8"
+      >
+        <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-500/20">
+          <Mic className="text-black w-12 h-12" />
+        </div>
+        
+        <div className="text-center space-y-2">
+          <h1 className="text-6xl font-display font-bold tracking-tighter text-white">
+            VOX<span className="text-emerald-500">NOVA</span>
+          </h1>
+          <p className="text-zinc-500 font-medium tracking-[0.3em] uppercase text-xs">The Future of AI Voice</p>
+        </div>
+
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: 200 }}
+          transition={{ duration: 2, ease: "easeInOut" }}
+          onAnimationComplete={() => setTimeout(onComplete, 500)}
+          className="h-1 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+        />
+      </motion.div>
+
+      <div className="absolute bottom-12 text-zinc-600 text-[10px] uppercase tracking-widest font-bold">
+        Professional Studio Grade TTS
+      </div>
+    </motion.div>
+  );
+};
 
 const StickyFooterAd = () => {
   const [isVisible, setIsVisible] = useState(true);
@@ -531,6 +598,10 @@ export default function App() {
   const [showContact, setShowContact] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [showWelcome, setShowWelcome] = useState(true);
 
   const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
   const [isSending, setIsSending] = useState(false);
@@ -540,25 +611,28 @@ export default function App() {
     e.preventDefault();
     setIsSending(true);
     
-    // EmailJS logic - Using placeholders for ServiceID, TemplateID, and UserID
-    // User will need to configure these in their EmailJS dashboard
+    // EmailJS logic - Using environment variables for security
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_52isgcx';
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '__ejs-test-mail-service__';
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'IDmeLxswf1eiQFsde';
+
     emailjs.send(
-      'service_52isgcx', // Your EmailJS Service ID
-      'template_id', // Replace with your Template ID
+      serviceId,
+      templateId,
       {
         from_name: contactForm.name,
         from_email: contactForm.email,
         message: contactForm.message,
         to_email: 'robotlinkan@gmail.com'
       },
-      'user_id' // Replace with your Public Key (User ID)
+      publicKey
     ).then(() => {
       setSendSuccess(true);
       setContactForm({ name: '', email: '', message: '' });
       setTimeout(() => setSendSuccess(false), 5000);
     }).catch((err) => {
       console.error('EmailJS Error:', err);
-      setError("Failed to send message. Please try the Google Form or Mailto link.");
+      setError("Failed to send message. Please use the Google Form link in the contact section below.");
     }).finally(() => {
       setIsSending(false);
     });
@@ -625,7 +699,7 @@ export default function App() {
             'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
             'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
             'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Charon'
+            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon'
           };
 
           const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
@@ -671,7 +745,8 @@ export default function App() {
             'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
             'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
             'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
-            'Virat Best Voice': 'Extremely powerful, deep, and authoritative masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
+            'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
+            'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
           };
 
           promptPrefix += `${voiceTraits[selectedVoice.name] || ''} `;
@@ -1162,7 +1237,7 @@ export default function App() {
   };
 
   const deleteHistoryItem = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this generation from your history?")) return;
+    if (!window.confirm("Are you sure you want to delete this generation?")) return;
     try {
       const token = await currentUser!.getIdToken();
       const res = await fetch(`/api/history/${id}`, {
@@ -1173,9 +1248,13 @@ export default function App() {
       });
       if (res.ok) {
         setHistory(prev => prev.filter(item => item.id !== id));
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete history item:", err);
+      setError(`Delete failed: ${err.message}`);
     }
   };
 
@@ -1191,38 +1270,20 @@ export default function App() {
 
       if (!audioData) throw new Error("No audio data available");
       if (audioData === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
-        setError("This audio was too large to be stored in history. Please generate it again.");
+        setError("This audio was too large to be stored in history.");
         return;
       }
 
-      const pcmBuffer = base64ToArrayBuffer(audioData);
-      const resampledPcm = resamplePCM(pcmBuffer, 24000, targetSampleRate);
+      // Fix: History audio is already a WAV/MP3 base64, don't re-process as PCM
+      const blob = new Blob([base64ToArrayBuffer(audioData)], { 
+        type: audioData.startsWith('//') || audioData.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
+      });
+      const audioUrl = URL.createObjectURL(blob);
       
-      let finalBlob: Blob;
-      if (audioFormat === 'mp3') {
-        const _lamejs = (window as any).lamejs;
-        if (!_lamejs) throw new Error("MP3 encoder not loaded");
-        const mp3Encoder = new _lamejs.Mp3Encoder(1, targetSampleRate, 128);
-        const mp3Data: any[] = [];
-        const sampleBlockSize = 1152;
-        const pcmInt16 = new Int16Array(resampledPcm);
-        for (let i = 0; i < pcmInt16.length; i += sampleBlockSize) {
-          const sampleChunk = pcmInt16.subarray(i, i + sampleBlockSize);
-          const mp3buf = mp3Encoder.encodeBuffer(sampleChunk);
-          if (mp3buf.length > 0) mp3Data.push(new Uint8Array(mp3buf));
-        }
-        const mp3Last = mp3Encoder.flush();
-        if (mp3Last.length > 0) mp3Data.push(new Uint8Array(mp3Last));
-        finalBlob = new Blob(mp3Data, { type: 'audio/mp3' });
-      } else {
-        const wavHeader = createWavHeader(resampledPcm, targetSampleRate);
-        const combinedBuffer = new Uint8Array(wavHeader.byteLength + resampledPcm.byteLength);
-        combinedBuffer.set(new Uint8Array(wavHeader), 0);
-        combinedBuffer.set(new Uint8Array(resampledPcm), wavHeader.byteLength);
-        finalBlob = new Blob([combinedBuffer], { type: 'audio/wav' });
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
       
-      const audioUrl = URL.createObjectURL(finalBlob);
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
       setPlayingId(id);
@@ -1234,15 +1295,266 @@ export default function App() {
 
       audio.play().catch(e => {
         console.error("History playback failed:", e);
-        setError("Playback failed. Your browser might be blocking auto-play or the audio format is unsupported.");
+        setError("Playback failed. Please try downloading the file.");
         setPlayingId(null);
       });
     } catch (err: any) {
       console.error("Error playing from history:", err);
-      setError("Failed to process audio for playback.");
+      setError("Failed to play audio.");
       setPlayingId(null);
     }
   };
+
+  const handleRestoreScript = (item: Generation) => {
+    setText(item.text);
+    const voice = VOICES.find(v => v.name === item.voice_name);
+    if (voice) setSelectedVoice(voice);
+    setSpeed(item.speed || 1);
+    setPitch(item.pitch || 1);
+    setStyle(item.style || 'normal');
+    setActiveTab('generate');
+    setShowHistoryModal(false);
+  };
+
+  const filteredHistory = history.filter(item => 
+    item.text.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+    item.voice_name.toLowerCase().includes(historySearchTerm.toLowerCase())
+  );
+
+  const SettingsModal = () => (
+    <AnimatePresence>
+      {showSettings && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowSettings(false)}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative w-full max-w-md glass-panel p-8 rounded-3xl space-y-8"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
+                  <Settings2 size={24} />
+                </div>
+                <h2 className="text-2xl font-display font-bold">Voice Settings</h2>
+              </div>
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-8">
+              {/* Speed Control */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                    <Zap size={14} className="text-emerald-500" />
+                    Speaking Speed
+                  </label>
+                  <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-emerald-500">
+                    {speed.toFixed(1)}x
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.1"
+                  value={speed}
+                  onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-600 font-mono uppercase tracking-wider">
+                  <span>Slow</span>
+                  <span>Normal</span>
+                  <span>Fast</span>
+                </div>
+              </div>
+
+              {/* Pitch Control */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                    <Music size={14} className="text-emerald-500" />
+                    Voice Pitch
+                  </label>
+                  <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-emerald-500">
+                    {pitch.toFixed(1)}x
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="1.5"
+                  step="0.1"
+                  value={pitch}
+                  onChange={(e) => setPitch(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-600 font-mono uppercase tracking-wider">
+                  <span>Deep</span>
+                  <span>Normal</span>
+                  <span>High</span>
+                </div>
+              </div>
+
+              {/* Pause Control */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                    <Clock size={14} className="text-emerald-500" />
+                    Pause Gap
+                  </label>
+                  <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-emerald-500">
+                    {pause.toFixed(1)}s
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="3.0"
+                  step="0.1"
+                  value={pause}
+                  onChange={(e) => setPause(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-600 font-mono uppercase tracking-wider">
+                  <span>None</span>
+                  <span>Short</span>
+                  <span>Long</span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
+                <p className="text-xs text-emerald-500/70 leading-relaxed">
+                  Tip: Use lower pitch and slower speed for a more cinematic, dramatic documentary feel.
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowSettings(false)}
+              className="w-full btn-primary bg-emerald-500 hover:bg-emerald-400 text-white py-4 rounded-2xl font-bold"
+            >
+              Apply Settings
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+
+  const HistoryModal = () => (
+    <AnimatePresence>
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowHistoryModal(false)}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0, x: 50 }}
+            animate={{ scale: 1, opacity: 1, x: 0 }}
+            exit={{ scale: 0.9, opacity: 0, x: 50 }}
+            className="relative w-full max-w-2xl h-[80vh] glass-panel p-8 rounded-3xl flex flex-col"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
+                  <History size={24} />
+                </div>
+                <h2 className="text-2xl font-display font-bold">Generation History</h2>
+              </div>
+              <button 
+                onClick={() => setShowHistoryModal(false)}
+                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="relative mb-6">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+              <input 
+                type="text"
+                placeholder="Search history by text or voice..."
+                value={historySearchTerm}
+                onChange={(e) => setHistorySearchTerm(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+              />
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+              {filteredHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4">
+                  <History size={48} className="opacity-20" />
+                  <p>No matching history found.</p>
+                </div>
+              ) : (
+                filteredHistory.map((item) => (
+                  <div key={item.id} className="p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">
+                            {item.voice_name}
+                          </span>
+                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-zinc-300 line-clamp-2 italic">"{item.text}"</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => playFromHistory(item.audio_data, item.id)}
+                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white' : 'bg-white/5 hover:bg-white/10 text-zinc-300'}`}
+                        >
+                          {playingId === item.id ? <Pause size={18} /> : <Play size={18} />}
+                        </button>
+                        <button 
+                          onClick={() => handleRestoreScript(item)}
+                          title="Restore Script & Settings"
+                          className="p-3 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-xl transition-all"
+                        >
+                          <RefreshCw size={18} />
+                        </button>
+                        <button 
+                          onClick={() => downloadAudio(item.audio_data, `voxnova-${item.voice_name.toLowerCase()}-${item.id}.wav`)}
+                          className="p-3 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-xl transition-all"
+                        >
+                          <Download size={18} />
+                        </button>
+                        <button 
+                          onClick={() => deleteHistoryItem(item.id)}
+                          className="p-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
 
   const downloadAudio = (audioDataOrUrl: string, fileName: string) => {
     try {
@@ -1312,28 +1624,36 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#0f1115] text-zinc-100 relative overflow-hidden">
-      {/* Mobile Header */}
-      <header className="md:hidden flex items-center justify-between p-4 border-b border-white/10 bg-[#0f1115] z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-            <Mic className="text-black w-5 h-5" />
-          </div>
-          <h1 className="text-lg font-display font-bold tracking-tight">VoxNova</h1>
-        </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-zinc-400 hover:text-white"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </header>
+    <AnimatePresence mode="wait">
+      {showWelcome ? (
+        <WelcomeScreen onComplete={() => setShowWelcome(false)} />
+      ) : (
+        <div key="app" className="min-h-screen flex flex-col md:flex-row bg-[#0f1115] text-zinc-100 relative overflow-hidden">
+          {/* Mobile Header */}
+          <header className="md:hidden flex items-center justify-between p-4 border-b border-white/10 bg-[#0f1115] z-50">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+                <Mic className="text-black w-5 h-5" />
+              </div>
+              <h1 className="text-lg font-display font-bold tracking-tight">VoxNova</h1>
+            </div>
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 text-zinc-400 hover:text-white"
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </header>
 
-      {/* Background Mesh Gradient for Professional Look */}
-      <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/20 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
-      </div>
+          {/* Background Mesh Gradient */}
+          <div className="fixed inset-0 pointer-events-none opacity-20">
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/20 blur-[120px] rounded-full" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
+          </div>
+
+          <SettingsModal />
+          <HistoryModal />
+          <StickyFooterAd />
 
       {/* Sidebar */}
       <aside className={`
@@ -1617,6 +1937,20 @@ export default function App() {
                 </div>
                 
                 <div className="flex items-center gap-4">
+                   <button 
+                     onClick={() => setShowHistoryModal(true)}
+                     className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-white/10 rounded-xl text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                   >
+                     <History size={16} />
+                     History
+                   </button>
+                   <button 
+                     onClick={() => setShowSettings(true)}
+                     className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-white/10 rounded-xl text-sm text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                   >
+                     <Settings2 size={16} />
+                     Settings
+                   </button>
                    <div className="flex items-center gap-2 bg-zinc-900 border border-white/10 rounded-xl p-1">
                       <button 
                         onClick={() => setStudioClarity(!studioClarity)}
@@ -1919,9 +2253,6 @@ export default function App() {
                     </div>
                   )}
                 </div>
-
-                <AdBox className="mt-16" label="A" />
-
 
                 {currentAudio && (
                   <audio 
@@ -2341,14 +2672,68 @@ export default function App() {
 
         {/* Bottom Ads Section */}
         <div className="mt-12 pt-12 border-t border-white/5 max-w-4xl mx-auto pb-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <AdBox label="B" />
-            <AdBox label="C" />
-          </div>
         </div>
 
-        {/* SEO Content Section */}
+        {/* Contact Section - Above Why Choose VoxNova */}
+        <section className="max-w-4xl mx-auto py-16 px-6">
+          <div className="glass-panel p-10 rounded-[3rem] border-white/5 bg-white/2 space-y-8">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl font-display font-bold">Get in Touch</h2>
+              <p className="text-zinc-400">Have questions or need support? We're here to help you create amazing content.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-emerald-400">
+                    <Mail size={24} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">Email Support</p>
+                    <p className="text-xs text-zinc-500">Response within 24 hours</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400">
+                    <Globe size={24} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">Community</p>
+                    <p className="text-xs text-zinc-500">Join our creator network</p>
+                  </div>
+                </div>
+                <div className="pt-6">
+                  <button 
+                    onClick={() => setShowContact(true)}
+                    className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Mail size={18} />
+                    Open Contact Form
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  For technical issues, please include your account email and generation ID if applicable. You can also reach us directly via our Google Form for faster processing of feature requests.
+                </p>
+                <a 
+                  href="https://forms.gle/your-google-form-id" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-emerald-400 hover:text-emerald-300 text-sm font-bold transition-colors"
+                >
+                  Submit via Google Form <ExternalLink size={14} />
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SEO Content Section (The "Boxes") - Moved to Bottom */}
         <section className="max-w-4xl mx-auto py-16 px-6 space-y-12">
+          {/* Ad Section - Top of SEO */}
+          <AdBox slot="5425662273" />
           <div className="text-center space-y-4">
             <h2 className="text-4xl font-display font-bold text-white">Why Choose VoxNova AI?</h2>
             <p className="text-zinc-400 max-w-2xl mx-auto">VoxNova is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
@@ -2410,6 +2795,12 @@ export default function App() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Bottom Ad Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
+            <AdBox slot="5425662273" />
+            <AdBox slot="5425662273" />
           </div>
         </section>
 
@@ -2537,9 +2928,6 @@ export default function App() {
                 <div className="pt-8 border-t border-white/5 space-y-4">
                   <p className="text-sm text-zinc-500 text-center">Alternatively, you can reach us via:</p>
                   <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-                    <a href="mailto:robotlinkan@gmail.com" className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full hover:bg-white/10 transition-all text-sm">
-                      <HelpCircle size={16} /> Direct Email
-                    </a>
                     <a href="https://forms.gle/your-google-form-link" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full hover:bg-white/10 transition-all text-sm">
                       <Sparkles size={16} /> Google Form
                     </a>
@@ -2736,6 +3124,16 @@ export default function App() {
           VoxNova AI &copy; 2026
         </div>
       </footer>
-    </div>
+
+      {/* AdSense at the Bottom */}
+      <div className="max-w-4xl mx-auto w-full p-6 space-y-8">
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-[10px] text-zinc-600 uppercase tracking-[0.2em]">Sponsored Content</p>
+          <AdBox className="w-full h-[90px]" slot="5425662273" />
+        </div>
+      </div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -30,7 +30,8 @@ export const VOICES: Voice[] = [
   { id: 'clara', name: 'Clara', gender: 'female', description: 'Kind, helpful, approachable realism' },
   { id: 'doc-pro', name: 'Documentary Pro', gender: 'male', description: 'Deep, cinematic, elite documentary narration', isPremium: true },
   { id: 'atlas-do', name: 'Atlas (Do)', gender: 'male', description: 'Ultra-high quality cinematic documentary voice' },
-  { id: 'virat-best', name: 'Virat Best Voice', gender: 'male', description: 'Powerful, deep, and authoritative male voice - perfect for professional documentaries' },
+  { id: 'priyanka', name: 'Priyanka', gender: 'female', description: 'Powerful, deep, and authoritative female voice - perfect for professional documentaries' },
+  { id: 'virat-male', name: 'Virat', gender: 'male', description: 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.' },
 ];
 
 export interface Generation {
