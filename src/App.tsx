@@ -92,10 +92,10 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
         </div>
         
         <div className="text-center space-y-2">
-          <h1 className="text-6xl font-display font-bold tracking-tighter text-zinc-900">
-            VOX<span className="text-emerald-500">NOVA</span>
+          <h1 className="text-5xl font-display font-bold tracking-tighter text-zinc-900 flex flex-col items-center">
+            <div>VOX<span className="text-emerald-500">NOVA</span></div>
+            <div className="text-xl text-zinc-400 font-medium tracking-tight mt-1">Text to Speech</div>
           </h1>
-          <p className="text-zinc-400 font-medium tracking-[0.3em] uppercase text-xs">Text to Speech Voice</p>
         </div>
 
         <motion.div 
@@ -491,7 +491,7 @@ export default function App() {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: "VoxNova AI",
+        name: "VoxNova Text to Speech",
         description: `Purchase ${credits.toLocaleString()} Credits`,
         order_id: orderData.id,
         handler: async (response: any) => {
@@ -538,7 +538,7 @@ export default function App() {
 
   const handleShare = async () => {
     const shareData = {
-      title: 'VoxNova AI - Professional Voice Generator',
+      title: 'VoxNova Text to Speech - Professional Voice Generator',
       text: 'Check out this amazing AI Voice Generator! Create professional narrations in Hindi and English.',
       url: window.location.href
     };
@@ -636,7 +636,7 @@ export default function App() {
           from_name: contactForm.name,
           from_email: contactForm.email,
           message: contactForm.message,
-          to_name: 'VoxNova Support',
+          to_name: 'VoxNova Text to Speech Support',
         },
         publicKey
       );
@@ -1639,7 +1639,9 @@ export default function App() {
               <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center">
                 <Mic className="text-white w-5 h-5" />
               </div>
-              <h1 className="text-lg font-display font-bold tracking-tight">VoxNova</h1>
+              <h1 className="text-lg font-display font-bold tracking-tight">
+                VoxNova <span className="text-emerald-500 font-medium text-sm">Text to Speech</span>
+              </h1>
             </div>
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -1669,7 +1671,9 @@ export default function App() {
           <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center">
             <Mic className="text-white w-6 h-6" />
           </div>
-          <h1 className="text-xl font-display font-bold tracking-tight">VoxNova</h1>
+          <h1 className="text-xl font-display font-bold tracking-tight">
+            VoxNova <span className="text-emerald-500 font-medium text-base">Text to Speech</span>
+          </h1>
         </div>
 
         <nav className="flex flex-col gap-2">
@@ -2688,7 +2692,7 @@ export default function App() {
         <div className="mt-12 pt-12 border-t border-white/5 max-w-4xl mx-auto pb-12">
         </div>
 
-        {/* Contact Section - Above Why Choose VoxNova */}
+        {/* Contact Section - Above Why Choose VoxNova Text to Speech */}
         <section className="max-w-4xl mx-auto py-16 px-6">
           <div className="glass-panel p-10 rounded-[3rem] border-zinc-100 bg-zinc-50/50 space-y-8">
             <div className="text-center space-y-4">
@@ -2753,8 +2757,8 @@ export default function App() {
           {/* Ad Section - Top of SEO */}
           <AdBox slot="5425662273" />
           <div className="text-center space-y-4">
-            <h2 className="text-4xl font-display font-bold text-zinc-900">Why Choose VoxNova AI?</h2>
-            <p className="text-zinc-500 max-w-2xl mx-auto">VoxNova is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
+            <h2 className="text-4xl font-display font-bold text-zinc-900">Why Choose VoxNova Text to Speech?</h2>
+            <p className="text-zinc-500 max-w-2xl mx-auto">VoxNova Text to Speech is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -2779,7 +2783,7 @@ export default function App() {
                 <Mic size={24} />
               </div>
               <h3 className="text-xl font-bold text-zinc-900">Cinematic Narration</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
+              <p className="text-sm text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova Text to Speech provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
             </div>
           </div>
 
@@ -2798,7 +2802,7 @@ export default function App() {
           </div>
 
           <div className="space-y-8">
-            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">How VoxNova Works</h3>
+            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">How VoxNova Text to Speech Works</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[
                 { step: '01', title: 'Input Text', desc: 'Paste your script into our advanced editor. We support long-form content up to 10,000 characters.' },
@@ -2829,7 +2833,10 @@ export default function App() {
               <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
                 <Mic className="text-white" size={18} />
               </div>
-              <span className="text-xl font-display font-bold tracking-tighter text-zinc-900">VOXNOVA</span>
+              <div className="flex flex-col">
+                <span className="text-xl font-display font-bold tracking-tighter text-zinc-900">VOXNOVA</span>
+                <span className="text-[10px] text-emerald-500 font-medium tracking-widest -mt-1 uppercase">Text to Speech</span>
+              </div>
             </div>
             
             <div className="flex flex-wrap justify-center gap-6 text-sm text-zinc-500">
@@ -2864,9 +2871,9 @@ export default function App() {
             >
               <button onClick={() => setShowAbout(false)} className="absolute top-6 right-6 p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900"><X size={20} /></button>
               <div className="space-y-6">
-                <h2 className="text-3xl font-display font-bold text-zinc-900">About VoxNova</h2>
+                <h2 className="text-3xl font-display font-bold text-zinc-900">About VoxNova Text to Speech</h2>
                 <div className="space-y-4 text-zinc-500 leading-relaxed">
-                  <p>VoxNova is a cutting-edge AI research lab dedicated to pushing the boundaries of synthetic speech and neural audio generation. Our mission is to democratize high-end cinematic voice production for creators worldwide.</p>
+                  <p>VoxNova Text to Speech is a cutting-edge AI research lab dedicated to pushing the boundaries of synthetic speech and neural audio generation. Our mission is to democratize high-end cinematic voice production for creators worldwide.</p>
                   <p>Founded by a team of audio engineers and AI researchers, we believe that the future of storytelling is multimodal. By combining advanced deep learning with professional audio standards, we provide tools that were once only available to major film studios.</p>
                   <p>Our platform is built on the latest Gemini 2.5 architecture, optimized for emotional resonance, natural prosody, and crystal-clear studio fidelity.</p>
                 </div>
@@ -3013,11 +3020,11 @@ export default function App() {
                 <div className="space-y-6 text-zinc-500 text-sm leading-relaxed">
                   <section className="space-y-2">
                     <h3 className="text-lg font-bold text-zinc-900">1. Acceptable Use</h3>
-                    <p>You agree not to use VoxNova to generate content that is illegal, harmful, threatening, abusive, harassing, defamatory, or otherwise objectionable. This includes generating deepfakes for malicious purposes.</p>
+                    <p>You agree not to use VoxNova Text to Speech to generate content that is illegal, harmful, threatening, abusive, harassing, defamatory, or otherwise objectionable. This includes generating deepfakes for malicious purposes.</p>
                   </section>
                   <section className="space-y-2">
                     <h3 className="text-lg font-bold text-zinc-900">2. Intellectual Property</h3>
-                    <p>You retain ownership of the text scripts you provide. VoxNova grants you a non-exclusive license to use the generated audio for personal or commercial purposes, provided you comply with these terms.</p>
+                    <p>You retain ownership of the text scripts you provide. VoxNova Text to Speech grants you a non-exclusive license to use the generated audio for personal or commercial purposes, provided you comply with these terms.</p>
                   </section>
                   <section className="space-y-2">
                     <h3 className="text-lg font-bold text-zinc-900">3. Service Availability</h3>
