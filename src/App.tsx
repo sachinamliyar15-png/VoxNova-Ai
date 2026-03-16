@@ -58,7 +58,7 @@ const AdBox = ({ className = "", slot = "5425662273" }: { className?: string, sl
       <ins
         className="adsbygoogle"
         style={{ display: 'block', width: '100%', height: '100%', minWidth: '300px', minHeight: '50px' }}
-        data-ad-client="ca-pub-6725485605608054"
+        data-ad-client="ca-pub-2663893470385909"
         data-ad-slot={slot}
         data-ad-format="auto"
         data-full-width-responsive="true"
@@ -95,7 +95,7 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
           <h1 className="text-6xl font-display font-bold tracking-tighter text-zinc-900">
             VOX<span className="text-emerald-500">NOVA</span>
           </h1>
-          <p className="text-zinc-400 font-medium tracking-[0.3em] uppercase text-xs">The Future of AI Voice</p>
+          <p className="text-zinc-400 font-medium tracking-[0.3em] uppercase text-xs">Text to Speech Voice</p>
         </div>
 
         <motion.div 
@@ -1681,13 +1681,6 @@ export default function App() {
             Text to Speech Voice
           </button>
           <button 
-            onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'history' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
-          >
-            <History size={20} />
-            History
-          </button>
-          <button 
             onClick={() => { setActiveTab('dubbing'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
@@ -1707,13 +1700,6 @@ export default function App() {
           >
             <Library size={20} />
             Voice Library
-          </button>
-          <button 
-            onClick={() => { setShowSettings(true); setIsMobileMenuOpen(false); }}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
-          >
-            <Settings2 size={20} />
-            Settings
           </button>
           <button 
             onClick={() => { handleShare(); setIsMobileMenuOpen(false); }}
@@ -1742,9 +1728,18 @@ export default function App() {
                     {isWhitelisted(currentUser.email) ? 'Owner' : (userProfile?.plan || 'Free')} Plan
                   </p>
                 </div>
-                <button onClick={handleLogout} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
-                  <LogOut size={18} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setShowSettings(true)}
+                    className="p-2 text-zinc-400 hover:text-zinc-900 transition-colors"
+                    title="Settings"
+                  >
+                    <Settings2 size={18} />
+                  </button>
+                  <button onClick={handleLogout} className="p-2 text-zinc-400 hover:text-red-500 transition-colors" title="Logout">
+                    <LogOut size={18} />
+                  </button>
+                </div>
               </div>
               <div className="pt-3 border-t border-zinc-100">
                 <div className="flex justify-between items-center mb-1">
@@ -2102,9 +2097,17 @@ export default function App() {
                   </div>
 
                   <div className="glass-panel p-4 rounded-2xl space-y-3">
-                    <label className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                      <Settings2 size={14} /> Controls
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                        <Settings2 size={14} /> Controls
+                      </label>
+                      <button 
+                        onClick={resetSettings}
+                        className="text-[10px] text-zinc-400 hover:text-zinc-900 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+                      >
+                        <RefreshCw size={10} /> Reset
+                      </button>
+                    </div>
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] text-zinc-500">
@@ -2114,19 +2117,19 @@ export default function App() {
                         <div className="flex gap-2 mb-2">
                           <button 
                             onClick={() => setSpeed(0.7)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 0.7 ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 0.7 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Slow
                           </button>
                           <button 
                             onClick={() => setSpeed(1.0)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.0 ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.0 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Normal
                           </button>
                           <button 
                             onClick={() => setSpeed(1.4)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.4 ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.4 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Fast
                           </button>
@@ -2134,7 +2137,7 @@ export default function App() {
                         <input 
                           type="range" min="0.5" max="2" step="0.1" 
                           value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                          className="w-full accent-white h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                          className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
                         />
                       </div>
                       <div className="space-y-1">
@@ -2145,7 +2148,7 @@ export default function App() {
                         <input 
                           type="range" min="0.5" max="1.5" step="0.1" 
                           value={pitch} onChange={(e) => setPitch(parseFloat(e.target.value))}
-                          className="w-full accent-white h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                          className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
                         />
                       </div>
                       <div className="space-y-1">
@@ -2156,24 +2159,24 @@ export default function App() {
                         <input 
                           type="range" min="0.1" max="1" step="0.1" 
                           value={pause} onChange={(e) => setPause(parseFloat(e.target.value))}
-                          className="w-full accent-white h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer"
+                          className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
                         />
                       </div>
 
-                      <div className="space-y-1 pt-2 border-t border-white/5">
+                      <div className="space-y-1 pt-2 border-t border-zinc-100">
                         <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
                           <span>Output Format</span>
                         </div>
                         <div className="flex gap-2">
                           <button 
                             onClick={() => setAudioFormat('wav')}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${audioFormat === 'wav' ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${audioFormat === 'wav' ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             WAV
                           </button>
                           <button 
                             onClick={() => setAudioFormat('mp3')}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${audioFormat === 'mp3' ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${audioFormat === 'mp3' ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             MP3
                           </button>
@@ -2187,19 +2190,19 @@ export default function App() {
                         <div className="flex gap-2">
                           <button 
                             onClick={() => setTargetSampleRate(24000)}
-                            className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 24000 ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 24000 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             24kHz
                           </button>
                           <button 
                             onClick={() => setTargetSampleRate(44100)}
-                            className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 44100 ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 44100 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             44.1kHz
                           </button>
                           <button 
                             onClick={() => setTargetSampleRate(48000)}
-                            className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 48000 ? 'bg-white/10 border-white/20 text-white' : 'border-white/5 text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 48000 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             48kHz
                           </button>
@@ -2209,7 +2212,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-4 pt-4">
+              <div className="flex flex-col md:flex-row gap-4 pt-4">
                   <button 
                     onClick={resetSettings}
                     className="md:w-32 h-14 glass-panel flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-900 transition-all"
@@ -2356,6 +2359,8 @@ export default function App() {
                       <option value="fr" className="bg-white">French</option>
                     </select>
                   </div>
+                </div>
+
                 <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">3. Select Voice</label>
@@ -2712,28 +2717,32 @@ export default function App() {
                   </div>
                 </div>
                 <div className="pt-6">
-                  <button 
-                    onClick={() => setShowContact(true)}
+                  <a 
+                    href="https://docs.google.com/forms/d/e/1FAIpQLSeTJ4HGSwYNxAYwHwa_OTayYQfY3marHFgLHwHPe_M1yT5bEQ/viewform?embedded=true"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="w-full py-4 bg-zinc-900 text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
                   >
-                    <Mail size={18} />
-                    Open Contact Form
-                  </button>
+                    <ExternalLink size={18} />
+                    Open Google Form
+                  </a>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <p className="text-sm text-zinc-500 leading-relaxed">
-                  For technical issues, please include your account email and generation ID if applicable. You can also reach us directly via our Google Form for faster processing of feature requests.
-                </p>
-                <a 
-                  href="https://forms.gle/your-google-form-id" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-500 text-sm font-bold transition-colors"
-                >
-                  Submit via Google Form <ExternalLink size={14} />
-                </a>
+                <div className="rounded-2xl overflow-hidden border border-zinc-200 bg-white h-[300px]">
+                  <iframe 
+                    src="https://docs.google.com/forms/d/e/1FAIpQLSeTJ4HGSwYNxAYwHwa_OTayYQfY3marHFgLHwHPe_M1yT5bEQ/viewform?embedded=true" 
+                    width="100%" 
+                    height="100%" 
+                    frameBorder="0" 
+                    marginHeight={0} 
+                    marginWidth={0}
+                  >
+                    Loading…
+                  </iframe>
+                </div>
+                <p className="text-[10px] text-zinc-400 text-center uppercase tracking-widest">Official Support Form</p>
               </div>
             </div>
           </div>
@@ -2835,8 +2844,7 @@ export default function App() {
             </div>
           </div>
         </footer>
-      </main>
-
+        
       <StickyFooterAd />
 
       {/* Legal & Info Modals */}
@@ -2937,8 +2945,8 @@ export default function App() {
                 <div className="pt-8 border-t border-zinc-100 space-y-4">
                   <p className="text-sm text-zinc-500 text-center">Alternatively, you can reach us via:</p>
                   <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-                    <a href="https://forms.gle/your-google-form-link" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-zinc-50 rounded-full hover:bg-zinc-100 transition-all text-sm text-zinc-600">
-                      <Sparkles size={16} /> Google Form
+                    <a href="https://docs.google.com/forms/d/e/1FAIpQLSeTJ4HGSwYNxAYwHwa_OTayYQfY3marHFgLHwHPe_M1yT5bEQ/viewform?embedded=true" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-zinc-50 rounded-full hover:bg-zinc-100 transition-all text-sm text-zinc-600">
+                      <ExternalLink size={16} /> Google Form
                     </a>
                   </div>
                 </div>
@@ -3141,8 +3149,9 @@ export default function App() {
           <AdBox className="w-full h-[90px]" slot="5425662273" />
         </div>
       </div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
+        </main>
+      </div>
+    )}
+  </AnimatePresence>
+);
 }
