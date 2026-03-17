@@ -34,10 +34,13 @@ if (process.env.FIREBASE_PROJECT_ID) {
   }
 }
 
+// Initialize Firestore
+const firestore = admin.firestore();
+
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' })); // Increased limit for video files
 app.use(cookieParser());
 
 // Initialize Database
@@ -112,8 +115,8 @@ const BLOCKED_DOMAINS = [
   'guerrillamail.org', 'guerrillamailblock.com', 'pokemail.net', 'spam4.me'
 ];
 
-// User Profile & Credit Reset Logic
-app.get("/api/user/profile", authenticate, (req: any, res) => {
+// User Profile & Credit Reset Logic (Firestore)
+app.get("/api/user/profile", authenticate, async (req: any, res) => {
   const userId = req.user.uid;
   const email = req.user.email || '';
   const domain = email.split('@')[1]?.toLowerCase();
@@ -122,24 +125,47 @@ app.get("/api/user/profile", authenticate, (req: any, res) => {
     return res.status(403).json({ error: 'Temporary email addresses are not allowed. Please use a permanent email.' });
   }
 
-  let user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+  try {
+    const userRef = firestore.collection('users').doc(userId);
+    const doc = await userRef.get();
+    let userData: any;
 
-  if (!user) {
-    // Create new user
-    db.prepare("INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)")
-      .run(userId, req.user.email, req.user.name || '');
-    user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
+    if (!doc.exists) {
+      userData = {
+        uid: userId,
+        email: email,
+        displayName: req.user.name || '',
+        photoURL: req.user.picture || '',
+        credits: 20000,
+        plan: 'free',
+        lastResetDate: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      };
+      await userRef.set(userData);
+    } else {
+      userData = doc.data();
+    }
+
+    // Monthly Credit Reset Logic (30 days check)
+    const lastReset = new Date(userData.lastResetDate);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - lastReset.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (userData.plan === 'free' && diffDays >= 30) {
+      userData.credits = 20000;
+      userData.lastResetDate = now.toISOString();
+      await userRef.update({
+        credits: 20000,
+        lastResetDate: userData.lastResetDate
+      });
+    }
+
+    res.json(userData);
+  } catch (error: any) {
+    console.error("Firestore profile error:", error);
+    res.status(500).json({ error: error.message });
   }
-
-  // Monthly Credit Reset Logic (Free tier only)
-  const lastReset = new Date(user.last_reset);
-  const now = new Date();
-  if (user.plan === 'free' && (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear())) {
-    db.prepare("UPDATE users SET credits = 20000, last_reset = CURRENT_TIMESTAMP WHERE id = ?").run(userId);
-    user.credits = 20000;
-  }
-
-  res.json(user);
 });
 
   // Razorpay: Create Order
@@ -192,10 +218,14 @@ app.get("/api/user/profile", authenticate, (req: any, res) => {
       };
 
       try {
-        db.prepare("UPDATE users SET plan = ?, credits = credits + ? WHERE id = ?")
-          .run(plan, planCredits[plan], userId);
+        const userRef = firestore.collection('users').doc(userId);
+        await userRef.update({
+          plan: plan,
+          credits: admin.firestore.FieldValue.increment(planCredits[plan])
+        });
         res.json({ success: true });
       } catch (error: any) {
+        console.error("Firestore payment update error:", error);
         res.status(500).json({ error: "Database update failed" });
       }
     } else {
@@ -213,27 +243,29 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
   }
 
   try {
-    const user = db.prepare("SELECT credits FROM users WHERE id = ?").get(userId) as any;
-    if (!user || user.credits < creditCost) {
+    const userRef = firestore.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists || (userDoc.data()?.credits || 0) < creditCost) {
       return res.status(403).json({ error: "Insufficient credits" });
     }
 
-    db.transaction(() => {
-      // Deduct credits
-      db.prepare("UPDATE users SET credits = credits - ? WHERE id = ?").run(creditCost, userId);
-      
-      // Save generation
-      const stmt = db.prepare(`
-        INSERT INTO generations (user_id, text, voice_name, style, speed, pitch, audio_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-      stmt.run(userId, text, voice, style, speed, pitch, audioData);
-    })();
+    // Deduct credits in Firestore
+    await userRef.update({
+      credits: admin.firestore.FieldValue.increment(-creditCost)
+    });
+    
+    // Save generation in SQLite (History)
+    const stmt = db.prepare(`
+      INSERT INTO generations (user_id, text, voice_name, style, speed, pitch, audio_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(userId, text, voice, style, speed, pitch, audioData);
 
     res.json({ success: true });
-  } catch (dbError: any) {
-    console.error("Database save error:", dbError);
-    res.status(500).json({ error: dbError.message });
+  } catch (error: any) {
+    console.error("Database save error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 

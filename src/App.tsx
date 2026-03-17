@@ -22,6 +22,7 @@ import {
   DollarSign,
   LogOut,
   User,
+  Video,
   CreditCard,
   Crown,
   Upload,
@@ -321,7 +322,7 @@ export default function App() {
     };
   }, [currentAudio]);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'dubbing' | 'voice-changer'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'dubbing' | 'voice-changer' | 'captions'>('generate');
   const [showShareToast, setShowShareToast] = useState(false);
   const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -343,6 +344,29 @@ export default function App() {
   const [dubbingResult, setDubbingResult] = useState<{ text: string, audioUrl: string } | null>(null);
   const [voiceSearchTerm, setVoiceSearchTerm] = useState('');
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+
+  // AI Captions States
+  const [captionFile, setCaptionFile] = useState<File | null>(null);
+  const [isCaptioning, setIsCaptioning] = useState(false);
+  const [captionResult, setCaptionResult] = useState<any>(null);
+  const [captionStyle, setCaptionStyle] = useState<'viral' | 'minimal' | 'bold-hindi'>('viral');
+  const [captionProgress, setCaptionProgress] = useState(0);
+  const [captionStep, setCaptionStep] = useState('');
+
+  // Auto-save feature
+  useEffect(() => {
+    const savedScript = localStorage.getItem('voxnova_script_draft');
+    if (savedScript) {
+      setText(savedScript);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem('voxnova_script_draft', text);
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [text]);
 
   const handlePreviewVoice = async (voice: Voice) => {
     if (previewingVoiceId) return;
@@ -1290,6 +1314,109 @@ export default function App() {
     }
   };
 
+  const handleCaptioning = async () => {
+    if (!captionFile) {
+      setError("Please upload a video file first.");
+      return;
+    }
+
+    if (!currentUser) {
+      setError("Please login to use this feature.");
+      setErrorType('auth');
+      return;
+    }
+
+    const captionCost = 10;
+    if (userProfile && userProfile.credits < captionCost && !isWhitelisted(currentUser.email)) {
+      setError(`Insufficient credits. You need ${captionCost} credits for AI Captioning.`);
+      setIsPricingModalOpen(true);
+      return;
+    }
+
+    setIsCaptioning(true);
+    setCaptionProgress(5);
+    setCaptionStep("Analyzing video audio...");
+
+    try {
+      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key not configured.");
+
+      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+      const activeKey = keys[Math.floor(Math.random() * keys.length)];
+      const ai = new GoogleGenAI({ apiKey: activeKey });
+
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.readAsDataURL(captionFile);
+      });
+      const fileBase64 = await base64Promise;
+
+      setCaptionProgress(30);
+      setCaptionStep("Generating time-synced captions...");
+
+      const prompt = `Analyze the attached video's audio and generate time-synced captions in SRT format. 
+      Return ONLY the SRT content. Ensure the timing is accurate. 
+      If the language is Hindi, provide the captions in Hindi script.
+      Style requested: ${captionStyle}.`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [{
+          parts: [
+            { inlineData: { data: fileBase64, mimeType: captionFile.type } },
+            { text: prompt }
+          ]
+        }]
+      });
+
+      const srtContent = result.text;
+      if (!srtContent || srtContent.trim().length === 0) {
+        throw new Error("Failed to generate captions. Please try a clearer video.");
+      }
+
+      setCaptionResult({ srt: srtContent, videoUrl: URL.createObjectURL(captionFile) });
+      setCaptionProgress(100);
+      setCaptionStep("Complete!");
+
+      // Deduct credits
+      await fetch('/api/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`
+        },
+        body: JSON.stringify({
+          text: "AI Captioning Generation",
+          voice: "System",
+          style: captionStyle,
+          speed: 1,
+          pitch: 1,
+          audioData: "caption_gen",
+          creditCost: captionCost
+        })
+      });
+
+      // Refresh profile
+      const profileRes = await fetch('/api/user/profile', {
+        headers: { 'Authorization': `Bearer ${await currentUser.getIdToken()}` }
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        setUserProfile(profile);
+      }
+
+    } catch (err: any) {
+      console.error("Captioning error:", err);
+      setError(err.message || "Failed to generate captions.");
+    } finally {
+      setIsCaptioning(false);
+    }
+  };
+
   const deleteHistoryItem = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this generation?")) return;
     try {
@@ -1746,6 +1873,13 @@ export default function App() {
             Voice Changer
           </button>
           <button 
+            onClick={() => { setActiveTab('captions'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'captions' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+          >
+            <Video size={20} />
+            AI Video Captions
+          </button>
+          <button 
             onClick={() => { setShowVoiceLibrary(true); setIsMobileMenuOpen(false); }}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
           >
@@ -2032,8 +2166,8 @@ export default function App() {
                   <textarea 
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder="Enter your script here... (up to 10,000 characters)"
-                    maxLength={10000}
+                    placeholder="Enter your script here... (up to 5,000 characters)"
+                    maxLength={5000}
                     className="w-full h-64 bg-zinc-50 border border-zinc-200 rounded-2xl p-6 text-lg resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900/5 transition-all placeholder:text-zinc-400 text-zinc-900"
                   />
                   <div className="absolute bottom-4 right-6 text-xs text-zinc-400 flex items-center gap-4">
@@ -2512,6 +2646,150 @@ export default function App() {
                 </h4>
                 <p className="text-xs text-zinc-500 leading-relaxed">
                   Our AI will analyze your uploaded audio, transcribe the content, and then re-generate it using your selected target voice. For dubbing, it will also translate the content into your chosen language while maintaining the original meaning.
+                </p>
+              </div>
+            </motion.div>
+          ) : activeTab === 'captions' ? (
+            <motion.div 
+              key="captions"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto space-y-8"
+            >
+              <div className="space-y-2">
+                <h2 className="text-3xl font-display font-bold text-zinc-900">AI Video Captions</h2>
+                <p className="text-zinc-500">Generate stylish, time-synced captions for your videos automatically.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload Video</label>
+                    <div 
+                      onClick={() => document.getElementById('video-upload-captions')?.click()}
+                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${captionFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
+                    >
+                      <input 
+                        type="file" id="video-upload-captions" hidden accept="video/*" 
+                        onChange={(e) => {
+                          setCaptionFile(e.target.files?.[0] || null);
+                          setCaptionResult(null);
+                        }}
+                      />
+                      {captionFile ? (
+                        <>
+                          <div className="p-4 bg-emerald-100 rounded-2xl text-emerald-600">
+                            <Video size={32} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-emerald-600">{captionFile.name}</p>
+                            <p className="text-xs text-zinc-500">{(captionFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-4 bg-zinc-100 rounded-2xl text-zinc-400">
+                            <Upload size={32} />
+                          </div>
+                          <p className="text-sm text-zinc-500">Click to upload video</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Select Style</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { id: 'viral', name: 'Viral Reels' },
+                        { id: 'minimal', name: 'Minimalist' },
+                        { id: 'bold-hindi', name: 'Bold Hindi' }
+                      ].map((style) => (
+                        <button
+                          key={style.id}
+                          onClick={() => setCaptionStyle(style.id as any)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${captionStyle === style.id ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                        >
+                          {style.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleCaptioning}
+                    disabled={isCaptioning || !captionFile}
+                    className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isCaptioning ? (
+                      <>
+                        <Loader2 className="animate-spin" size={20} />
+                        {captionStep} ({captionProgress}%)
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={20} />
+                        Generate Captions
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
+                  <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">Preview & Export</label>
+                  
+                  {captionResult ? (
+                    <div className="space-y-6">
+                      <div className="aspect-video bg-zinc-900 rounded-3xl overflow-hidden relative group">
+                        <video src={captionResult.videoUrl} controls className="w-full h-full object-contain" />
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-bold text-zinc-900">SRT Content</h4>
+                          <button 
+                            onClick={() => {
+                              const blob = new Blob([captionResult.srt], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `captions-${Date.now()}.srt`;
+                              a.click();
+                            }}
+                            className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                          >
+                            <Download size={14} />
+                            Download SRT
+                          </button>
+                        </div>
+                        <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 h-48 overflow-y-auto">
+                          <pre className="text-[10px] font-mono text-zinc-500 whitespace-pre-wrap">
+                            {captionResult.srt}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
+                      <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center text-zinc-300">
+                        <Video size={32} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-zinc-400">No Video Processed</p>
+                        <p className="text-xs text-zinc-400">Upload a video and click generate to see captions here.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
+                <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-zinc-900">
+                  <Sparkles size={16} className="text-emerald-500" /> Pro Tip
+                </h4>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  For the best results with "Bold Hindi" style, ensure your video has clear audio. Our AI will automatically detect the language and generate time-synced SRT files that you can use in any video editor.
                 </p>
               </div>
             </motion.div>

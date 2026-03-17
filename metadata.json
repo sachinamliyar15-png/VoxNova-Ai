@@ -1,6 +1,6 @@
 {
   "name": "VoxNova Text to Speech",
-  "description": "Professional AI voice generator optimized for long-form narration, documentaries, and storytelling. Features CD-quality output and intelligent speed controls.",
+  "description": "Professional AI voice generator with AI Dubbing, AI Video Captions, and Voice Changer. Optimized for long-form narration, documentaries, and storytelling.",
   "requestFramePermissions": [
     "microphone"
   ]

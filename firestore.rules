@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string
+    //   - photoURL: string
+    //   - credits: number (required)
+    //   - plan: string (required)
+    //   - lastResetDate: string (required)
+    //   - createdAt: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'credits', 'plan', 'lastResetDate']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.credits is number &&
+             data.plan in ['free', 'basic', 'pro', 'elite'] &&
+             data.lastResetDate is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      
+      // Only allow creation if the user is authenticated and setting their own UID
+      // and starting with the default free plan credits
+      allow create: if isOwner(userId) && 
+                      isValidUser(request.resource.data) && 
+                      request.resource.data.credits == 20000 &&
+                      request.resource.data.plan == 'free';
+      
+      // Allow updates to credits if the user is authenticated
+      // In a production app, credit updates should ideally be handled by Cloud Functions
+      // but for this implementation we'll allow the owner to update their own credits
+      // while ensuring they don't change their plan or UID
+      allow update: if isOwner(userId) && 
+                      isValidUser(request.resource.data) &&
+                      request.resource.data.plan == resource.data.plan &&
+                      request.resource.data.uid == resource.data.uid;
+    }
+  }
+}
