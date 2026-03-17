@@ -37,7 +37,10 @@ import {
   Zap,
   Clock,
   Mail,
-  ExternalLink
+  ExternalLink,
+  PenTool,
+  ArrowRight,
+  Type
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
@@ -322,7 +325,15 @@ export default function App() {
     };
   }, [currentAudio]);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'dubbing' | 'voice-changer' | 'captions'>('generate');
+  const [showLimitToast, setShowLimitToast] = useState(false);
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'dubbing' | 'voice-changer' | 'captions' | 'script-writer'>('generate');
+  const [rawScript, setRawScript] = useState('');
+  const [viralScript, setViralScript] = useState('');
+  const [isWritingScript, setIsWritingScript] = useState(false);
+  const [scriptTone, setScriptTone] = useState<'viral' | 'storytelling' | 'educational'>('viral');
+  const [captionAnimation, setCaptionAnimation] = useState<'fade' | 'pop' | 'karaoke' | 'glow'>('pop');
+  const [aiHighlights, setAiHighlights] = useState<any[]>([]);
+  const [isAnalyzingCaptions, setIsAnalyzingCaptions] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
   const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -367,6 +378,158 @@ export default function App() {
     }, 1000);
     return () => clearTimeout(timeoutId);
   }, [text]);
+
+  const [isPolishing, setIsPolishing] = useState(false);
+
+  const handleViralMagic = async () => {
+    if (!text || text.trim().length < 10) {
+      setError("Please enter a script of at least 10 characters to optimize.");
+      return;
+    }
+
+    setIsPolishing(true);
+    try {
+      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key not configured.");
+
+      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+      const activeKey = keys[Math.floor(Math.random() * keys.length)];
+      const ai = new GoogleGenAI({ apiKey: activeKey });
+
+      const prompt = `Rewrite and optimize the following script for a high-retention social media video (Shorts/Reels style). 
+      Make it punchy, engaging, and viral-ready. 
+      Maintain the original language (${language === 'hi' ? 'Hindi' : 'English'}).
+      Keep it under 5,000 characters.
+      Return ONLY the optimized script. Do not include any notes or explanations.
+
+      SCRIPT:
+      ${text}`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ parts: [{ text: prompt }] }]
+      });
+
+      const polishedText = result.text;
+      if (polishedText) {
+        setText(polishedText.trim().slice(0, 5000));
+      }
+    } catch (err: any) {
+      console.error("Viral Magic error:", err);
+      setError(`Failed to polish script: ${err.message}`);
+    } finally {
+      setIsPolishing(false);
+    }
+  };
+
+  const handleViralScriptWriter = async () => {
+    if (!rawScript.trim()) {
+      setError("Please enter a raw script first.");
+      return;
+    }
+
+    setIsWritingScript(true);
+    setError(null);
+    setViralScript('');
+
+    try {
+      const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+      if (!baseKey) throw new Error("API Key not configured");
+      const keys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+      const apiKey = keys[Math.floor(Math.random() * keys.length)];
+      const ai = new GoogleGenAI({ apiKey });
+
+      const prompt = `You are a world-class viral script writer for YouTube Shorts, TikTok, and Instagram Reels. 
+      Your goal is to rewrite the following raw script to maximize engagement, retention, and virality.
+      
+      TONE: ${scriptTone === 'viral' ? 'High-energy, punchy, and trend-focused' : scriptTone === 'storytelling' ? 'Emotional, narrative-driven, and immersive' : 'Clear, educational, and value-packed'}
+      
+      REQUIREMENTS:
+      1. Start with a POWERFUL HOOK in the first 3 seconds.
+      2. Use a viral storytelling structure (Loop, Problem-Solution, or Curiosity Gap).
+      3. Keep it under 5,000 characters.
+      4. Use natural, conversational language.
+      5. Add appropriate emojis for visual rhythm.
+      6. Maintain the original language of the script.
+      
+      RAW SCRIPT:
+      ${rawScript}`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ parts: [{ text: prompt }] }]
+      });
+
+      const output = result.text;
+      if (output) {
+        setViralScript(output.trim());
+      }
+    } catch (err: any) {
+      console.error("Script Writer error:", err);
+      setError(`Failed to generate viral script: ${err.message}`);
+    } finally {
+      setIsWritingScript(false);
+    }
+  };
+
+  const handleAnalyzeCaptions = async () => {
+    if (!text.trim()) {
+      setError("Please enter or generate a script first.");
+      return;
+    }
+
+    setIsAnalyzingCaptions(true);
+    setError(null);
+
+    try {
+      const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+      if (!baseKey) throw new Error("API Key not configured");
+      const keys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+      const apiKey = keys[Math.floor(Math.random() * keys.length)];
+      const ai = new GoogleGenAI({ apiKey });
+
+      const prompt = `Analyze the following script and suggest 'Visual Emphasis Points' for video captions. 
+      Identify keywords or phrases that should be highlighted with specific colors, emojis, or font-size increases based on the emotional tone.
+      
+      Return ONLY a JSON array of objects with this structure:
+      [
+        { "word": "keyword", "color": "hex_color", "emoji": "🔥", "size": "large|normal" }
+      ]
+      
+      SCRIPT:
+      ${text}`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [{ parts: [{ text: prompt }] }],
+        config: { responseMimeType: "application/json" }
+      });
+
+      const output = result.text;
+      if (output) {
+        const parsed = JSON.parse(output);
+        setAiHighlights(parsed);
+      }
+    } catch (err: any) {
+      console.error("Caption Analysis error:", err);
+      setError(`Failed to analyze captions: ${err.message}`);
+    } finally {
+      setIsAnalyzingCaptions(false);
+    }
+  };
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    if (val.length <= 5000) {
+      setText(val);
+      if (val.length === 5000) {
+        setShowLimitToast(true);
+        setTimeout(() => setShowLimitToast(false), 3000);
+      }
+    } else {
+      setShowLimitToast(true);
+      setTimeout(() => setShowLimitToast(false), 3000);
+    }
+  };
 
   const handlePreviewVoice = async (voice: Voice) => {
     if (previewingVoiceId) return;
@@ -713,8 +876,8 @@ export default function App() {
       });
     }
 
-    // Calculate credit cost (1 credit per 10 characters)
-    const creditCost = Math.ceil(text.length / 10);
+    // Calculate credit cost (1 credit per character)
+    const creditCost = text.length;
     
     // Check for premium voice restriction
     if (selectedVoice.isPremium && (!userProfile || userProfile.plan === 'free') && !isWhitelisted(currentUser.email)) {
@@ -1880,6 +2043,13 @@ export default function App() {
             AI Video Captions
           </button>
           <button 
+            onClick={() => { setActiveTab('script-writer'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'script-writer' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+          >
+            <PenTool size={20} />
+            Viral Script Writer
+          </button>
+          <button 
             onClick={() => { setShowVoiceLibrary(true); setIsMobileMenuOpen(false); }}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 transition-all"
           >
@@ -1955,7 +2125,7 @@ export default function App() {
         <div className="mt-4 p-4 glass-panel rounded-2xl border-zinc-100">
           <p className="text-xs text-zinc-500 mb-2">Current Voice</p>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-bold">
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}>
               {selectedVoice.name[0]}
             </div>
             <div>
@@ -1974,8 +2144,19 @@ export default function App() {
         />
       )}
 
-      {/* Share Toast */}
+      {/* Toasts */}
       <AnimatePresence>
+        {showLimitToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-red-500 text-white rounded-2xl shadow-2xl flex items-center gap-3 font-bold"
+          >
+            <AlertCircle size={20} />
+            Character limit reached (5,000)
+          </motion.div>
+        )}
         {showShareToast && (
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
@@ -2162,23 +2343,90 @@ export default function App() {
               </div>
 
               <div className="space-y-4">
-                <div className="relative">
+                <div className="relative group">
                   <textarea 
                     value={text}
-                    onChange={(e) => setText(e.target.value)}
+                    onChange={handleTextChange}
                     placeholder="Enter your script here... (up to 5,000 characters)"
-                    maxLength={5000}
-                    className="w-full h-64 bg-zinc-50 border border-zinc-200 rounded-2xl p-6 text-lg resize-none focus:outline-none focus:ring-2 focus:ring-zinc-900/5 transition-all placeholder:text-zinc-400 text-zinc-900"
+                    className="w-full h-80 bg-white border-2 border-zinc-100 rounded-3xl p-8 text-xl leading-relaxed resize-none focus:outline-none focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 transition-all placeholder:text-zinc-300 text-zinc-900 shadow-sm"
                   />
-                  <div className="absolute bottom-4 right-6 text-xs text-zinc-400 flex items-center gap-4">
-                    <button 
-                      onClick={() => setText('')}
-                      className="hover:text-white transition-colors"
-                    >
-                      Clear Text
-                    </button>
-                    <span>{text.length} / 10,000 characters</span>
+                  
+                  <div className="absolute bottom-6 left-8 right-8 flex items-center justify-between pointer-events-none">
+                    <div className="flex items-center gap-3 pointer-events-auto">
+                      <div className="relative w-5 h-5">
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                          <circle
+                            cx="18"
+                            cy="18"
+                            r="16"
+                            fill="none"
+                            className="stroke-zinc-100"
+                            strokeWidth="3"
+                          />
+                          <motion.circle
+                            cx="18"
+                            cy="18"
+                            r="16"
+                            fill="none"
+                            className="stroke-emerald-500"
+                            strokeWidth="3"
+                            strokeDasharray="100"
+                            animate={{ strokeDashoffset: 100 - (text.length / 5000) * 100 }}
+                            transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+                          />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium text-zinc-500">
+                        {isWhitelisted(currentUser?.email || '') ? 'Unlimited' : `${(userProfile?.credits || 0).toLocaleString()} credits remaining`}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 pointer-events-auto">
+                      <button 
+                        onClick={() => setText('')}
+                        className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors"
+                      >
+                        Clear
+                      </button>
+                      <div className="h-4 w-px bg-zinc-200" />
+                      <span className={`text-sm font-mono font-bold ${text.length >= 4500 ? 'text-amber-500' : 'text-zinc-400'}`}>
+                        {text.length.toLocaleString()} / 5,000
+                      </span>
+                    </div>
                   </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <button 
+                    onClick={handleViralMagic}
+                    disabled={isPolishing || !text}
+                    className="flex-1 py-4 px-6 bg-zinc-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-zinc-900/10"
+                  >
+                    {isPolishing ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <Sparkles size={20} className="text-emerald-400" />
+                    )}
+                    {isPolishing ? 'Polishing...' : 'Viral Magic (AI Polish)'}
+                  </button>
+
+                  <button 
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !text || !selectedVoice}
+                    className="flex-[2] py-4 px-6 bg-emerald-500 text-white rounded-2xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20"
+                  >
+                    {isGenerating ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={24} />
+                        <span>Generating {generationProgress}%</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Play size={24} fill="currentColor" />
+                        <span>Generate Speech</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {isGenerating && (
@@ -2254,7 +2502,7 @@ export default function App() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-zinc-800 flex items-center justify-center text-[10px] font-bold">
+                        <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-[10px] font-bold text-white`}>
                           {selectedVoice.name[0]}
                         </div>
                         <span className="text-sm font-medium">{selectedVoice.name}</span>
@@ -2554,7 +2802,7 @@ export default function App() {
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-700">
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}>
                           {selectedVoice.name[0]}
                         </div>
                         <span className="text-sm font-medium text-zinc-900">{selectedVoice.name}</span>
@@ -2649,6 +2897,99 @@ export default function App() {
                 </p>
               </div>
             </motion.div>
+          ) : activeTab === 'script-writer' ? (
+            <motion.div 
+              key="script-writer"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto space-y-8"
+            >
+              <div className="space-y-2">
+                <h2 className="text-3xl font-display font-bold text-zinc-900">Viral Script Writer</h2>
+                <p className="text-zinc-500">Transform your raw ideas into high-retention viral scripts for social media.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Raw Script / Idea</label>
+                    <textarea 
+                      value={rawScript}
+                      onChange={(e) => setRawScript(e.target.value)}
+                      placeholder="Paste your raw script or idea here..."
+                      className="w-full h-64 bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm focus:outline-none focus:border-emerald-500 transition-all resize-none"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Tone & Style</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {(['viral', 'storytelling', 'educational'] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setScriptTone(t)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all capitalize ${scriptTone === t ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleViralScriptWriter}
+                    disabled={isWritingScript || !rawScript.trim()}
+                    className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                  >
+                    {isWritingScript ? (
+                      <>
+                        <Loader2 className="animate-spin" size={20} />
+                        Writing Viral Script...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={20} />
+                        Generate Viral Script
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100 bg-zinc-50/50">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">Viral Output</label>
+                    {viralScript && (
+                      <button 
+                        onClick={() => {
+                          setText(viralScript);
+                          setActiveTab('generate');
+                        }}
+                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                      >
+                        <ArrowRight size={14} />
+                        Use for TTS
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="relative h-full min-h-[300px]">
+                    {viralScript ? (
+                      <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm h-full overflow-y-auto">
+                        <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">{viralScript}</p>
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
+                        <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-300">
+                          <PenTool size={32} />
+                        </div>
+                        <p className="text-xs text-zinc-400">Your viral script will appear here.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           ) : activeTab === 'captions' ? (
             <motion.div 
               key="captions"
@@ -2699,22 +3040,61 @@ export default function App() {
                   </div>
 
                   <div className="space-y-4">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Select Style</label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Select Animation Style</label>
+                    <div className="grid grid-cols-2 gap-3">
                       {[
-                        { id: 'viral', name: 'Viral Reels' },
-                        { id: 'minimal', name: 'Minimalist' },
-                        { id: 'bold-hindi', name: 'Bold Hindi' }
-                      ].map((style) => (
+                        { id: 'fade', name: 'Fade In', color: 'from-blue-400 to-blue-600' },
+                        { id: 'pop', name: 'Pop Up', color: 'from-purple-400 to-purple-600' },
+                        { id: 'karaoke', name: 'Karaoke', color: 'from-emerald-400 to-emerald-600' },
+                        { id: 'glow', name: 'Glow', color: 'from-orange-400 to-orange-600' }
+                      ].map((anim) => (
                         <button
-                          key={style.id}
-                          onClick={() => setCaptionStyle(style.id as any)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${captionStyle === style.id ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                          key={anim.id}
+                          onClick={() => setCaptionAnimation(anim.id as any)}
+                          className={`relative overflow-hidden p-4 rounded-2xl border-2 transition-all ${captionAnimation === anim.id ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-100 bg-white hover:border-zinc-200'}`}
                         >
-                          {style.name}
+                          <div className={`absolute top-0 right-0 w-12 h-12 bg-gradient-to-br ${anim.color} opacity-10 blur-xl`} />
+                          <div className="relative flex flex-col items-start gap-1">
+                            <span className="text-xs font-bold">{anim.name}</span>
+                            <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
+                              <motion.div 
+                                animate={captionAnimation === anim.id ? { x: ['-100%', '100%'] } : {}}
+                                transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                                className={`h-full w-1/2 bg-gradient-to-r ${anim.color}`}
+                              />
+                            </div>
+                          </div>
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">3. AI Visual Emphasis</label>
+                      <button 
+                        onClick={handleAnalyzeCaptions}
+                        disabled={isAnalyzingCaptions || !text}
+                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {isAnalyzingCaptions ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+                        AI Suggest Highlights
+                      </button>
+                    </div>
+                    
+                    {aiHighlights.length > 0 && (
+                      <div className="flex flex-wrap gap-2 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                        {aiHighlights.map((h, i) => (
+                          <span 
+                            key={i}
+                            className="px-2 py-1 rounded-lg bg-white border border-zinc-200 text-[10px] font-bold flex items-center gap-1 shadow-sm"
+                            style={{ color: h.color }}
+                          >
+                            {h.word} {h.emoji}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <button 
@@ -2852,7 +3232,7 @@ export default function App() {
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-700">
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}>
                           {selectedVoice.name[0]}
                         </div>
                         <span className="text-sm font-medium text-zinc-900">{selectedVoice.name}</span>
@@ -3423,7 +3803,7 @@ export default function App() {
                       }}
                     />
                     <div className="flex items-center justify-between mb-4 relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center font-display font-bold text-xl text-zinc-900 group-hover:scale-110 transition-transform">
+                      <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${voice.color} flex items-center justify-center font-display font-bold text-xl text-white group-hover:scale-110 transition-transform shadow-lg`}>
                         {voice.name[0]}
                       </div>
                       <div className="flex items-center gap-2">
