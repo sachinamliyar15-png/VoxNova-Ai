@@ -857,13 +857,13 @@ export default function App() {
           
           if (!base64) {
             if (candidate?.finishReason === 'SAFETY') {
-              throw new Error("The generation was blocked by safety filters. Please check your script for sensitive content.");
+              throw new Error("The generation was blocked by safety filters. This often happens with long scripts containing sensitive words. Please try a shorter or cleaner script.");
             }
             if (candidate?.finishReason === 'RECITATION') {
-              throw new Error("The generation was blocked due to recitation filters (copyrighted content).");
+              throw new Error("The generation was blocked due to recitation filters (copyrighted content detected).");
             }
             if (candidate?.finishReason === 'OTHER' || !candidate) {
-              throw new Error("AI model failed to generate audio data. Try shortening your text or checking for special characters.");
+              throw new Error("AI model failed to generate audio data. The script might be too complex or contain unsupported characters.");
             }
             throw new Error("AI model failed to generate audio data. Please try again with a simpler script.");
           }
@@ -902,11 +902,11 @@ export default function App() {
 
     try {
       // 1. Split text into chunks for long-form stability
-      const chunks = splitTextIntoChunks(text, 700); // Slightly smaller chunks for better reliability
+      // Increased chunk size to 2500 for faster processing of long scripts
+      const chunks = splitTextIntoChunks(text, 2500); 
       
-      // Limit parallel requests to avoid hitting rate limits too hard
-      // Using 1 for maximum safety with free tier quotas
-      const CONCURRENCY_LIMIT = 1;
+      // Increased concurrency to 2 for faster generation while staying within safe limits
+      const CONCURRENCY_LIMIT = 2;
       const allPcmBuffers: ArrayBuffer[] = new Array(chunks.length);
       
       // Process chunks in batches

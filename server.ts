@@ -82,8 +82,10 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 
   if (admin.apps.length === 0) {
-    console.error("Firebase Admin not initialized. Check environment variables.");
-    return res.status(500).json({ error: 'Authentication service unavailable' });
+    console.error("Firebase Admin not initialized. Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY in environment variables.");
+    return res.status(500).json({ 
+      error: 'Authentication service unavailable. Please ensure server-side Firebase environment variables are configured correctly in your deployment dashboard (e.g., Render/Vercel).' 
+    });
   }
 
   const idToken = authHeader.split('Bearer ')[1];
