@@ -40,12 +40,31 @@ import {
   ExternalLink,
   PenTool,
   ArrowRight,
-  Type
+  Type,
+  Plus,
+  Edit2,
+  PanelLeft,
+  Copy,
+  Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { VOICES, Voice, Generation } from './types';
 import emailjs from 'emailjs-com';
+import Markdown from 'react-markdown';
+import { 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  onSnapshot, 
+  deleteDoc, 
+  doc, 
+  updateDoc,
+  serverTimestamp,
+  orderBy
+} from 'firebase/firestore';
+import { db, auth, googleProvider, analytics, logEvent } from './firebase';
 
 const AdBox = ({ className = "", slot = "5425662273" }: { className?: string, slot?: string }) => {
   useEffect(() => {
@@ -137,8 +156,6 @@ const StickyFooterAd = () => {
     </div>
   );
 };
-
-import { auth, googleProvider, analytics, logEvent } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 declare global {
@@ -331,11 +348,18 @@ export default function App() {
   const [viralScript, setViralScript] = useState('');
   const [isWritingScript, setIsWritingScript] = useState(false);
   const [scriptTone, setScriptTone] = useState<'viral' | 'storytelling' | 'educational'>('viral');
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model', content: string }[]>([]);
+  const [isWebResearchEnabled, setIsWebResearchEnabled] = useState(false);
+  const [scriptHistory, setScriptHistory] = useState<{ id: string, title: string, content: string, createdAt: any }[]>([]);
+  const [currentScriptId, setCurrentScriptId] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(true);
   const [captionAnimation, setCaptionAnimation] = useState<'fade' | 'pop' | 'karaoke' | 'glow'>('pop');
   const [aiHighlights, setAiHighlights] = useState<any[]>([]);
   const [isAnalyzingCaptions, setIsAnalyzingCaptions] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
   const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
+  const [exhaustedKeys, setExhaustedKeys] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
@@ -344,6 +368,21 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const getAvailableApiKey = (currentExhausted: Set<string> = exhaustedKeys) => {
+    const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+    if (!baseKey) return null;
+    
+    const allKeys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    const availableKeys = allKeys.filter(k => !currentExhausted.has(k));
+    
+    if (availableKeys.length === 0) {
+      // If all keys are exhausted, reset the set and try again with all keys
+      setExhaustedKeys(new Set());
+      return allKeys[Math.floor(Math.random() * allKeys.length)];
+    }
+    
+    return availableKeys[Math.floor(Math.random() * availableKeys.length)];
+  };
   const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
   const isWhitelisted = (email: string | null | undefined) => email ? WHITELISTED_EMAILS.includes(email) : false;
 
@@ -422,15 +461,20 @@ export default function App() {
     }
   };
 
-  const handleViralScriptWriter = async () => {
-    if (!rawScript.trim()) {
-      setError("Please enter a raw script first.");
+  const handleViralScriptWriter = async (followUpInput?: string) => {
+    const input = followUpInput || chatInput;
+    if (!input.trim() && chatMessages.length === 0) {
+      setError("Please enter a raw script or instruction first.");
       return;
     }
 
     setIsWritingScript(true);
     setError(null);
-    setViralScript('');
+    
+    const newUserMessage = { role: 'user' as const, content: input };
+    const updatedMessages = [...chatMessages, newUserMessage];
+    setChatMessages(updatedMessages);
+    setChatInput('');
 
     try {
       const baseKey = userApiKey || process.env.GEMINI_API_KEY;
@@ -439,37 +483,114 @@ export default function App() {
       const apiKey = keys[Math.floor(Math.random() * keys.length)];
       const ai = new GoogleGenAI({ apiKey });
 
-      const prompt = `You are a world-class viral script writer for YouTube Shorts, TikTok, and Instagram Reels. 
-      Your goal is to rewrite the following raw script to maximize engagement, retention, and virality.
+      const systemInstruction = `You are a world-class viral script writer for YouTube Shorts, TikTok, and Instagram Reels. 
+      Your goal is to write or refine scripts to maximize engagement, retention, and virality.
       
       TONE: ${scriptTone === 'viral' ? 'High-energy, punchy, and trend-focused' : scriptTone === 'storytelling' ? 'Emotional, narrative-driven, and immersive' : 'Clear, educational, and value-packed'}
       
-      REQUIREMENTS:
-      1. Start with a POWERFUL HOOK in the first 3 seconds.
-      2. Use a viral storytelling structure (Loop, Problem-Solution, or Curiosity Gap).
-      3. Keep it under 5,000 characters.
-      4. Use natural, conversational language.
+      CORE PRINCIPLES:
+      1. Always include a 'Viral Hook' in the first 3 seconds.
+      2. Always include a 'Seamless Loop' at the end to encourage re-watching.
+      3. Use a viral storytelling structure.
+      4. Keep it under 5,000 characters.
       5. Add appropriate emojis for visual rhythm.
-      6. Maintain the original language of the script.
-      
-      RAW SCRIPT:
-      ${rawScript}`;
+      6. Return the script in a clean Markdown format with bold headers, bullet points, and clear time-stamps (e.g., [00:00 - 00:05]).
+      7. If web research is enabled, cite your sources or base advice on the latest 2026 research.`;
 
-      const result = await ai.models.generateContent({
+      const modelParams: any = {
         model: "gemini-3-flash-preview",
-        contents: [{ parts: [{ text: prompt }] }]
-      });
+        config: {
+          systemInstruction,
+        },
+        contents: updatedMessages.map(m => ({
+          role: m.role,
+          parts: [{ text: m.content }]
+        }))
+      };
 
-      const output = result.text;
-      if (output) {
-        setViralScript(output.trim());
+      if (isWebResearchEnabled) {
+        modelParams.config.tools = [{ googleSearch: {} }];
       }
-    } catch (err: any) {
-      console.error("Script Writer error:", err);
-      setError(`Failed to generate viral script: ${err.message}`);
+
+      const response = await ai.models.generateContent(modelParams);
+      const modelContent = response.text;
+
+      if (!modelContent) throw new Error("No response from AI");
+
+      const newModelMessage = { role: 'model' as const, content: modelContent };
+      setChatMessages(prev => [...prev, newModelMessage]);
+      setViralScript(modelContent);
+
+      // Deduct credits based on response length (1 credit per character)
+      if (currentUser && userProfile) {
+        const creditCost = modelContent.length;
+        const token = await currentUser.getIdToken();
+        await fetch('/api/user/deduct-credits', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ amount: creditCost })
+        });
+        // Update local profile
+        setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - creditCost }));
+      }
+
+      // Auto-save to Firestore if it's a new script or update existing
+      if (currentUser) {
+        if (currentScriptId) {
+          await updateDoc(doc(db, 'scripts', currentScriptId), {
+            content: modelContent,
+            messages: [...updatedMessages, newModelMessage],
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          const docRef = await addDoc(collection(db, 'scripts'), {
+            userId: currentUser.uid,
+            title: input.substring(0, 30) + '...',
+            content: modelContent,
+            messages: [...updatedMessages, newModelMessage],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          setCurrentScriptId(docRef.id);
+        }
+      }
+
+    } catch (error: any) {
+      console.error("Script writer error:", error);
+      setError(error.message);
     } finally {
       setIsWritingScript(false);
     }
+  };
+
+  const handleRenameScript = async (id: string, newTitle: string) => {
+    try {
+      await updateDoc(doc(db, 'scripts', id), { title: newTitle });
+    } catch (err) {
+      console.error("Rename error:", err);
+    }
+  };
+
+  const handleDeleteScript = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'scripts', id));
+      if (currentScriptId === id) {
+        setCurrentScriptId(null);
+        setChatMessages([]);
+        setViralScript('');
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
+
+  const handleOpenScript = (script: any) => {
+    setCurrentScriptId(script.id);
+    setChatMessages(script.messages || [{ role: 'model', content: script.content }]);
+    setViralScript(script.content);
   };
 
   const handleAnalyzeCaptions = async () => {
@@ -591,6 +712,32 @@ export default function App() {
       setPreviewingVoiceId(null);
     }
   };
+
+  // Firestore Script History Sync
+  useEffect(() => {
+    if (!currentUser) {
+      setScriptHistory([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'scripts'),
+      where('userId', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const scripts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      setScriptHistory(scripts);
+    }, (error) => {
+      console.error("Script history sync error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
 
   useEffect(() => {
     if (!auth) {
@@ -901,19 +1048,16 @@ export default function App() {
 
     const generateWithRetry = async (chunkText: string): Promise<string> => {
       let attempt = 0;
-      const maxRetries = 8; // Increased retries for rate limits
+      const maxRetries = 8; 
+      let currentExhausted = new Set(exhaustedKeys);
 
       while (attempt < maxRetries) {
+        let apiKey = getAvailableApiKey(currentExhausted);
+        if (!apiKey) {
+          throw new Error("Gemini API Key is not configured. Please enter your API key by clicking the 'Key' icon.");
+        }
+
         try {
-          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-          if (!baseKey) {
-            throw new Error("Gemini API Key is not configured. Please enter your API key by clicking the 'Key' icon.");
-          }
-
-          // Load Balancing: Support multiple keys separated by commas
-          const keys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-          const apiKey = keys[Math.floor(Math.random() * keys.length)];
-
           const ai = new GoogleGenAI({ apiKey });
           
           const voiceMapping: Record<string, string> = {
@@ -1064,16 +1208,29 @@ export default function App() {
           const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota");
           const isInternalError = errStr.includes("500") || errStr.includes("INTERNAL") || errStr.includes("Internal error");
           
+          if (isRateLimit) {
+            // Mark key as exhausted and try another one immediately
+            currentExhausted.add(apiKey);
+            setExhaustedKeys(new Set(currentExhausted));
+            console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted. Switching keys...`);
+            
+            // If we have more keys, don't increment attempt, just retry with new key
+            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+            const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+            if (currentExhausted.size < allKeys.length) {
+              attempt--; // Don't count this as a failed attempt for the whole process
+              continue;
+            }
+          }
+
           if ((isNetworkError || isGenerationError || isRateLimit || isInternalError) && attempt < maxRetries) {
-            // Exponential backoff with jitter
-            // Use much longer delay for rate limits (429)
             const baseDelay = isRateLimit ? 10000 : (isInternalError ? 5000 : 1000);
             const delay = Math.pow(2, attempt) * baseDelay + Math.random() * 2000;
             
             console.warn(`Attempt ${attempt} failed for chunk. Retrying in ${Math.round(delay)}ms...`, err);
             
             if (isRateLimit) {
-              setError(`Rate limit reached. Waiting ${Math.round(delay/1000)}s before retrying part ${attempt + 1}...`);
+              setError(`All API keys exhausted. Waiting ${Math.round(delay/1000)}s before retrying...`);
               setErrorType('rate-limit');
             }
             
@@ -1296,107 +1453,142 @@ export default function App() {
     setDubbingStep("Reading file...");
 
     try {
-      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error("API Key not configured. Please add your key in API Settings.");
+      let currentExhausted = new Set(exhaustedKeys);
+      let attempt = 0;
+      const maxRetries = 5;
+      let processedText = "";
+      let base64Audio = "";
 
-      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const activeKey = keys[Math.floor(Math.random() * keys.length)];
-      const ai = new GoogleGenAI({ apiKey: activeKey });
+      while (attempt < maxRetries) {
+        let apiKey = getAvailableApiKey(currentExhausted);
+        if (!apiKey) throw new Error("API Key not configured. Please add your key in API Settings.");
 
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
-        };
-        reader.readAsDataURL(dubbingFile);
-      });
-      const fileBase64 = await base64Promise;
-
-      setDubbingProgress(20);
-      setDubbingStep(dubbingMode === 'dub' ? "Transcribing & Translating..." : "Transcribing audio...");
-
-      const langMap: Record<string, string> = {
-        'hi': 'Hindi', 'bn': 'Bengali', 'mr': 'Marathi', 'te': 'Telugu', 
-        'ta': 'Tamil', 'gu': 'Gujarati', 'kn': 'Kannada', 'en': 'English',
-        'es': 'Spanish', 'fr': 'French', 'de': 'German', 'ja': 'Japanese',
-        'ko': 'Korean', 'zh': 'Chinese'
-      };
-
-      const targetLangName = langMap[targetLanguage] || 'English';
-
-      const prompt = dubbingMode === 'dub' 
-        ? `You are an expert translator. Transcribe the attached audio and translate it into ${targetLangName}. 
-           Maintain the original tone, emotion, and context. 
-           Return ONLY the translated text. Do not include any notes, explanations, or labels like "Translation:".`
-        : `Transcribe the attached audio exactly as it is spoken. 
-           Return ONLY the transcribed text. Do not include any notes, explanations, or speaker labels.`;
-
-      console.log("Starting transcription with model: gemini-3-flash-preview");
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [{
-          parts: [
-            { inlineData: { data: fileBase64, mimeType: dubbingFile.type } },
-            { text: prompt }
-          ]
-        }]
-      });
-
-      const processedText = result.text;
-      console.log("Transcription result:", processedText);
-      
-      if (!processedText || processedText.trim().length === 0) {
-        throw new Error("The AI could not hear any speech in the audio. Please try a clearer recording.");
-      }
-
-      setDubbingProgress(60);
-      setDubbingStep("Generating new voice...");
-
-      const voiceMapping: Record<string, string> = {
-        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
-        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
-        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
-        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
-      };
-
-      const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
-      
-      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${targetLangName}. 
+        try {
+          const ai = new GoogleGenAI({ apiKey });
           
-      PERFORMANCE GUIDELINES:
-      - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
-      - Avoid any robotic, monotone, or repetitive cadence.
-      - For ${targetLangName}, ensure perfect native pronunciation, natural flow, and cultural nuance.
-      - Sound like a real person speaking in a high-end professional studio, not a computer.
-      - Pay close attention to the emotional weight of the text.
-      
-      TECHNICAL STANDARDS:
-      - NO background noise, hums, or digital artifacts.
-      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-      - Ensure crystal-clear, 48kHz studio-quality audio.
-      `;
+          if (!processedText) {
+            const reader = new FileReader();
+            const base64Promise = new Promise<string>((resolve) => {
+              reader.onload = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1]);
+              };
+              reader.readAsDataURL(dubbingFile);
+            });
+            const fileBase64 = await base64Promise;
 
-      console.log(`Generating TTS with voice: ${targetVoice}`);
-      const ttsResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: processedText }] }],
-        config: {
-          systemInstruction: systemInstruction,
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+            setDubbingProgress(20);
+            setDubbingStep(dubbingMode === 'dub' ? "Transcribing & Translating..." : "Transcribing audio...");
+
+            const langMap: Record<string, string> = {
+              'hi': 'Hindi', 'bn': 'Bengali', 'mr': 'Marathi', 'te': 'Telugu', 
+              'ta': 'Tamil', 'gu': 'Gujarati', 'kn': 'Kannada', 'en': 'English',
+              'es': 'Spanish', 'fr': 'French', 'de': 'German', 'ja': 'Japanese',
+              'ko': 'Korean', 'zh': 'Chinese'
+            };
+
+            const targetLangName = langMap[targetLanguage] || 'English';
+
+            const prompt = dubbingMode === 'dub' 
+              ? `You are an expert translator. Transcribe the attached audio and translate it into ${targetLangName}. 
+                 Maintain the original tone, emotion, and context. 
+                 Return ONLY the translated text. Do not include any notes, explanations, or labels like "Translation:".`
+              : `Transcribe the attached audio exactly as it is spoken. 
+                 Return ONLY the transcribed text. Do not include any notes, explanations, or speaker labels.`;
+
+            console.log("Starting transcription with model: gemini-3-flash-preview");
+            const result = await ai.models.generateContent({
+              model: "gemini-3-flash-preview",
+              contents: [{
+                parts: [
+                  { inlineData: { data: fileBase64, mimeType: dubbingFile.type } },
+                  { text: prompt }
+                ]
+              }]
+            });
+
+            processedText = result.text;
+            console.log("Transcription result:", processedText);
+            
+            if (!processedText || processedText.trim().length === 0) {
+              throw new Error("The AI could not hear any speech in the audio. Please try a clearer recording.");
+            }
+          }
+
+          setDubbingProgress(60);
+          setDubbingStep("Generating new voice...");
+
+          const voiceMapping: Record<string, string> = {
+            'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+            'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+            'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+            'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+            'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
+          };
+
+          const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
+          
+          const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${targetLanguage === 'hi' ? 'Hindi' : 'English'}. 
+              
+          PERFORMANCE GUIDELINES:
+          - Use natural human prosody, complex intonation, and realistic rhythm.
+          - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
+          - Avoid any robotic, monotone, or repetitive cadence.
+          - For ${targetLanguage === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
+          - Sound like a real person speaking in a high-end professional studio, not a computer.
+          - Pay close attention to the emotional weight of the text.
+          
+          TECHNICAL STANDARDS:
+          - NO background noise, hums, or digital artifacts.
+          - NO robotic glitches, metallic sounds, or synthetic "buzzing".
+          - Ensure crystal-clear, 48kHz studio-quality audio.
+          `;
+
+          console.log(`Generating TTS with voice: ${targetVoice}`);
+          const ttsResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: processedText }] }],
+            config: {
+              systemInstruction: systemInstruction,
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: targetVoice as any },
+                },
+              },
             },
-          },
-        },
-      });
+          });
 
-      const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!base64Audio) throw new Error("Voice generation failed. The text might be too complex or the service is temporarily unavailable.");
+          base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+          if (!base64Audio) throw new Error("Voice generation failed. The text might be too complex or the service is temporarily unavailable.");
+          
+          break; // Success!
+
+        } catch (err: any) {
+          attempt++;
+          const errStr = err.message || JSON.stringify(err);
+          const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota");
+          
+          if (isRateLimit) {
+            currentExhausted.add(apiKey);
+            setExhaustedKeys(new Set(currentExhausted));
+            console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted during dubbing. Switching...`);
+            
+            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+            const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+            if (currentExhausted.size < allKeys.length) {
+              attempt--;
+              continue;
+            }
+          }
+          
+          if (attempt >= maxRetries) throw err;
+          
+          const delay = Math.pow(2, attempt) * 2000 + Math.random() * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
 
       setDubbingProgress(90);
       setDubbingStep("Finalizing audio...");
@@ -1501,44 +1693,76 @@ export default function App() {
     setCaptionStep("Analyzing video audio...");
 
     try {
-      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error("API Key not configured.");
+      let currentExhausted = new Set(exhaustedKeys);
+      let attempt = 0;
+      const maxRetries = 5;
+      let srtContent = "";
 
-      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const activeKey = keys[Math.floor(Math.random() * keys.length)];
-      const ai = new GoogleGenAI({ apiKey: activeKey });
+      while (attempt < maxRetries) {
+        let apiKey = getAvailableApiKey(currentExhausted);
+        if (!apiKey) throw new Error("API Key not configured.");
 
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
-        };
-        reader.readAsDataURL(captionFile);
-      });
-      const fileBase64 = await base64Promise;
+        try {
+          const ai = new GoogleGenAI({ apiKey });
 
-      setCaptionProgress(30);
-      setCaptionStep("Generating time-synced captions...");
+          const reader = new FileReader();
+          const base64Promise = new Promise<string>((resolve) => {
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1]);
+            };
+            reader.readAsDataURL(captionFile);
+          });
+          const fileBase64 = await base64Promise;
 
-      const prompt = `Analyze the attached video's audio and generate time-synced captions in SRT format. 
-      Return ONLY the SRT content. Ensure the timing is accurate. 
-      If the language is Hindi, provide the captions in Hindi script.
-      Style requested: ${captionStyle}.`;
+          setCaptionProgress(30);
+          setCaptionStep("Generating time-synced captions...");
 
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [{
-          parts: [
-            { inlineData: { data: fileBase64, mimeType: captionFile.type } },
-            { text: prompt }
-          ]
-        }]
-      });
+          const prompt = `Analyze the attached video's audio and generate time-synced captions in SRT format. 
+          Return ONLY the SRT content. Ensure the timing is accurate. 
+          If the language is Hindi, provide the captions in Hindi script.
+          Style requested: ${captionStyle}.`;
 
-      const srtContent = result.text;
-      if (!srtContent || srtContent.trim().length === 0) {
-        throw new Error("Failed to generate captions. Please try a clearer video.");
+          const result = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [{
+              parts: [
+                { inlineData: { data: fileBase64, mimeType: captionFile.type } },
+                { text: prompt }
+              ]
+            }]
+          });
+
+          srtContent = result.text;
+          if (!srtContent || srtContent.trim().length === 0) {
+            throw new Error("Failed to generate captions. Please try a clearer video.");
+          }
+          
+          break; // Success!
+
+        } catch (err: any) {
+          attempt++;
+          const errStr = err.message || JSON.stringify(err);
+          const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota");
+          
+          if (isRateLimit) {
+            currentExhausted.add(apiKey);
+            setExhaustedKeys(new Set(currentExhausted));
+            console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted during captioning. Switching...`);
+            
+            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+            const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+            if (currentExhausted.size < allKeys.length) {
+              attempt--;
+              continue;
+            }
+          }
+          
+          if (attempt >= maxRetries) throw err;
+          
+          const delay = Math.pow(2, attempt) * 2000 + Math.random() * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
 
       setCaptionResult({ srt: srtContent, videoUrl: URL.createObjectURL(captionFile) });
@@ -1726,6 +1950,45 @@ export default function App() {
                     Sign In with Google
                   </button>
                 )}
+              </div>
+
+              {/* API Configuration Section */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">API Configuration</h3>
+                <div className="space-y-3">
+                  <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
+                          <Key size={18} />
+                        </div>
+                        <span className="text-sm font-medium">Gemini API Keys</span>
+                      </div>
+                      <a 
+                        href="https://aistudio.google.com/app/apikey" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-bold text-blue-500 hover:underline uppercase"
+                      >
+                        Get Keys
+                      </a>
+                    </div>
+                    <textarea
+                      value={userApiKey}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setUserApiKey(val);
+                        localStorage.setItem('voxnova_api_key', val);
+                        setExhaustedKeys(new Set()); // Reset exhausted keys when user updates keys
+                      }}
+                      placeholder="Enter multiple API keys separated by commas..."
+                      className="w-full h-24 p-3 text-xs bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none font-mono"
+                    />
+                    <p className="text-[10px] text-zinc-400 leading-relaxed">
+                      Pro Tip: Enter 10-20 free API keys separated by commas. Our system will automatically switch to the next key if one hits a rate limit, ensuring continuous generation.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* System Section */}
@@ -2047,7 +2310,7 @@ export default function App() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'script-writer' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <PenTool size={20} />
-            Viral Script Writer
+            Smart Script Workspace
           </button>
           <button 
             onClick={() => { setShowVoiceLibrary(true); setIsMobileMenuOpen(false); }}
@@ -2900,92 +3163,243 @@ export default function App() {
           ) : activeTab === 'script-writer' ? (
             <motion.div 
               key="script-writer"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto space-y-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex h-[calc(100vh-12rem)] gap-6"
             >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold text-zinc-900">Viral Script Writer</h2>
-                <p className="text-zinc-500">Transform your raw ideas into high-retention viral scripts for social media.</p>
-              </div>
+              {/* History Sidebar */}
+              <AnimatePresence>
+                {isHistorySidebarOpen && (
+                  <motion.div
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 280, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    className="glass-panel rounded-3xl border-zinc-100 flex flex-col overflow-hidden"
+                  >
+                    <div className="p-6 border-bottom border-zinc-100 flex items-center justify-between">
+                      <h3 className="font-bold text-zinc-900 flex items-center gap-2">
+                        <History size={18} className="text-zinc-400" />
+                        History
+                      </h3>
+                      <button 
+                        onClick={() => {
+                          setCurrentScriptId(null);
+                          setChatMessages([]);
+                          setViralScript('');
+                        }}
+                        className="p-2 hover:bg-zinc-100 rounded-xl text-emerald-500 transition-all"
+                        title="New Script"
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                      {scriptHistory.length === 0 ? (
+                        <div className="text-center py-10 space-y-2">
+                          <div className="text-zinc-300 flex justify-center"><PenTool size={24} /></div>
+                          <p className="text-xs text-zinc-400">No scripts yet</p>
+                        </div>
+                      ) : (
+                        scriptHistory.map((script) => (
+                          <div 
+                            key={script.id}
+                            className={`group p-3 rounded-xl cursor-pointer transition-all relative ${currentScriptId === script.id ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-50 text-zinc-600'}`}
+                            onClick={() => handleOpenScript(script)}
+                          >
+                            <div className="text-xs font-medium truncate pr-8">{script.title}</div>
+                            <div className="text-[10px] opacity-50 mt-1">
+                              {script.createdAt?.toDate ? new Date(script.createdAt.toDate()).toLocaleDateString() : 'Just now'}
+                            </div>
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newTitle = prompt("Rename script:", script.title);
+                                  if (newTitle) handleRenameScript(script.id, newTitle);
+                                }}
+                                className="p-1 hover:bg-white/20 rounded"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm("Delete this script?")) handleDeleteScript(script.id);
+                                }}
+                                className="p-1 hover:bg-red-500/20 text-red-400 rounded"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
-                  <div className="space-y-4">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Raw Script / Idea</label>
-                    <textarea 
-                      value={rawScript}
-                      onChange={(e) => setRawScript(e.target.value)}
-                      placeholder="Paste your raw script or idea here..."
-                      className="w-full h-64 bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm focus:outline-none focus:border-emerald-500 transition-all resize-none"
-                    />
+              {/* Main Chat Workspace */}
+              <div className="flex-1 flex flex-col gap-6 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setIsHistorySidebarOpen(!isHistorySidebarOpen)}
+                      className="p-2 hover:bg-zinc-100 rounded-xl text-zinc-500 transition-all"
+                    >
+                      <PanelLeft size={20} />
+                    </button>
+                    <div className="space-y-0.5">
+                      <h2 className="text-xl font-display font-bold text-zinc-900">Smart Workspace</h2>
+                      <p className="text-xs text-zinc-400">AI-Powered Viral Scripting</p>
+                    </div>
                   </div>
-
-                  <div className="space-y-4">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Tone & Style</label>
-                    <div className="grid grid-cols-3 gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
                       {(['viral', 'storytelling', 'educational'] as const).map((t) => (
                         <button
                           key={t}
                           onClick={() => setScriptTone(t)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all capitalize ${scriptTone === t ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize ${scriptTone === t ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
                         >
                           {t}
                         </button>
                       ))}
                     </div>
+                    <button 
+                      onClick={() => setIsWebResearchEnabled(!isWebResearchEnabled)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${isWebResearchEnabled ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-500'}`}
+                    >
+                      <Globe size={14} />
+                      Deep Research
+                    </button>
                   </div>
-
-                  <button 
-                    onClick={handleViralScriptWriter}
-                    disabled={isWritingScript || !rawScript.trim()}
-                    className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-                  >
-                    {isWritingScript ? (
-                      <>
-                        <Loader2 className="animate-spin" size={20} />
-                        Writing Viral Script...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={20} />
-                        Generate Viral Script
-                      </>
-                    )}
-                  </button>
                 </div>
 
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100 bg-zinc-50/50">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">Viral Output</label>
-                    {viralScript && (
-                      <button 
-                        onClick={() => {
-                          setText(viralScript);
-                          setActiveTab('generate');
-                        }}
-                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
-                      >
-                        <ArrowRight size={14} />
-                        Use for TTS
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="relative h-full min-h-[300px]">
-                    {viralScript ? (
-                      <div className="p-6 bg-white border border-zinc-100 rounded-3xl shadow-sm h-full overflow-y-auto">
-                        <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">{viralScript}</p>
+                {/* Chat Messages Area */}
+                <div className="flex-1 glass-panel rounded-[2.5rem] border-zinc-100 overflow-hidden flex flex-col bg-zinc-50/30">
+                  <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                    {chatMessages.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-6">
+                        <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center text-emerald-500">
+                          <Sparkles size={40} />
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-bold text-zinc-900">Start your viral journey</h3>
+                          <p className="text-sm text-zinc-500">Paste your raw idea or script below. I'll transform it using viral hooks and looping logic.</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 w-full">
+                          <button 
+                            onClick={() => handleViralScriptWriter("Write a viral hook for a fitness video")}
+                            className="p-3 bg-white border border-zinc-100 rounded-2xl text-[10px] font-bold text-zinc-600 hover:border-emerald-500 transition-all text-left"
+                          >
+                            "Write a viral hook for a fitness video"
+                          </button>
+                          <button 
+                            onClick={() => handleViralScriptWriter("Create a storytelling script about productivity")}
+                            className="p-3 bg-white border border-zinc-100 rounded-2xl text-[10px] font-bold text-zinc-600 hover:border-emerald-500 transition-all text-left"
+                          >
+                            "Create a storytelling script about productivity"
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
-                        <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-300">
-                          <PenTool size={32} />
+                      chatMessages.map((msg, i) => (
+                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] p-6 rounded-[2rem] ${msg.role === 'user' ? 'bg-zinc-900 text-white rounded-tr-none' : 'bg-white border border-zinc-100 text-zinc-800 rounded-tl-none shadow-sm'}`}>
+                            {msg.role === 'model' ? (
+                              <div className="prose prose-sm prose-zinc max-w-none">
+                                <Markdown>{msg.content}</Markdown>
+                                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(msg.content);
+                                        setShowShareToast(true);
+                                        setTimeout(() => setShowShareToast(false), 3000);
+                                      }}
+                                      className="p-2 hover:bg-zinc-50 rounded-lg text-zinc-400 transition-all"
+                                      title="Copy Script"
+                                    >
+                                      <Copy size={14} />
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setText(msg.content);
+                                        setActiveTab('generate');
+                                      }}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg text-[10px] font-bold hover:bg-emerald-500/20 transition-all"
+                                    >
+                                      <ArrowRight size={12} />
+                                      Use for TTS
+                                    </button>
+                                  </div>
+                                  <div className="text-[10px] text-zinc-400 font-medium">
+                                    {msg.content.length} characters
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm leading-relaxed">{msg.content}</p>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-xs text-zinc-400">Your viral script will appear here.</p>
+                      ))
+                    )}
+                    {isWritingScript && (
+                      <div className="flex justify-start">
+                        <div className="bg-white border border-zinc-100 p-6 rounded-[2rem] rounded-tl-none shadow-sm flex items-center gap-3">
+                          <Loader2 className="animate-spin text-emerald-500" size={18} />
+                          <span className="text-sm text-zinc-500 font-medium">Gemini is researching and writing...</span>
+                        </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Chat Input Area */}
+                  <div className="p-6 bg-white border-t border-zinc-100">
+                    <div className="max-w-3xl mx-auto space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                            {userProfile?.credits?.toLocaleString() || '20,000'} Credits Available
+                          </span>
+                        </div>
+                        <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                          {chatInput.length} / 5,000 Characters
+                        </div>
+                      </div>
+                      <div className="relative flex items-end gap-3">
+                        <div className="flex-1 relative">
+                          <textarea 
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value.slice(0, 5000))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleViralScriptWriter();
+                              }
+                            }}
+                            placeholder="Type your script idea or refinement instruction..."
+                            className="w-full bg-zinc-50 border border-zinc-200 rounded-3xl p-4 pr-12 text-sm focus:outline-none focus:border-emerald-500 transition-all resize-none min-h-[60px] max-h-[200px]"
+                            rows={1}
+                            style={{ height: 'auto' }}
+                          />
+                          <button 
+                            onClick={() => handleViralScriptWriter()}
+                            disabled={isWritingScript || !chatInput.trim()}
+                            className="absolute right-2 bottom-2 p-2 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
+                          >
+                            <Send size={18} />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-center text-zinc-400">
+                        Gemini may consume credits based on response length. Research toggle uses real-time 2026 data.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

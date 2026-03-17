@@ -19,23 +19,46 @@ const razorpay = new Razorpay({
 });
 
 // Initialize Firebase Admin
-if (process.env.FIREBASE_PROJECT_ID) {
+let firestore: admin.firestore.Firestore;
+
+if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-    });
-    console.log("Firebase Admin initialized");
+    if (admin.apps.length === 0) {
+      // Robust private key parsing
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      
+      // Handle cases where the key might be wrapped in quotes
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+        privateKey = privateKey.substring(1, privateKey.length - 1);
+      }
+      
+      // Replace escaped newlines with actual newlines
+      privateKey = privateKey.replace(/\\n/g, '\n');
+      
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: privateKey,
+        }),
+      });
+      console.log("Firebase Admin initialized successfully");
+    }
   } catch (error) {
     console.error("Firebase Admin init error:", error);
   }
 }
 
-// Initialize Firestore
-const firestore = admin.firestore();
+// Initialize Firestore only if admin was initialized
+try {
+  if (admin.apps.length > 0) {
+    firestore = admin.firestore();
+  } else {
+    console.warn("Firebase Admin not initialized. Firestore features will be disabled.");
+  }
+} catch (error) {
+  console.error("Firestore initialization error:", error);
+}
 
 const app = express();
 const PORT = 3000;
@@ -126,6 +149,9 @@ app.get("/api/user/profile", authenticate, async (req: any, res) => {
   }
 
   try {
+    if (!firestore) {
+      return res.status(503).json({ error: 'Database service unavailable' });
+    }
     const userRef = firestore.collection('users').doc(userId);
     const doc = await userRef.get();
     let userData: any;
@@ -164,6 +190,30 @@ app.get("/api/user/profile", authenticate, async (req: any, res) => {
     res.json(userData);
   } catch (error: any) {
     console.error("Firestore profile error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Deduct Credits
+app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
+  const userId = req.user.uid;
+  const { amount } = req.body;
+
+  if (!amount || typeof amount !== 'number') {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+
+  try {
+    if (!firestore) {
+      return res.status(503).json({ error: 'Database service unavailable' });
+    }
+    const userRef = firestore.collection('users').doc(userId);
+    await userRef.update({
+      credits: admin.firestore.FieldValue.increment(-amount)
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Firestore deduct error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -218,6 +268,9 @@ app.get("/api/user/profile", authenticate, async (req: any, res) => {
       };
 
       try {
+        if (!firestore) {
+          return res.status(503).json({ error: 'Database service unavailable' });
+        }
         const userRef = firestore.collection('users').doc(userId);
         await userRef.update({
           plan: plan,
@@ -243,6 +296,9 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
   }
 
   try {
+    if (!firestore) {
+      return res.status(503).json({ error: 'Database service unavailable' });
+    }
     const userRef = firestore.collection('users').doc(userId);
     const userDoc = await userRef.get();
     

@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getAnalytics, logEvent } from "firebase/analytics";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
@@ -17,11 +18,13 @@ let app;
 let auth: any;
 let googleProvider: any;
 let analytics: any;
+let db: any;
 
 if (firebaseConfig.apiKey) {
   try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
+    db = getFirestore(app);
     googleProvider = new GoogleAuthProvider();
     // Analytics is only supported in browser environments
     if (typeof window !== 'undefined') {
@@ -32,4 +35,4 @@ if (firebaseConfig.apiKey) {
   }
 }
 
-export { auth, googleProvider, analytics, logEvent };
+export { auth, googleProvider, analytics, logEvent, db };
