@@ -1665,7 +1665,18 @@ export default function App() {
 
   return (
     <AnimatePresence mode="wait">
-      {showWelcome ? (
+      {isAuthLoading ? (
+        <motion.div 
+          key="auth-loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[300] bg-white flex flex-col items-center justify-center"
+        >
+          <div className="w-12 h-12 border-4 border-zinc-100 border-t-zinc-900 rounded-full animate-spin" />
+          <p className="mt-4 text-zinc-500 font-medium animate-pulse">Initializing VoxNova...</p>
+        </motion.div>
+      ) : showWelcome ? (
         <WelcomeScreen onComplete={() => setShowWelcome(false)} />
       ) : (
         <div key="app" className="min-h-screen flex flex-col md:flex-row bg-white text-zinc-900 relative overflow-hidden">
