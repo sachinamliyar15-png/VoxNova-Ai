@@ -411,6 +411,7 @@ export default function App() {
       return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log("Auth State Changed:", user?.email);
       setCurrentUser(user);
       setIsAuthLoading(false);
       if (user) {
@@ -419,6 +420,10 @@ export default function App() {
         setUserProfile(null);
         setHistory([]);
       }
+    }, (error) => {
+      console.error("Auth State Error:", error);
+      setIsAuthLoading(false);
+      setError("Authentication service encountered an error. Please refresh the page.");
     });
     return () => unsubscribe();
   }, []);
@@ -430,10 +435,12 @@ export default function App() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch profile");
       setUserProfile(data);
       fetchHistory(user);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch profile', err);
+      // Don't show error for profile fetch to avoid blocking UI, but log it
     }
   };
 
@@ -442,25 +449,36 @@ export default function App() {
       setError("Firebase is not configured. Please add your Firebase environment variables to enable login.");
       return;
     }
+    
+    setIsAuthLoading(true);
     try {
+      console.log("Starting Google Login...");
       const result = await signInWithPopup(auth, googleProvider);
+      console.log("Login successful:", result.user.email);
       if (analytics) {
         logEvent(analytics, 'login', {
           method: 'Google',
           user_id: result.user.uid
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login failed', err);
+      setError(`Login failed: ${err.message || "Please check your internet connection and try again."}`);
+      setIsAuthLoading(false);
     }
   };
 
   const handleLogout = async () => {
     if (!auth) return;
+    setIsAuthLoading(true);
     try {
+      console.log("Starting Logout...");
       await signOut(auth);
-    } catch (err) {
+      console.log("Logout successful");
+    } catch (err: any) {
       console.error('Logout failed', err);
+      setError(`Logout failed: ${err.message}`);
+      setIsAuthLoading(false);
     }
   };
 
@@ -722,7 +740,7 @@ export default function App() {
 
           const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
           
-          let promptPrefix = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
+          const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
           
           PERFORMANCE GUIDELINES:
           - Use natural human prosody, complex intonation, and realistic rhythm.
@@ -730,12 +748,15 @@ export default function App() {
           - Avoid any robotic, monotone, or repetitive cadence.
           - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
           - Sound like a real person speaking in a high-end professional studio, not a computer.
+          - Pay close attention to the emotional weight of the text.
           
           TECHNICAL STANDARDS:
           - NO background noise, hums, or digital artifacts.
           - NO robotic glitches, metallic sounds, or synthetic "buzzing".
           - Ensure crystal-clear, 48kHz studio-quality audio.
           `;
+          
+          let promptPrefix = "";
           
           if (studioClarity) {
             promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
@@ -770,7 +791,7 @@ export default function App() {
           promptPrefix += `${voiceTraits[selectedVoice.name] || ''} `;
 
           if (style === 'documentary' || style === 'doc-pro' || selectedVoice.name === 'Documentary Pro') {
-            promptPrefix = `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
+            promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
             
             CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
             1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
@@ -782,9 +803,7 @@ export default function App() {
                - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
             3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
             4. PACING: Medium pace generally, but slow down for dramatic effect.
-            5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.
-            
-            This is a high-end cinematic production. Deliver a performance that sounds like a real human narrator.`;
+            5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
           } else if (style === 'emotional') {
             promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
           } else if (style === 'storytelling') {
@@ -816,7 +835,6 @@ export default function App() {
 
           let currentPrompt = finalPrompt;
           if (attempt > 0) {
-            // On retries, keep the high-quality instructions but emphasize realism even more
             currentPrompt = `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunkText}`;
           }
 
@@ -824,10 +842,11 @@ export default function App() {
             model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text: currentPrompt }] }],
             config: {
+              systemInstruction: systemInstruction,
               responseModalities: [Modality.AUDIO],
               speechConfig: {
                 voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: targetVoice },
+                  prebuiltVoiceConfig: { voiceName: targetVoice as any },
                 },
               },
             },
@@ -1158,11 +1177,28 @@ export default function App() {
 
       const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
       
+      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${targetLangName}. 
+          
+      PERFORMANCE GUIDELINES:
+      - Use natural human prosody, complex intonation, and realistic rhythm.
+      - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
+      - Avoid any robotic, monotone, or repetitive cadence.
+      - For ${targetLangName}, ensure perfect native pronunciation, natural flow, and cultural nuance.
+      - Sound like a real person speaking in a high-end professional studio, not a computer.
+      - Pay close attention to the emotional weight of the text.
+      
+      TECHNICAL STANDARDS:
+      - NO background noise, hums, or digital artifacts.
+      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
+      - Ensure crystal-clear, 48kHz studio-quality audio.
+      `;
+
       console.log(`Generating TTS with voice: ${targetVoice}`);
       const ttsResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: processedText }] }],
         config: {
+          systemInstruction: systemInstruction,
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
@@ -1749,7 +1785,7 @@ export default function App() {
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] text-zinc-500 uppercase font-bold">Credits</span>
                   <span className="text-xs font-mono text-emerald-600">
-                    {isWhitelisted(currentUser.email) ? 'Unlimited' : (userProfile?.credits?.toLocaleString() || 0)}
+                    {isWhitelisted(currentUser.email) ? 'Unlimited' : (userProfile ? userProfile.credits?.toLocaleString() : '...')}
                   </span>
                 </div>
                 <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
