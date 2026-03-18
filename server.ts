@@ -25,15 +25,22 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
   try {
     if (admin.apps.length === 0) {
       // Robust private key parsing
-      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
       
-      // Handle cases where the key might be wrapped in quotes
+      // Trim whitespace and handle potential wrapping quotes
+      privateKey = privateKey.trim();
       if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
         privateKey = privateKey.substring(1, privateKey.length - 1);
       }
       
       // Replace escaped newlines with actual newlines
+      // This handles the common case where the key is provided as a single line with \n strings
       privateKey = privateKey.replace(/\\n/g, '\n');
+      
+      // Ensure the key has the correct PEM headers
+      if (privateKey && !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+        console.error("FIREBASE_PRIVATE_KEY appears to be missing PEM headers");
+      }
       
       admin.initializeApp({
         credential: admin.credential.cert({

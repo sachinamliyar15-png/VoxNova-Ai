@@ -21,6 +21,42 @@
     "/users/{uid}": {
       "schema": "UserProfile",
       "description": "Collection of user profiles"
+    },
+    "/scripts/{scriptId}": {
+      "schema": "ScriptProject",
+      "description": "Collection of script projects and chat history"
+    }
+  },
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user credits, plan, and last reset date.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "User photo URL" },
+        "credits": { "type": "number", "description": "Current credit balance" },
+        "plan": { "type": "string", "description": "Subscription plan (free, basic, pro, elite)" },
+        "lastResetDate": { "type": "string", "description": "ISO date of last credit reset" },
+        "createdAt": { "type": "string", "description": "Account creation date" }
+      },
+      "required": ["uid", "email", "credits", "plan", "lastResetDate"]
+    },
+    "ScriptProject": {
+      "title": "Script Project",
+      "description": "Stores script content and chat history.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID" },
+        "title": { "type": "string", "description": "Project title" },
+        "content": { "type": "string", "description": "Latest script content" },
+        "messages": { "type": "array", "description": "Chat history" },
+        "createdAt": { "type": "string", "description": "Creation date" },
+        "updatedAt": { "type": "string", "description": "Last update date" }
+      },
+      "required": ["userId", "title", "content", "messages"]
     }
   }
 }

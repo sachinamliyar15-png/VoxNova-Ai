@@ -45,7 +45,13 @@ import {
   Edit2,
   PanelLeft,
   Copy,
-  Send
+  Send,
+  ImagePlus,
+  Image as ImageIcon,
+  MoreVertical,
+  Folder,
+  Square,
+  LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
@@ -348,16 +354,44 @@ export default function App() {
   const [viralScript, setViralScript] = useState('');
   const [isWritingScript, setIsWritingScript] = useState(false);
   const [scriptTone, setScriptTone] = useState<'viral' | 'storytelling' | 'educational'>('viral');
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model', content: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model', content: string, type?: 'text' | 'image', imageUrl?: string }[]>([]);
   const [isWebResearchEnabled, setIsWebResearchEnabled] = useState(false);
-  const [scriptHistory, setScriptHistory] = useState<{ id: string, title: string, content: string, createdAt: any }[]>([]);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsWritingScript(false);
+    setIsGeneratingImage(false);
+    setLoadingStep(0);
+    setGenerationProgress(0);
+  };
+  const [scriptHistory, setScriptHistory] = useState<{ id: string, title: string, content: string, messages?: any[], createdAt: any }[]>([]);
   const [currentScriptId, setCurrentScriptId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(true);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
   const [captionAnimation, setCaptionAnimation] = useState<'fade' | 'pop' | 'karaoke' | 'glow'>('pop');
   const [aiHighlights, setAiHighlights] = useState<any[]>([]);
   const [isAnalyzingCaptions, setIsAnalyzingCaptions] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setShowShareToast(true);
+    setTimeout(() => setShowShareToast(false), 3000);
+  };
   const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
   const exhaustedKeysRef = useRef<Set<string>>(new Set());
   const [exhaustedCount, setExhaustedCount] = useState(0);
@@ -370,31 +404,30 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const getAvailableApiKey = () => {
-    const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+    const baseKey = userApiKey || process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
     if (!baseKey) return null;
     
     const allKeys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
     const availableKeys = allKeys.filter(k => !exhaustedKeysRef.current.has(k));
     
     if (availableKeys.length === 0) {
-      // If all keys are exhausted, we don't reset automatically here to avoid infinite loops
-      // but we return a random one as a last resort if requested, 
-      // though the calling function should handle the wait.
-      return allKeys[Math.floor(Math.random() * allKeys.length)];
+      return null;
     }
     
+    // Randomly pick an available key
     return availableKeys[Math.floor(Math.random() * availableKeys.length)];
   };
 
   const markKeyAsExhausted = (key: string) => {
+    if (!key) return;
     exhaustedKeysRef.current.add(key);
     setExhaustedCount(exhaustedKeysRef.current.size);
     
-    // Automatically clear exhausted keys after 1 minute to try again
+    // Clear exhausted keys after 2 minutes (increased from 1 min for better safety)
     setTimeout(() => {
       exhaustedKeysRef.current.delete(key);
       setExhaustedCount(exhaustedKeysRef.current.size);
-    }, 60000);
+    }, 120000);
   };
   const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
   const isWhitelisted = (email: string | null | undefined) => email ? WHITELISTED_EMAILS.includes(email) : false;
@@ -484,98 +517,221 @@ export default function App() {
     setIsWritingScript(true);
     setError(null);
     
-    const newUserMessage = { role: 'user' as const, content: input };
+    const newUserMessage = { role: 'user' as const, content: input, type: 'text' as const };
     const updatedMessages = [...chatMessages, newUserMessage];
     setChatMessages(updatedMessages);
     setChatInput('');
 
-    try {
-      const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-      if (!baseKey) throw new Error("API Key not configured");
-      const keys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const apiKey = keys[Math.floor(Math.random() * keys.length)];
-      const ai = new GoogleGenAI({ apiKey });
+    const maxRetries = 15;
+    let attempt = 0;
 
-      const systemInstruction = `You are a world-class viral script writer for YouTube Shorts, TikTok, and Instagram Reels. 
-      Your goal is to write or refine scripts to maximize engagement, retention, and virality.
-      
-      TONE: ${scriptTone === 'viral' ? 'High-energy, punchy, and trend-focused' : scriptTone === 'storytelling' ? 'Emotional, narrative-driven, and immersive' : 'Clear, educational, and value-packed'}
-      
-      CORE PRINCIPLES:
-      1. Always include a 'Viral Hook' in the first 3 seconds.
-      2. Always include a 'Seamless Loop' at the end to encourage re-watching.
-      3. Use a viral storytelling structure.
-      4. Keep it under 5,000 characters.
-      5. Add appropriate emojis for visual rhythm.
-      6. Return the script in a clean Markdown format with bold headers, bullet points, and clear time-stamps (e.g., [00:00 - 00:05]).
-      7. If web research is enabled, cite your sources or base advice on the latest 2026 research.`;
+    const executeGeneration = async () => {
+      while (attempt < maxRetries) {
+        const apiKey = getAvailableApiKey();
+        if (!apiKey) {
+          const waitTime = 5000;
+          console.warn(`All keys exhausted. Waiting ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          attempt++;
+          continue;
+        }
 
-      const modelParams: any = {
-        model: "gemini-3-flash-preview",
-        config: {
-          systemInstruction,
-        },
-        contents: updatedMessages.map(m => ({
-          role: m.role,
-          parts: [{ text: m.content }]
-        }))
-      };
+        try {
+          const ai = new GoogleGenAI({ apiKey });
+          const systemInstruction = `You are a World-Class Movie Scriptwriter and Viral Content Strategist. 
+          Your goal is to write scripts that use deep psychological hooks to keep the audience "locked in" from the first second.
+          
+          STORYTELLING RULES:
+          1. OPENING: Start with a high-stakes psychological hook.
+          2. RETENTION: Use "Open Loops" to keep viewers curious.
+          3. PACING: Fast-paced but emotionally resonant.
+          4. LANGUAGE: Use powerful, evocative words that paint a picture.
+          5. FORMAT: Use professional script formatting with scene directions and emotional cues.
+          
+          THUMBNAIL RULES (If asked for image/thumbnail):
+          - Create high-CTR, high-competition YouTube thumbnails.
+          - Focus on "Storytelling through a single frame".
+          - Use vibrant colors, high contrast, and clear focal points.
+          
+          Always aim for "Hollywood Quality" in every response.`;
 
-      if (isWebResearchEnabled) {
-        modelParams.config.tools = [{ googleSearch: {} }];
-      }
+          const modelParams: any = {
+            model: "gemini-3-flash-preview",
+            config: { systemInstruction, temperature: 0.9, topP: 0.95 },
+            contents: updatedMessages.filter(m => m.type !== 'image').map(m => ({
+              role: m.role,
+              parts: [{ text: m.content }]
+            }))
+          };
 
-      const response = await ai.models.generateContent(modelParams);
-      const modelContent = response.text;
+          if (isWebResearchEnabled) {
+            modelParams.config.tools = [{ googleSearch: {} }];
+          }
 
-      if (!modelContent) throw new Error("No response from AI");
+          const response = await ai.models.generateContent(modelParams);
+          const modelContent = response.text;
+          if (!modelContent) throw new Error("No response from AI");
 
-      const newModelMessage = { role: 'model' as const, content: modelContent };
-      setChatMessages(prev => [...prev, newModelMessage]);
-      setViralScript(modelContent);
+          const newModelMessage = { role: 'model' as const, content: modelContent, type: 'text' as const };
+          const finalMessages = [...updatedMessages, newModelMessage];
+          setChatMessages(finalMessages);
+          setViralScript(modelContent);
 
-      // Deduct credits based on response length (1 credit per character)
-      if (currentUser && userProfile) {
-        const creditCost = modelContent.length;
-        const token = await currentUser.getIdToken();
-        await fetch('/api/user/deduct-credits', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ amount: creditCost })
-        });
-        // Update local profile
-        setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - creditCost }));
-      }
+          if (currentUser) {
+            if (currentScriptId) {
+              await updateDoc(doc(db, 'scripts', currentScriptId), {
+                content: modelContent,
+                messages: finalMessages,
+                updatedAt: serverTimestamp()
+              });
+            } else {
+              const docRef = await addDoc(collection(db, 'scripts'), {
+                userId: currentUser.uid,
+                title: input.substring(0, 30) + (input.length > 30 ? '...' : ''),
+                content: modelContent,
+                messages: finalMessages,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+              setCurrentScriptId(docRef.id);
+            }
+          }
+          return; // Success
 
-      // Auto-save to Firestore if it's a new script or update existing
-      if (currentUser) {
-        if (currentScriptId) {
-          await updateDoc(doc(db, 'scripts', currentScriptId), {
-            content: modelContent,
-            messages: [...updatedMessages, newModelMessage],
-            updatedAt: serverTimestamp()
-          });
-        } else {
-          const docRef = await addDoc(collection(db, 'scripts'), {
-            userId: currentUser.uid,
-            title: input.substring(0, 30) + '...',
-            content: modelContent,
-            messages: [...updatedMessages, newModelMessage],
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
-          setCurrentScriptId(docRef.id);
+        } catch (error: any) {
+          const errStr = error.message || "";
+          if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED")) {
+            markKeyAsExhausted(apiKey!);
+            attempt++;
+            continue;
+          }
+          throw error;
         }
       }
+      throw new Error("All API keys are busy. Please try again in 1 minute.");
+    };
 
+    try {
+      await executeGeneration();
     } catch (error: any) {
       console.error("Script writer error:", error);
       setError(error.message);
     } finally {
       setIsWritingScript(false);
+    }
+  };
+
+  const handleGenerateImage = async (prompt: string, aspectRatio: "1:1" | "16:9" | "9:16" = "16:9") => {
+    if (!prompt.trim()) return;
+    
+    setIsGeneratingImage(true);
+    setError(null);
+    
+    const newUserMessage = { role: 'user' as const, content: `Generate ${aspectRatio} thumbnail: ${prompt}`, type: 'text' as const };
+    const updatedMessages = [...chatMessages, newUserMessage];
+    setChatMessages(updatedMessages);
+
+    const maxRetries = 15;
+    let attempt = 0;
+
+    const executeImageGen = async () => {
+      while (attempt < maxRetries) {
+        const apiKey = getAvailableApiKey();
+        if (!apiKey) {
+          const waitTime = 5000;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          attempt++;
+          continue;
+        }
+
+        try {
+          const ai = new GoogleGenAI({ apiKey });
+          const imagePrompt = `World-class professional YouTube thumbnail, high-CTR, cinematic lighting, psychological hook visual. ${prompt}. 8k resolution, cinematic composition, vibrant colors, trending on ArtStation style, highly detailed, sharp focus.`;
+
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-image-preview',
+            contents: [{ text: imagePrompt }],
+            config: {
+              imageConfig: {
+                aspectRatio,
+                imageSize: "1K"
+              }
+            }
+          });
+
+          let imageUrl = '';
+          for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+              imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+              break;
+            }
+          }
+
+          if (!imageUrl) throw new Error("Failed to generate image data.");
+
+          const newModelMessage = { 
+            role: 'model' as const, 
+            content: `Generated ${aspectRatio} professional thumbnail for: ${prompt}`, 
+            type: 'image' as const, 
+            imageUrl 
+          };
+          
+          const finalMessages = [...updatedMessages, newModelMessage];
+          setChatMessages(finalMessages);
+
+          if (currentUser) {
+            // Deduct credits
+            const token = await currentUser.getIdToken();
+            await fetch('/api/user/deduct-credits', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ amount: 500 })
+            });
+            setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - 500 }));
+
+            // Save to Firestore
+            if (currentScriptId) {
+              await updateDoc(doc(db, 'scripts', currentScriptId), {
+                messages: finalMessages,
+                updatedAt: serverTimestamp()
+              });
+            } else {
+              const docRef = await addDoc(collection(db, 'scripts'), {
+                userId: currentUser.uid,
+                title: `Image: ${prompt.substring(0, 20)}...`,
+                content: prompt,
+                messages: finalMessages,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              });
+              setCurrentScriptId(docRef.id);
+            }
+          }
+          return;
+
+        } catch (error: any) {
+          const errStr = error.message || "";
+          if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED")) {
+            markKeyAsExhausted(apiKey!);
+            attempt++;
+            continue;
+          }
+          throw error;
+        }
+      }
+      throw new Error("All API keys are busy. Please try again in 1 minute.");
+    };
+
+    try {
+      await executeImageGen();
+    } catch (error: any) {
+      console.error("Image generation error:", error);
+      setError(`Image Generation Failed: ${error.message}`);
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
@@ -669,57 +825,78 @@ export default function App() {
     if (previewingVoiceId) return;
     
     setPreviewingVoiceId(voice.id);
-    try {
-      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error("API Key not configured");
+    const maxRetries = 5;
+    let attempt = 0;
 
-      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const activeKey = keys[Math.floor(Math.random() * keys.length)];
-      const ai = new GoogleGenAI({ apiKey: activeKey });
+    const executePreview = async () => {
+      while (attempt < maxRetries) {
+        const apiKey = getAvailableApiKey();
+        if (!apiKey) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          attempt++;
+          continue;
+        }
 
-      const voiceMapping: Record<string, string> = {
-        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
-        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
-        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
-        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
-      };
+        try {
+          const ai = new GoogleGenAI({ apiKey });
+          const voiceMapping: Record<string, string> = {
+            'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+            'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+            'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+            'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+            'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Virat Best Voice': 'Zephyr'
+          };
 
-      const targetVoice = voiceMapping[voice.name] || 'Puck';
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Hello! I am ${voice.name}. I can speak in many languages.` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+          const targetVoice = voiceMapping[voice.name] || 'Puck';
+          
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: `Hello! I am ${voice.name}. I can speak in many languages.` }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: targetVoice as any },
+                },
+              },
             },
-          },
-        },
-      });
+          });
 
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        const pcmBuffer = base64ToArrayBuffer(base64Audio);
-        const resampledPcm = resamplePCM(pcmBuffer, 24000, 44100);
-        const wavHeader = createWavHeader(resampledPcm, 44100);
-        const combinedBuffer = new Uint8Array(wavHeader.byteLength + resampledPcm.byteLength);
-        combinedBuffer.set(new Uint8Array(wavHeader), 0);
-        combinedBuffer.set(new Uint8Array(resampledPcm), wavHeader.byteLength);
-        const blob = new Blob([combinedBuffer], { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => {
-          setPreviewingVoiceId(null);
-          URL.revokeObjectURL(url);
-        };
-        audio.play();
-      } else {
-        setPreviewingVoiceId(null);
+          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            const pcmBuffer = base64ToArrayBuffer(base64Audio);
+            const resampledPcm = resamplePCM(pcmBuffer, 24000, 44100);
+            const wavHeader = createWavHeader(resampledPcm, 44100);
+            const combinedBuffer = new Uint8Array(wavHeader.byteLength + resampledPcm.byteLength);
+            combinedBuffer.set(new Uint8Array(wavHeader), 0);
+            combinedBuffer.set(new Uint8Array(resampledPcm), wavHeader.byteLength);
+            const blob = new Blob([combinedBuffer], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.onended = () => {
+              setPreviewingVoiceId(null);
+              URL.revokeObjectURL(url);
+            };
+            audio.play();
+            return;
+          } else {
+            throw new Error("No audio data");
+          }
+        } catch (error: any) {
+          if (error.message?.includes('429')) {
+            markKeyAsExhausted(apiKey!);
+            attempt++;
+            continue;
+          }
+          throw error;
+        }
       }
+      setPreviewingVoiceId(null);
+    };
+
+    try {
+      await executePreview();
     } catch (error) {
       console.error("Preview failed:", error);
       setPreviewingVoiceId(null);
@@ -1061,14 +1238,25 @@ export default function App() {
 
     const generateWithRetry = async (chunkText: string): Promise<string> => {
       let attempt = 0;
-      const maxRetries = 10; // Increased retries for better failover
+      const maxRetries = 15; // Increased retries for better failover
 
       while (attempt < maxRetries) {
-        const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-        const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-        
         let apiKey = getAvailableApiKey();
+        
         if (!apiKey) {
+          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+          const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+          
+          if (allKeys.length > 0 && exhaustedKeysRef.current.size >= allKeys.length) {
+            // All keys exhausted, wait and retry if we have attempts left
+            const waitTime = 10000; // Increased wait time
+            console.warn(`All ${allKeys.length} keys exhausted. Waiting ${waitTime}ms...`);
+            setError(`All API keys exhausted. Waiting ${waitTime/1000}s before retrying...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            setError(null);
+            attempt++;
+            continue;
+          }
           throw new Error("Gemini API Key is not configured. Please enter your API key by clicking the 'Key' icon.");
         }
 
@@ -1227,6 +1415,9 @@ export default function App() {
             markKeyAsExhausted(apiKey);
             console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted. Switching keys...`);
             
+            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+            const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+            
             if (exhaustedKeysRef.current.size < allKeys.length) {
               attempt--; // Don't count this as a failed attempt for the whole process
               continue;
@@ -1255,9 +1446,23 @@ export default function App() {
     };
 
     try {
+      // Sanitize text: remove problematic characters that might crash the TTS model
+      const sanitizeText = (t: string) => {
+        return t.replace(/[*_#`~[\]()<>|\\{}]/g, '') // Remove markdown-like chars
+                .replace(/[^\x20-\x7E\u0900-\u097F\u00A0-\u00FF]/g, ' ') // Keep basic Latin, Hindi, and common symbols
+                .trim();
+      };
+
+      const sanitizedText = sanitizeText(text);
+      if (sanitizedText.length === 0) {
+        setError("Please enter some valid text to generate voice.");
+        setIsGenerating(false);
+        return;
+      }
+
       // 1. Split text into chunks for long-form stability
       // Increased chunk size to 2500 for faster processing of long scripts
-      const chunks = splitTextIntoChunks(text, 2500); 
+      const chunks = splitTextIntoChunks(sanitizedText, 2500); 
       
       // Increased concurrency to 2 for faster generation while staying within safe limits
       const CONCURRENCY_LIMIT = 2;
@@ -1412,7 +1617,9 @@ export default function App() {
         setError("Network connection lost. Please check your internet and try again.");
         setErrorType('network');
       } else {
-        setError("Something went wrong while generating your voice. Please try again later.");
+        // Show the actual error message to help diagnose the issue
+        const displayMsg = err.message || "Something went wrong while generating your voice. Please try again later.";
+        setError(displayMsg);
         setErrorType('general');
       }
     } finally {
@@ -1473,7 +1680,14 @@ export default function App() {
         const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
         
         let apiKey = getAvailableApiKey();
-        if (!apiKey) throw new Error("API Key not configured. Please add your key in API Settings.");
+        if (!apiKey) {
+          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+          const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+          if (allKeys.length > 0 && exhaustedKeysRef.current.size >= allKeys.length) {
+            throw new Error("429: All API keys exhausted.");
+          }
+          throw new Error("API Key not configured. Please add your key in API Settings.");
+        }
 
         try {
           const ai = new GoogleGenAI({ apiKey });
@@ -1713,7 +1927,14 @@ export default function App() {
         const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
         
         let apiKey = getAvailableApiKey();
-        if (!apiKey) throw new Error("API Key not configured.");
+        if (!apiKey) {
+          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+          const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+          if (allKeys.length > 0 && exhaustedKeysRef.current.size >= allKeys.length) {
+            throw new Error("429: All API keys exhausted.");
+          }
+          throw new Error("API Key not configured.");
+        }
 
         try {
           const ai = new GoogleGenAI({ apiKey });
@@ -2338,14 +2559,14 @@ export default function App() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'captions' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <Video size={20} />
-            AI Video Captions
+            Animated Captions
           </button>
           <button 
             onClick={() => { setActiveTab('script-writer'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'script-writer' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
-            <PenTool size={20} />
-            Smart Script Workspace
+            <Sparkles size={20} />
+            Smart Workspace
           </button>
           <button 
             onClick={() => { setShowVoiceLibrary(true); setIsMobileMenuOpen(false); }}
@@ -2457,13 +2678,15 @@ export default function App() {
         )}
         {showShareToast && (
           <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-emerald-500 text-white rounded-full shadow-2xl flex items-center gap-2 font-medium"
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-zinc-900 text-white rounded-full shadow-2xl flex items-center gap-3 border border-white/10"
           >
-            <Check size={18} />
-            Link copied to clipboard!
+            <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+              <Check size={12} className="text-white" />
+            </div>
+            <span className="text-sm font-bold">{toastMessage || "Link copied to clipboard!"}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -3201,240 +3424,288 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex h-[calc(100vh-12rem)] gap-6"
+              className="flex h-[calc(100vh-8rem)] gap-0 -mx-4 -mb-8 bg-white overflow-hidden relative"
             >
-              {/* History Sidebar */}
+              {/* History Sidebar - Gemini Style */}
               <AnimatePresence>
                 {isHistorySidebarOpen && (
                   <motion.div
                     initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 280, opacity: 1 }}
+                    animate={{ width: 300, opacity: 1 }}
                     exit={{ width: 0, opacity: 0 }}
-                    className="glass-panel rounded-3xl border-zinc-100 flex flex-col overflow-hidden"
+                    className="bg-zinc-50 border-r border-zinc-100 flex flex-col overflow-hidden h-full z-20"
                   >
-                    <div className="p-6 border-bottom border-zinc-100 flex items-center justify-between">
-                      <h3 className="font-bold text-zinc-900 flex items-center gap-2">
-                        <History size={18} className="text-zinc-400" />
-                        History
-                      </h3>
+                    <div className="p-4 flex flex-col gap-4">
                       <button 
                         onClick={() => {
                           setCurrentScriptId(null);
                           setChatMessages([]);
                           setViralScript('');
                         }}
-                        className="p-2 hover:bg-zinc-100 rounded-xl text-emerald-500 transition-all"
-                        title="New Script"
+                        className="flex items-center gap-3 px-4 py-3 bg-zinc-200/50 hover:bg-zinc-200 rounded-full text-zinc-600 transition-all text-sm font-medium"
                       >
                         <Plus size={18} />
+                        New Chat
                       </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+
+                    <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
+                      <div className="px-4 py-2 flex items-center gap-2">
+                        <History size={14} className="text-zinc-400" />
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">History</span>
+                      </div>
                       {scriptHistory.length === 0 ? (
-                        <div className="text-center py-10 space-y-2">
+                        <div className="px-4 py-8 text-center space-y-2">
                           <div className="text-zinc-300 flex justify-center"><PenTool size={24} /></div>
-                          <p className="text-xs text-zinc-400">No scripts yet</p>
+                          <p className="text-[10px] text-zinc-400">No scripts yet</p>
                         </div>
                       ) : (
                         scriptHistory.map((script) => (
                           <div 
                             key={script.id}
-                            className={`group p-3 rounded-xl cursor-pointer transition-all relative ${currentScriptId === script.id ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-50 text-zinc-600'}`}
+                            className={`group flex items-center gap-3 px-4 py-2.5 rounded-full cursor-pointer transition-all relative ${currentScriptId === script.id ? 'bg-emerald-500/10 text-emerald-700' : 'hover:bg-zinc-200/50 text-zinc-600'}`}
                             onClick={() => handleOpenScript(script)}
                           >
-                            <div className="text-xs font-medium truncate pr-8">{script.title}</div>
-                            <div className="text-[10px] opacity-50 mt-1">
-                              {script.createdAt?.toDate ? new Date(script.createdAt.toDate()).toLocaleDateString() : 'Just now'}
-                            </div>
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="text-xs font-medium truncate flex-1">{script.title}</div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const newTitle = prompt("Rename script:", script.title);
                                   if (newTitle) handleRenameScript(script.id, newTitle);
                                 }}
-                                className="p-1 hover:bg-white/20 rounded"
+                                className="p-1 hover:bg-zinc-200 rounded text-zinc-400"
                               >
-                                <Edit2 size={12} />
+                                <Edit2 size={10} />
                               </button>
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (confirm("Delete this script?")) handleDeleteScript(script.id);
                                 }}
-                                className="p-1 hover:bg-red-500/20 text-red-400 rounded"
+                                className="p-1 hover:bg-red-50 text-red-400 rounded"
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={10} />
                               </button>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
+
+                    <div className="p-4 border-t border-zinc-100 space-y-1">
+                      <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-200/50 rounded-full text-zinc-600 transition-all text-xs">
+                        <HelpCircle size={14} /> Help
+                      </button>
+                      <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-200/50 rounded-full text-zinc-600 transition-all text-xs">
+                        <Settings2 size={14} /> Settings
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               {/* Main Chat Workspace */}
-              <div className="flex-1 flex flex-col gap-6 min-w-0">
-                <div className="flex items-center justify-between">
+              <div className="flex-1 flex flex-col min-w-0 bg-white relative">
+                {/* Header - Exact Gemini Style */}
+                <div className="h-16 border-b border-zinc-100 flex items-center justify-between px-4 bg-white sticky top-0 z-10">
                   <div className="flex items-center gap-4">
                     <button 
                       onClick={() => setIsHistorySidebarOpen(!isHistorySidebarOpen)}
-                      className="p-2 hover:bg-zinc-100 rounded-xl text-zinc-500 transition-all"
+                      className="p-2 hover:bg-zinc-100 rounded-full text-zinc-600 transition-all"
                     >
-                      <PanelLeft size={20} />
+                      <Menu size={24} />
                     </button>
-                    <div className="space-y-0.5">
-                      <h2 className="text-xl font-display font-bold text-zinc-900">Smart Workspace</h2>
-                      <p className="text-xs text-zinc-400">AI-Powered Viral Scripting</p>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-medium text-zinc-900 truncate max-w-[200px] md:max-w-md">
+                        {currentScriptId ? scriptHistory.find(s => s.id === currentScriptId)?.title : 'Smart Script Workspace'}
+                      </h2>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
-                      {(['viral', 'storytelling', 'educational'] as const).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setScriptTone(t)}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize ${scriptTone === t ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                    <button 
-                      onClick={() => setIsWebResearchEnabled(!isWebResearchEnabled)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${isWebResearchEnabled ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-500'}`}
-                    >
-                      <Globe size={14} />
-                      Deep Research
-                    </button>
+                  <div className="flex items-center gap-1">
+                    <button className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500"><Edit2 size={20} /></button>
+                    <button className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500"><Share2 size={20} /></button>
+                    <button className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500"><MoreVertical size={20} /></button>
                   </div>
                 </div>
 
                 {/* Chat Messages Area */}
-                <div className="flex-1 glass-panel rounded-[2.5rem] border-zinc-100 overflow-hidden flex flex-col bg-zinc-50/30">
-                  <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                    {chatMessages.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-6">
-                        <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center text-emerald-500">
-                          <Sparkles size={40} />
-                        </div>
-                        <div className="space-y-2">
-                          <h3 className="text-lg font-bold text-zinc-900">Start your viral journey</h3>
-                          <p className="text-sm text-zinc-500">Paste your raw idea or script below. I'll transform it using viral hooks and looping logic.</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 w-full">
-                          <button 
-                            onClick={() => handleViralScriptWriter("Write a viral hook for a fitness video")}
-                            className="p-3 bg-white border border-zinc-100 rounded-2xl text-[10px] font-bold text-zinc-600 hover:border-emerald-500 transition-all text-left"
-                          >
-                            "Write a viral hook for a fitness video"
-                          </button>
-                          <button 
-                            onClick={() => handleViralScriptWriter("Create a storytelling script about productivity")}
-                            className="p-3 bg-white border border-zinc-100 rounded-2xl text-[10px] font-bold text-zinc-600 hover:border-emerald-500 transition-all text-left"
-                          >
-                            "Create a storytelling script about productivity"
-                          </button>
-                        </div>
+                <div className="flex-1 overflow-y-auto px-4 py-8 md:px-20 space-y-8 scroll-smooth pb-40">
+                  {chatMessages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center max-w-2xl mx-auto space-y-10 py-10">
+                      <motion.div 
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-3xl flex items-center justify-center text-white shadow-2xl shadow-emerald-500/30"
+                      >
+                        <Sparkles size={40} />
+                      </motion.div>
+                      <div className="space-y-4">
+                        <h1 className="text-3xl font-display font-bold text-zinc-900 tracking-tight">How can I help you today?</h1>
+                        <p className="text-zinc-500 text-base">I'm Smart Workspace, your personal viral script writer and image generator. Let's create something legendary.</p>
                       </div>
-                    ) : (
-                      chatMessages.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[85%] p-6 rounded-[2rem] ${msg.role === 'user' ? 'bg-zinc-900 text-white rounded-tr-none' : 'bg-white border border-zinc-100 text-zinc-800 rounded-tl-none shadow-sm'}`}>
-                            {msg.role === 'model' ? (
-                              <div className="prose prose-sm prose-zinc max-w-none">
-                                <Markdown>{msg.content}</Markdown>
-                                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                        {[
+                          { icon: <TrendingUp size={16} />, text: "Write a viral fitness hook", prompt: "Write a viral hook for a fitness video that stops the scroll in 1 second." },
+                          { icon: <ImageIcon size={16} />, text: "Generate a fitness thumbnail", prompt: "Generate a high-CTR fitness thumbnail image with a muscular athlete and vibrant neon lighting." },
+                          { icon: <PenTool size={16} />, text: "Storytelling script for business", prompt: "Create an emotional storytelling script about a failed entrepreneur who made it big." },
+                          { icon: <Zap size={16} />, text: "Quick value-packed reel", prompt: "Write a 30-second educational script about 3 productivity hacks." }
+                        ].map((item, i) => (
+                          <button 
+                            key={i}
+                            onClick={() => item.text.includes('Generate') ? handleGenerateImage(item.prompt.replace('Generate ', '')) : handleViralScriptWriter(item.prompt)}
+                            className="p-4 bg-white border border-zinc-100 rounded-2xl text-sm font-medium text-zinc-700 hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/5 transition-all text-left flex items-start gap-3 group"
+                          >
+                            <div className="p-2 bg-zinc-50 rounded-xl text-zinc-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-colors">
+                              {item.icon}
+                            </div>
+                            <span>{item.text}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="max-w-3xl mx-auto space-y-10">
+                      {chatMessages.map((msg, i) => (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          key={i} 
+                          className={`flex gap-6 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                        >
+                          <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold shadow-sm ${msg.role === 'user' ? 'bg-zinc-900 text-white' : 'bg-emerald-500 text-white'}`}>
+                            {msg.role === 'user' ? (userProfile?.displayName?.[0] || 'U') : <Sparkles size={20} />}
+                          </div>
+                          <div className={`flex-1 space-y-4 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                            <div className={`inline-block max-w-full ${msg.role === 'user' ? 'bg-zinc-100 p-4 rounded-2xl rounded-tr-none' : ''}`}>
+                              {msg.type === 'image' ? (
+                                <div className="space-y-4">
+                                  <img 
+                                    src={msg.imageUrl} 
+                                    alt="Generated AI" 
+                                    className="rounded-2xl w-full aspect-video object-cover shadow-xl border border-zinc-100"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div className="flex justify-between items-center">
+                                    <p className="text-xs text-zinc-500 font-medium italic">{msg.content}</p>
                                     <button 
                                       onClick={() => {
-                                        navigator.clipboard.writeText(msg.content);
-                                        setShowShareToast(true);
-                                        setTimeout(() => setShowShareToast(false), 3000);
+                                        const a = document.createElement('a');
+                                        a.href = msg.imageUrl!;
+                                        a.download = `viral-image-${Date.now()}.png`;
+                                        a.click();
                                       }}
-                                      className="p-2 hover:bg-zinc-50 rounded-lg text-zinc-400 transition-all"
-                                      title="Copy Script"
+                                      className="p-2 hover:bg-zinc-100 rounded-xl text-emerald-500 transition-all"
                                     >
-                                      <Copy size={14} />
+                                      <Download size={16} />
                                     </button>
-                                    <button 
-                                      onClick={() => {
-                                        setText(msg.content);
-                                        setActiveTab('generate');
-                                      }}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg text-[10px] font-bold hover:bg-emerald-500/20 transition-all"
-                                    >
-                                      <ArrowRight size={12} />
-                                      Use for TTS
-                                    </button>
-                                  </div>
-                                  <div className="text-[10px] text-zinc-400 font-medium">
-                                    {msg.content.length} characters
                                   </div>
                                 </div>
+                              ) : (
+                                <div className="prose prose-sm prose-zinc max-w-none leading-relaxed text-zinc-800">
+                                  <Markdown>{msg.content}</Markdown>
+                                  {msg.role === 'model' && (
+                                    <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center gap-4">
+                                      <button 
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(msg.content);
+                                          showToast("Copied to clipboard!");
+                                        }}
+                                        className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-400 transition-all"
+                                        title="Copy text"
+                                      >
+                                        <Copy size={16} />
+                                      </button>
+                                      <button 
+                                        onClick={() => {
+                                          setText(msg.content);
+                                          setActiveTab('generate');
+                                        }}
+                                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all"
+                                      >
+                                        <Volume2 size={14} /> Use for Voice
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                      {(isWritingScript || isGeneratingImage) && (
+                        <div className="flex gap-6">
+                          <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                            <Sparkles size={20} className="animate-pulse" />
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-4">
+                              <Loader2 className="animate-spin text-emerald-500" size={20} />
+                              <div className="space-y-1">
+                                <p className="text-sm font-bold text-zinc-900">{isGeneratingImage ? 'Generating High-CTR Thumbnail...' : 'Smart Workspace is thinking...'}</p>
+                                <p className="text-xs text-zinc-400">{isGeneratingImage ? 'Applying cinematic lighting and psychological hooks...' : 'Writing movie-level script with psychological hooks...'}</p>
                               </div>
-                            ) : (
-                              <p className="text-sm leading-relaxed">{msg.content}</p>
-                            )}
+                            </div>
+                            <button 
+                              onClick={stopGeneration}
+                              className="px-4 py-2 bg-white border border-zinc-200 rounded-full text-[10px] font-bold uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all flex items-center gap-2"
+                            >
+                              <Square size={12} fill="currentColor" /> Stop
+                            </button>
                           </div>
                         </div>
-                      ))
-                    )}
-                    {isWritingScript && (
-                      <div className="flex justify-start">
-                        <div className="bg-white border border-zinc-100 p-6 rounded-[2rem] rounded-tl-none shadow-sm flex items-center gap-3">
-                          <Loader2 className="animate-spin text-emerald-500" size={18} />
-                          <span className="text-sm text-zinc-500 font-medium">Gemini is researching and writing...</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+                  )}
+                </div>
 
-                  {/* Chat Input Area */}
-                  <div className="p-6 bg-white border-t border-zinc-100">
-                    <div className="max-w-3xl mx-auto space-y-4">
-                      <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                            {userProfile?.credits?.toLocaleString() || '20,000'} Credits Available
-                          </span>
-                        </div>
-                        <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                          {chatInput.length} / 5,000 Characters
-                        </div>
-                      </div>
-                      <div className="relative flex items-end gap-3">
-                        <div className="flex-1 relative">
-                          <textarea 
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value.slice(0, 5000))}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleViralScriptWriter();
-                              }
-                            }}
-                            placeholder="Type your script idea or refinement instruction..."
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-3xl p-4 pr-12 text-sm focus:outline-none focus:border-emerald-500 transition-all resize-none min-h-[60px] max-h-[200px]"
-                            rows={1}
-                            style={{ height: 'auto' }}
-                          />
+                {/* Gemini Style Bottom Input Bar - Exact Clone */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
+                  <div className="max-w-3xl mx-auto pointer-events-auto">
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-zinc-900/5 blur-2xl rounded-[2.5rem] group-focus-within:bg-emerald-500/10 transition-all" />
+                      <div className="relative bg-zinc-50 border border-zinc-200 rounded-[2.5rem] p-2 shadow-2xl flex items-end gap-2 focus-within:border-emerald-500/30 transition-all">
+                        <button className="p-3 hover:bg-zinc-200 rounded-full text-zinc-400 transition-all flex-shrink-0">
+                          <Plus size={22} />
+                        </button>
+                        <button 
+                          onClick={() => handleGenerateImage(chatInput || "A viral YouTube thumbnail")}
+                          className="p-3 hover:bg-emerald-50 rounded-full text-emerald-500 transition-all flex-shrink-0"
+                          title="Generate Thumbnail"
+                        >
+                          <Sparkles size={22} />
+                        </button>
+                        <textarea
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleViralScriptWriter();
+                            }
+                          }}
+                          placeholder="Describe your video idea or paste a raw script..."
+                          className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-2 min-h-[52px] max-h-40 resize-none"
+                          rows={1}
+                        />
+                        <div className="flex items-center gap-2 pb-1 pr-1">
+                          <button className="px-4 py-2 bg-white border border-zinc-200 hover:bg-zinc-100 rounded-full text-[10px] font-bold uppercase tracking-widest text-zinc-500 transition-all shadow-sm">
+                            Fast
+                          </button>
                           <button 
                             onClick={() => handleViralScriptWriter()}
-                            disabled={isWritingScript || !chatInput.trim()}
-                            className="absolute right-2 bottom-2 p-2 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
+                            disabled={!chatInput.trim() || isWritingScript}
+                            className={`p-3 rounded-full transition-all flex-shrink-0 ${chatInput.trim() ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-100 text-zinc-300'}`}
                           >
-                            <Send size={18} />
+                            <Send size={20} />
                           </button>
                         </div>
                       </div>
-                      <p className="text-[10px] text-center text-zinc-400">
-                        Gemini may consume credits based on response length. Research toggle uses real-time 2026 data.
-                      </p>
                     </div>
+                    <p className="text-[10px] text-center text-zinc-400 mt-4 font-medium uppercase tracking-widest">
+                      Smart Workspace can make mistakes. Check important info.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -3490,27 +3761,36 @@ export default function App() {
 
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Select Animation Style</label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-4">
                       {[
-                        { id: 'fade', name: 'Fade In', color: 'from-blue-400 to-blue-600' },
-                        { id: 'pop', name: 'Pop Up', color: 'from-purple-400 to-purple-600' },
-                        { id: 'karaoke', name: 'Karaoke', color: 'from-emerald-400 to-emerald-600' },
-                        { id: 'glow', name: 'Glow', color: 'from-orange-400 to-orange-600' }
+                        { id: 'fade', name: 'Fade In', color: 'from-blue-400 to-blue-600', preview: 'Smooth & Professional' },
+                        { id: 'pop', name: 'Pop Up', color: 'from-purple-400 to-purple-600', preview: 'High Energy & Viral' },
+                        { id: 'karaoke', name: 'Karaoke', color: 'from-emerald-400 to-emerald-600', preview: 'Word-by-Word Sync' },
+                        { id: 'glow', name: 'Glow', color: 'from-orange-400 to-orange-600', preview: 'Cinematic Highlights' }
                       ].map((anim) => (
                         <button
                           key={anim.id}
                           onClick={() => setCaptionAnimation(anim.id as any)}
-                          className={`relative overflow-hidden p-4 rounded-2xl border-2 transition-all ${captionAnimation === anim.id ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-100 bg-white hover:border-zinc-200'}`}
+                          className={`relative overflow-hidden p-6 rounded-3xl border-2 transition-all text-left ${captionAnimation === anim.id ? 'border-emerald-500 bg-emerald-50/50' : 'border-zinc-100 bg-white hover:border-zinc-200'}`}
                         >
-                          <div className={`absolute top-0 right-0 w-12 h-12 bg-gradient-to-br ${anim.color} opacity-10 blur-xl`} />
-                          <div className="relative flex flex-col items-start gap-1">
-                            <span className="text-xs font-bold">{anim.name}</span>
-                            <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
-                              <motion.div 
-                                animate={captionAnimation === anim.id ? { x: ['-100%', '100%'] } : {}}
-                                transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                                className={`h-full w-1/2 bg-gradient-to-r ${anim.color}`}
-                              />
+                          <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${anim.color} opacity-5 blur-2xl`} />
+                          <div className="relative space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className={`text-sm font-bold ${captionAnimation === anim.id ? 'text-emerald-700' : 'text-zinc-900'}`}>{anim.name}</span>
+                              {captionAnimation === anim.id && <Check size={16} className="text-emerald-500" />}
+                            </div>
+                            <div className="p-3 bg-zinc-900 rounded-xl overflow-hidden relative h-12 flex items-center justify-center">
+                              <motion.span 
+                                animate={captionAnimation === anim.id ? 
+                                  (anim.id === 'pop' ? { scale: [1, 1.2, 1] } : 
+                                   anim.id === 'fade' ? { opacity: [0, 1] } :
+                                   anim.id === 'glow' ? { textShadow: ["0 0 0px #fff", "0 0 10px #fff", "0 0 0px #fff"] } :
+                                   { x: [-20, 20] }) : {}}
+                                transition={{ repeat: Infinity, duration: 1.5 }}
+                                className={`text-[10px] font-bold text-white text-center ${anim.id === 'karaoke' ? 'bg-gradient-to-r from-emerald-400 to-white bg-clip-text text-transparent' : ''}`}
+                              >
+                                {anim.preview}
+                              </motion.span>
                             </div>
                           </div>
                         </button>
