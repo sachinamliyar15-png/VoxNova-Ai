@@ -39,6 +39,7 @@ import {
   Mail,
   ExternalLink,
   PenTool,
+  ArrowUp,
   ArrowRight,
   Type,
   Plus,
@@ -71,30 +72,6 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db, auth, googleProvider, analytics, logEvent } from './firebase';
-
-const AdBox = ({ className = "", slot = "5425662273" }: { className?: string, slot?: string }) => {
-  useEffect(() => {
-    try {
-      // @ts-ignore
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-    } catch (e) {
-      // console.error("Adsbygoogle error:", e);
-    }
-  }, []);
-
-  return (
-    <div className={`glass-panel p-2 rounded-2xl flex flex-col items-center justify-center min-h-[180px] border-white/10 bg-white/5 overflow-hidden ${className}`}>
-      <ins
-        className="adsbygoogle"
-        style={{ display: 'block', width: '100%', height: '100%', minWidth: '300px', minHeight: '50px' }}
-        data-ad-client="ca-pub-2663893470385909"
-        data-ad-slot={slot}
-        data-ad-format="auto"
-        data-full-width-responsive="true"
-      ></ins>
-    </div>
-  );
-};
 
 const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
   return (
@@ -143,25 +120,6 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-const StickyFooterAd = () => {
-  const [isVisible, setIsVisible] = useState(true);
-  if (!isVisible) return null;
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-md border-t border-zinc-200 p-2 flex items-center justify-center animate-in slide-in-from-bottom duration-500">
-      <div className="max-w-5xl w-full flex items-center justify-between gap-4 px-4">
-        <div className="flex-1 h-14 glass-panel rounded-xl flex items-center justify-center text-zinc-300 font-bold text-lg opacity-20 border-emerald-500/10">
-          ADVERTISEMENT
-        </div>
-        <button 
-          onClick={() => setIsVisible(false)}
-          className="p-1.5 hover:bg-zinc-100 rounded-full text-zinc-400 transition-colors"
-        >
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  );
-};
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 declare global {
@@ -354,12 +312,14 @@ export default function App() {
   const [viralScript, setViralScript] = useState('');
   const [isWritingScript, setIsWritingScript] = useState(false);
   const [scriptTone, setScriptTone] = useState<'viral' | 'storytelling' | 'educational'>('viral');
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model', content: string, type?: 'text' | 'image', imageUrl?: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ id?: number, role: 'user' | 'model', content: string, type?: 'text' | 'image', imageUrl?: string, timestamp?: Date }[]>([]);
   const [isWebResearchEnabled, setIsWebResearchEnabled] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const stopGeneration = () => {
+    stopGenerationRef.current = true;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -372,7 +332,7 @@ export default function App() {
   const [scriptHistory, setScriptHistory] = useState<{ id: string, title: string, content: string, messages?: any[], createdAt: any }[]>([]);
   const [currentScriptId, setCurrentScriptId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
-  const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(true);
+  const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -380,6 +340,13 @@ export default function App() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+
+  useEffect(() => {
+    if (chatInputRef.current) {
+      chatInputRef.current.style.height = 'auto';
+      chatInputRef.current.style.height = `${chatInputRef.current.scrollHeight}px`;
+    }
+  }, [chatInput]);
 
   const [captionAnimation, setCaptionAnimation] = useState<'fade' | 'pop' | 'karaoke' | 'glow'>('pop');
   const [aiHighlights, setAiHighlights] = useState<any[]>([]);
@@ -402,6 +369,10 @@ export default function App() {
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isProMode, setIsProMode] = useState(false);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const stopGenerationRef = useRef(false);
 
   const getAvailableApiKey = () => {
     const baseKey = userApiKey || process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
@@ -515,6 +486,7 @@ export default function App() {
     }
 
     setIsWritingScript(true);
+    stopGenerationRef.current = false;
     setError(null);
     
     const newUserMessage = { role: 'user' as const, content: input, type: 'text' as const };
@@ -568,19 +540,33 @@ export default function App() {
             modelParams.config.tools = [{ googleSearch: {} }];
           }
 
-          const response = await ai.models.generateContent(modelParams);
-          const modelContent = response.text;
-          if (!modelContent) throw new Error("No response from AI");
+          const stream = await ai.models.generateContentStream(modelParams);
+          let fullResponse = '';
+          
+          const aiMessageId = Date.now() + 1;
+          setChatMessages(prev => [...prev, { id: aiMessageId, role: 'model', content: '', type: 'text' }]);
 
-          const newModelMessage = { role: 'model' as const, content: modelContent, type: 'text' as const };
-          const finalMessages = [...updatedMessages, newModelMessage];
-          setChatMessages(finalMessages);
-          setViralScript(modelContent);
+          for await (const chunk of stream) {
+            // Check if user clicked "Stop"
+            if (stopGenerationRef.current) break;
+            
+            const chunkText = chunk.text || '';
+            fullResponse += chunkText;
+            
+            setChatMessages(prev => prev.map(msg => 
+              msg.id === aiMessageId ? { ...msg, content: fullResponse } : msg
+            ));
+          }
+
+          if (stopGenerationRef.current) return;
+
+          setViralScript(fullResponse);
 
           if (currentUser) {
+            const finalMessages = [...updatedMessages, { id: aiMessageId, role: 'model', content: fullResponse, type: 'text' }];
             if (currentScriptId) {
               await updateDoc(doc(db, 'scripts', currentScriptId), {
-                content: modelContent,
+                content: fullResponse,
                 messages: finalMessages,
                 updatedAt: serverTimestamp()
               });
@@ -588,7 +574,7 @@ export default function App() {
               const docRef = await addDoc(collection(db, 'scripts'), {
                 userId: currentUser.uid,
                 title: input.substring(0, 30) + (input.length > 30 ? '...' : ''),
-                content: modelContent,
+                content: fullResponse,
                 messages: finalMessages,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
@@ -625,6 +611,7 @@ export default function App() {
     if (!prompt.trim()) return;
     
     setIsGeneratingImage(true);
+    stopGenerationRef.current = false;
     setError(null);
     
     const newUserMessage = { role: 'user' as const, content: `Generate ${aspectRatio} thumbnail: ${prompt}`, type: 'text' as const };
@@ -645,16 +632,16 @@ export default function App() {
         }
 
         try {
+          if (stopGenerationRef.current) break;
           const ai = new GoogleGenAI({ apiKey });
           const imagePrompt = `World-class professional YouTube thumbnail, high-CTR, cinematic lighting, psychological hook visual. ${prompt}. 8k resolution, cinematic composition, vibrant colors, trending on ArtStation style, highly detailed, sharp focus.`;
 
           const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-image-preview',
+            model: 'gemini-2.5-flash-image',
             contents: [{ text: imagePrompt }],
             config: {
               imageConfig: {
                 aspectRatio,
-                imageSize: "1K"
               }
             }
           });
@@ -718,6 +705,20 @@ export default function App() {
             markKeyAsExhausted(apiKey!);
             attempt++;
             continue;
+          }
+          if (errStr.includes("403") || errStr.includes("PERMISSION_DENIED")) {
+            if (window.aistudio?.openSelectKey) {
+              setError("Permission Denied: Your API key doesn't have access to image generation. Please select a paid API key from the AI Studio dialog.");
+              await window.aistudio.openSelectKey();
+              const newKey = (process.env as any).API_KEY || '';
+              if (newKey) {
+                setUserApiKey(newKey);
+                localStorage.setItem('voxnova_api_key', newKey);
+              }
+            } else {
+              setError("Permission Denied: Your API key doesn't have access to image generation. Please add a valid API key in Settings.");
+            }
+            break;
           }
           throw error;
         }
@@ -2515,7 +2516,6 @@ export default function App() {
 
           <SettingsModal />
           <HistoryModal />
-          <StickyFooterAd />
 
       {/* Sidebar */}
       <aside className={`
@@ -3424,30 +3424,46 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex h-[calc(100vh-8rem)] gap-0 -mx-4 -mb-8 bg-white overflow-hidden relative"
+              className="flex flex-col md:flex-row gap-0 -mx-4 -mb-8 bg-white relative min-h-screen"
             >
               {/* History Sidebar - Gemini Style */}
               <AnimatePresence>
                 {isHistorySidebarOpen && (
-                  <motion.div
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 300, opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    className="bg-zinc-50 border-r border-zinc-100 flex flex-col overflow-hidden h-full z-20"
-                  >
-                    <div className="p-4 flex flex-col gap-4">
-                      <button 
-                        onClick={() => {
-                          setCurrentScriptId(null);
-                          setChatMessages([]);
-                          setViralScript('');
-                        }}
-                        className="flex items-center gap-3 px-4 py-3 bg-zinc-200/50 hover:bg-zinc-200 rounded-full text-zinc-600 transition-all text-sm font-medium"
-                      >
-                        <Plus size={18} />
-                        New Chat
-                      </button>
-                    </div>
+                  <>
+                    {/* Mobile Overlay Backdrop */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setIsHistorySidebarOpen(false)}
+                      className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 md:hidden"
+                    />
+                    <motion.div
+                      initial={{ x: -300, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: -300, opacity: 0 }}
+                      className="absolute md:relative left-0 top-0 bottom-0 w-[280px] md:w-[300px] bg-zinc-50 border-r border-zinc-100 flex flex-col overflow-hidden h-full z-40 shadow-2xl md:shadow-none"
+                    >
+                      <div className="p-4 flex flex-col gap-4">
+                        <div className="flex items-center justify-between md:hidden mb-2">
+                          <span className="text-sm font-bold text-zinc-900">History</span>
+                          <button onClick={() => setIsHistorySidebarOpen(false)} className="p-2 hover:bg-zinc-200 rounded-full">
+                            <X size={20} />
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setCurrentScriptId(null);
+                            setChatMessages([]);
+                            setViralScript('');
+                            if (window.innerWidth < 768) setIsHistorySidebarOpen(false);
+                          }}
+                          className="flex items-center gap-3 px-4 py-3 bg-zinc-200/50 hover:bg-zinc-200 rounded-full text-zinc-600 transition-all text-sm font-medium"
+                        >
+                          <Plus size={18} />
+                          New Chat
+                        </button>
+                      </div>
 
                     <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
                       <div className="px-4 py-2 flex items-center gap-2">
@@ -3464,7 +3480,10 @@ export default function App() {
                           <div 
                             key={script.id}
                             className={`group flex items-center gap-3 px-4 py-2.5 rounded-full cursor-pointer transition-all relative ${currentScriptId === script.id ? 'bg-emerald-500/10 text-emerald-700' : 'hover:bg-zinc-200/50 text-zinc-600'}`}
-                            onClick={() => handleOpenScript(script)}
+                            onClick={() => {
+                              handleOpenScript(script);
+                              if (window.innerWidth < 768) setIsHistorySidebarOpen(false);
+                            }}
                           >
                             <div className="text-xs font-medium truncate flex-1">{script.title}</div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -3502,8 +3521,9 @@ export default function App() {
                       </button>
                     </div>
                   </motion.div>
-                )}
-              </AnimatePresence>
+                </>
+              )}
+            </AnimatePresence>
 
               {/* Main Chat Workspace */}
               <div className="flex-1 flex flex-col min-w-0 bg-white relative">
@@ -3516,57 +3536,154 @@ export default function App() {
                     >
                       <Menu size={24} />
                     </button>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-medium text-zinc-900 truncate max-w-[200px] md:max-w-md">
-                        {currentScriptId ? scriptHistory.find(s => s.id === currentScriptId)?.title : 'Smart Script Workspace'}
+                    <div className="flex flex-col">
+                      <h2 className="text-sm md:text-base font-bold text-zinc-900 truncate max-w-[150px] md:max-w-md">
+                        {currentScriptId ? scriptHistory.find(s => s.id === currentScriptId)?.title : 'Smart Workspace'}
                       </h2>
                     </div>
                   </div>
+
                   <div className="flex items-center gap-1">
-                    <button className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500"><Edit2 size={20} /></button>
-                    <button className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500"><Share2 size={20} /></button>
-                    <button className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500"><MoreVertical size={20} /></button>
+                    <button 
+                      onClick={() => {
+                        const newTitle = prompt("Rename this workspace:", currentScriptId ? scriptHistory.find(s => s.id === currentScriptId)?.title : 'Smart Workspace');
+                        if (newTitle && currentScriptId) handleRenameScript(currentScriptId, newTitle);
+                      }}
+                      className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
+                    >
+                      <Edit2 size={20} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        showToast("Link copied to clipboard!");
+                      }}
+                      className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
+                    >
+                      <Share2 size={20} />
+                    </button>
+                    <div className="relative">
+                      <button 
+                        onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                        className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
+                      >
+                        <MoreVertical size={20} />
+                      </button>
+                      <AnimatePresence>
+                        {isMoreMenuOpen && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute right-0 mt-2 w-48 bg-white border border-zinc-100 rounded-2xl shadow-2xl py-2 z-50"
+                          >
+                            <button 
+                              onClick={() => {
+                                setChatMessages([]);
+                                setViralScript('');
+                                setCurrentScriptId(null);
+                                setIsMoreMenuOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              <Trash2 size={16} /> Clear Workspace
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const text = chatMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+                                const blob = new Blob([text], { type: 'text/plain' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `script-export-${Date.now()}.txt`;
+                                a.click();
+                                setIsMoreMenuOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center gap-2"
+                            >
+                              <Download size={16} /> Export as Text
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
 
-                {/* Chat Messages Area */}
-                <div className="flex-1 overflow-y-auto px-4 py-8 md:px-20 space-y-8 scroll-smooth pb-40">
-                  {chatMessages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center max-w-2xl mx-auto space-y-10 py-10">
+                {/* Chat Messages Area - Single Scrollable Page */}
+                <div className="flex-1 overflow-y-auto px-4 py-8 md:px-20 bg-zinc-50/30 scroll-smooth">
+                  <div className="max-w-4xl mx-auto space-y-12 pb-20">
+                    {/* Logo & Title - Always at Top of Scrollable Area */}
+                    <div className="space-y-6 text-center pt-10">
                       <motion.div 
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-3xl flex items-center justify-center text-white shadow-2xl shadow-emerald-500/30"
+                        className="w-24 h-24 bg-zinc-900 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl mx-auto mb-8"
                       >
-                        <Sparkles size={40} />
+                        <Mic size={48} />
                       </motion.div>
                       <div className="space-y-4">
-                        <h1 className="text-3xl font-display font-bold text-zinc-900 tracking-tight">How can I help you today?</h1>
-                        <p className="text-zinc-500 text-base">I'm Smart Workspace, your personal viral script writer and image generator. Let's create something legendary.</p>
+                        <h1 className="text-5xl font-display font-bold text-zinc-900 tracking-tight">
+                          VoxNova <span className="text-emerald-500">Text to Speech</span>
+                        </h1>
+                        <p className="text-zinc-500 text-xl max-w-2xl mx-auto font-medium">
+                          The ultimate viral script engine. Describe your vision, we build the legend.
+                        </p>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                    </div>
+
+                    {/* Mode Switcher - Always below Logo */}
+                    <div className="flex flex-wrap items-center justify-center gap-3 p-2 bg-white border border-zinc-100 rounded-[2rem] shadow-xl">
+                      <button 
+                        onClick={() => setScriptTone('viral')}
+                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${scriptTone === 'viral' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
+                      >
+                        Viral
+                      </button>
+                      <button 
+                        onClick={() => setScriptTone('storytelling')}
+                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${scriptTone === 'storytelling' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
+                      >
+                        Storytelling
+                      </button>
+                      <button 
+                        onClick={() => setScriptTone('educational')}
+                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${scriptTone === 'educational' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
+                      >
+                        Education
+                      </button>
+                      <div className="w-px h-6 bg-zinc-100 mx-2" />
+                      <button 
+                        onClick={() => setIsWebResearchEnabled(!isWebResearchEnabled)}
+                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${isWebResearchEnabled ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
+                      >
+                        <Globe size={14} /> Web Search
+                      </button>
+                    </div>
+
+                    {chatMessages.length === 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
                         {[
-                          { icon: <TrendingUp size={16} />, text: "Write a viral fitness hook", prompt: "Write a viral hook for a fitness video that stops the scroll in 1 second." },
-                          { icon: <ImageIcon size={16} />, text: "Generate a fitness thumbnail", prompt: "Generate a high-CTR fitness thumbnail image with a muscular athlete and vibrant neon lighting." },
-                          { icon: <PenTool size={16} />, text: "Storytelling script for business", prompt: "Create an emotional storytelling script about a failed entrepreneur who made it big." },
-                          { icon: <Zap size={16} />, text: "Quick value-packed reel", prompt: "Write a 30-second educational script about 3 productivity hacks." }
+                          { icon: <TrendingUp size={18} />, text: "Write a viral fitness hook", prompt: "Write a viral hook for a fitness video that stops the scroll in 1 second." },
+                          { icon: <ImageIcon size={18} />, text: "Generate a fitness thumbnail", prompt: "Generate a high-CTR fitness thumbnail image with a muscular athlete and vibrant neon lighting." },
+                          { icon: <PenTool size={18} />, text: "Storytelling script for business", prompt: "Create an emotional storytelling script about a failed entrepreneur who made it big." },
+                          { icon: <Zap size={18} />, text: "Quick value-packed reel", prompt: "Write a 30-second educational script about 3 productivity hacks." }
                         ].map((item, i) => (
                           <button 
                             key={i}
                             onClick={() => item.text.includes('Generate') ? handleGenerateImage(item.prompt.replace('Generate ', '')) : handleViralScriptWriter(item.prompt)}
-                            className="p-4 bg-white border border-zinc-100 rounded-2xl text-sm font-medium text-zinc-700 hover:border-emerald-500 hover:shadow-lg hover:shadow-emerald-500/5 transition-all text-left flex items-start gap-3 group"
+                            className="p-6 bg-white border border-zinc-100 rounded-[2rem] text-sm font-medium text-zinc-700 hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/5 transition-all text-left flex items-start gap-4 group"
                           >
-                            <div className="p-2 bg-zinc-50 rounded-xl text-zinc-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-colors">
+                            <div className="p-3 bg-zinc-50 rounded-2xl text-zinc-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-colors">
                               {item.icon}
                             </div>
-                            <span>{item.text}</span>
+                            <span className="pt-1">{item.text}</span>
                           </button>
                         ))}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="max-w-3xl mx-auto space-y-10">
-                      {chatMessages.map((msg, i) => (
+                    ) : (
+                      <div className="space-y-10">
+                        {chatMessages.map((msg, i) => (
                         <motion.div 
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -3577,7 +3694,19 @@ export default function App() {
                             {msg.role === 'user' ? (userProfile?.displayName?.[0] || 'U') : <Sparkles size={20} />}
                           </div>
                           <div className={`flex-1 space-y-4 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                            <div className={`inline-block max-w-full ${msg.role === 'user' ? 'bg-zinc-100 p-4 rounded-2xl rounded-tr-none' : ''}`}>
+                            <div className={`inline-block w-full group relative ${msg.role === 'user' ? 'bg-white p-6 rounded-[2rem] rounded-tr-none shadow-sm border border-zinc-100' : 'bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl border border-zinc-100'}`}>
+                              {msg.role === 'user' && (
+                                <button 
+                                  onClick={() => {
+                                    setChatInput(msg.content);
+                                    chatInputRef.current?.focus();
+                                  }}
+                                  className="absolute -left-10 top-2 p-2 opacity-0 group-hover:opacity-100 hover:bg-zinc-100 rounded-full text-zinc-400 transition-all"
+                                  title="Edit message"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              )}
                               {msg.type === 'image' ? (
                                 <div className="space-y-4">
                                   <img 
@@ -3602,8 +3731,8 @@ export default function App() {
                                   </div>
                                 </div>
                               ) : (
-                                <div className="prose prose-sm prose-zinc max-w-none leading-relaxed text-zinc-800">
-                                  <Markdown>{msg.content}</Markdown>
+                                <div className="prose prose-lg prose-zinc max-w-none leading-relaxed text-zinc-800">
+                                  <Markdown>{msg.content + (isWritingScript && msg.role === 'model' && i === chatMessages.length - 1 ? ' ●' : '')}</Markdown>
                                   {msg.role === 'model' && (
                                     <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center gap-4">
                                       <button 
@@ -3658,54 +3787,88 @@ export default function App() {
                       <div ref={chatEndRef} />
                     </div>
                   )}
-                </div>
 
-                {/* Gemini Style Bottom Input Bar - Exact Clone */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
-                  <div className="max-w-3xl mx-auto pointer-events-auto">
-                    <div className="relative group">
-                      <div className="absolute inset-0 bg-zinc-900/5 blur-2xl rounded-[2.5rem] group-focus-within:bg-emerald-500/10 transition-all" />
-                      <div className="relative bg-zinc-50 border border-zinc-200 rounded-[2.5rem] p-2 shadow-2xl flex items-end gap-2 focus-within:border-emerald-500/30 transition-all">
-                        <button className="p-3 hover:bg-zinc-200 rounded-full text-zinc-400 transition-all flex-shrink-0">
-                          <Plus size={22} />
-                        </button>
-                        <button 
-                          onClick={() => handleGenerateImage(chatInput || "A viral YouTube thumbnail")}
-                          className="p-3 hover:bg-emerald-50 rounded-full text-emerald-500 transition-all flex-shrink-0"
-                          title="Generate Thumbnail"
-                        >
-                          <Sparkles size={22} />
-                        </button>
-                        <textarea
-                          value={chatInput}
-                          onChange={(e) => setChatInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleViralScriptWriter();
-                            }
-                          }}
-                          placeholder="Describe your video idea or paste a raw script..."
-                          className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-2 min-h-[52px] max-h-40 resize-none"
-                          rows={1}
-                        />
-                        <div className="flex items-center gap-2 pb-1 pr-1">
-                          <button className="px-4 py-2 bg-white border border-zinc-200 hover:bg-zinc-100 rounded-full text-[10px] font-bold uppercase tracking-widest text-zinc-500 transition-all shadow-sm">
-                            Fast
+                  {/* Gemini Style Inline Input Bar */}
+                    <div className="pt-10">
+                      <motion.div 
+                        layout
+                        initial={false}
+                        animate={{ 
+                          y: isInputFocused ? -12 : 0,
+                          scale: isInputFocused ? 1.01 : 1,
+                          boxShadow: isInputFocused ? '0 20px 40px -10px rgba(0, 0, 0, 0.1)' : '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+                        }}
+                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                        className="relative group"
+                      >
+                        <div className={`absolute inset-0 bg-zinc-900/5 blur-3xl rounded-[2.5rem] transition-all duration-500 ${isInputFocused ? 'opacity-100 bg-emerald-500/10' : 'opacity-0'}`} />
+                        <div className={`
+                          relative bg-white border rounded-[2.5rem] p-2 md:p-3 flex items-end gap-2 md:gap-3 transition-all w-full
+                          ${isInputFocused ? 'border-emerald-500/40 shadow-2xl ring-8 ring-emerald-500/5' : 'border-zinc-200 shadow-lg hover:border-zinc-300'}
+                        `}>
+                          <button 
+                            onClick={() => showToast("File upload coming soon!")}
+                            className="p-3 md:p-4 hover:bg-zinc-100 rounded-full text-zinc-400 transition-all flex-shrink-0 active:scale-95"
+                          >
+                            <Plus size={22} />
                           </button>
                           <button 
-                            onClick={() => handleViralScriptWriter()}
-                            disabled={!chatInput.trim() || isWritingScript}
-                            className={`p-3 rounded-full transition-all flex-shrink-0 ${chatInput.trim() ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-100 text-zinc-300'}`}
+                            onClick={() => handleGenerateImage(chatInput || "A viral YouTube thumbnail")}
+                            className="p-3 md:p-4 hover:bg-emerald-50 rounded-full text-emerald-500 transition-all flex-shrink-0 active:scale-95"
+                            title="Generate Thumbnail"
                           >
-                            <Send size={20} />
+                            <Sparkles size={22} />
                           </button>
+                            <textarea
+                              ref={chatInputRef}
+                              value={chatInput}
+                              onFocus={() => setIsInputFocused(true)}
+                              onBlur={() => setIsInputFocused(false)}
+                              onChange={(e) => {
+                                setChatInput(e.target.value);
+                                // Auto-resize
+                                e.target.style.height = 'auto';
+                                e.target.style.height = `${Math.max(e.target.scrollHeight, 120)}px`;
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleViralScriptWriter();
+                                  // Reset height
+                                  if (chatInputRef.current) chatInputRef.current.style.height = 'auto';
+                                }
+                              }}
+                              placeholder="Describe your command..."
+                              className="flex-1 bg-transparent border-none focus:ring-0 text-lg md:text-xl py-4 md:py-6 px-2 md:px-4 min-h-[120px] md:min-h-[150px] max-h-[500px] resize-none leading-relaxed min-w-0"
+                              rows={1}
+                            />
+                          <div className="flex items-center gap-3 pb-1 pr-1 flex-shrink-0">
+                            <button 
+                              onClick={() => setIsProMode(!isProMode)}
+                              className={`hidden md:block px-6 py-2.5 border rounded-full text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm ${isProMode ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-100'}`}
+                            >
+                              {isProMode ? 'Pro' : 'Fast'}
+                            </button>
+                            {isWritingScript || isGeneratingImage ? (
+                              <button 
+                                onClick={stopGeneration}
+                                className="p-4 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition-all flex-shrink-0 active:scale-90"
+                              >
+                                <Square size={24} fill="currentColor" />
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleViralScriptWriter()}
+                                disabled={!chatInput.trim() || isWritingScript || isGeneratingImage}
+                                className={`p-4 rounded-full transition-all ${chatInput.trim() && !isWritingScript && !isGeneratingImage ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:scale-105' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'}`}
+                              >
+                                <ArrowUp size={24} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      </motion.div>
                     </div>
-                    <p className="text-[10px] text-center text-zinc-400 mt-4 font-medium uppercase tracking-widest">
-                      Smart Workspace can make mistakes. Check important info.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -4189,7 +4352,7 @@ export default function App() {
         {/* SEO Content Section (The "Boxes") - Moved to Bottom */}
         <section className="max-w-4xl mx-auto py-16 px-6 space-y-12">
           {/* Ad Section - Top of SEO */}
-          <AdBox slot="5425662273" />
+          {/* Removed AdBox */}
           <div className="text-center space-y-4">
             <h2 className="text-4xl font-display font-bold text-zinc-900">Why Choose VoxNova Text to Speech?</h2>
             <p className="text-zinc-500 max-w-2xl mx-auto">VoxNova Text to Speech is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
@@ -4255,8 +4418,8 @@ export default function App() {
 
           {/* Bottom Ad Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
-            <AdBox slot="5425662273" />
-            <AdBox slot="5425662273" />
+            {/* Removed AdBox */}
+            {/* Removed AdBox */}
           </div>
         </section>
 
@@ -4286,7 +4449,6 @@ export default function App() {
           </div>
         </footer>
         
-      <StickyFooterAd />
 
       {/* Legal & Info Modals */}
       <AnimatePresence>
@@ -4583,13 +4745,6 @@ export default function App() {
         </div>
       </footer>
 
-      {/* AdSense at the Bottom */}
-      <div className="max-w-4xl mx-auto w-full p-6 space-y-8">
-        <div className="flex flex-col items-center gap-4">
-          <p className="text-[10px] text-zinc-600 uppercase tracking-[0.2em]">Sponsored Content</p>
-          <AdBox className="w-full h-[90px]" slot="5425662273" />
-        </div>
-      </div>
         </main>
       </div>
     )}
