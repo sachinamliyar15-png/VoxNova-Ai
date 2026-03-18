@@ -359,7 +359,8 @@ export default function App() {
   const [isAnalyzingCaptions, setIsAnalyzingCaptions] = useState(false);
   const [showShareToast, setShowShareToast] = useState(false);
   const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
-  const [exhaustedKeys, setExhaustedKeys] = useState<Set<string>>(new Set());
+  const exhaustedKeysRef = useRef<Set<string>>(new Set());
+  const [exhaustedCount, setExhaustedCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
@@ -368,20 +369,32 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const getAvailableApiKey = (currentExhausted: Set<string> = exhaustedKeys) => {
+  const getAvailableApiKey = () => {
     const baseKey = userApiKey || process.env.GEMINI_API_KEY;
     if (!baseKey) return null;
     
     const allKeys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-    const availableKeys = allKeys.filter(k => !currentExhausted.has(k));
+    const availableKeys = allKeys.filter(k => !exhaustedKeysRef.current.has(k));
     
     if (availableKeys.length === 0) {
-      // If all keys are exhausted, reset the set and try again with all keys
-      setExhaustedKeys(new Set());
+      // If all keys are exhausted, we don't reset automatically here to avoid infinite loops
+      // but we return a random one as a last resort if requested, 
+      // though the calling function should handle the wait.
       return allKeys[Math.floor(Math.random() * allKeys.length)];
     }
     
     return availableKeys[Math.floor(Math.random() * availableKeys.length)];
+  };
+
+  const markKeyAsExhausted = (key: string) => {
+    exhaustedKeysRef.current.add(key);
+    setExhaustedCount(exhaustedKeysRef.current.size);
+    
+    // Automatically clear exhausted keys after 1 minute to try again
+    setTimeout(() => {
+      exhaustedKeysRef.current.delete(key);
+      setExhaustedCount(exhaustedKeysRef.current.size);
+    }, 60000);
   };
   const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
   const isWhitelisted = (email: string | null | undefined) => email ? WHITELISTED_EMAILS.includes(email) : false;
@@ -1048,11 +1061,13 @@ export default function App() {
 
     const generateWithRetry = async (chunkText: string): Promise<string> => {
       let attempt = 0;
-      const maxRetries = 8; 
-      let currentExhausted = new Set(exhaustedKeys);
+      const maxRetries = 10; // Increased retries for better failover
 
       while (attempt < maxRetries) {
-        let apiKey = getAvailableApiKey(currentExhausted);
+        const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+        const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+        
+        let apiKey = getAvailableApiKey();
         if (!apiKey) {
           throw new Error("Gemini API Key is not configured. Please enter your API key by clicking the 'Key' icon.");
         }
@@ -1209,15 +1224,10 @@ export default function App() {
           const isInternalError = errStr.includes("500") || errStr.includes("INTERNAL") || errStr.includes("Internal error");
           
           if (isRateLimit) {
-            // Mark key as exhausted and try another one immediately
-            currentExhausted.add(apiKey);
-            setExhaustedKeys(new Set(currentExhausted));
+            markKeyAsExhausted(apiKey);
             console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted. Switching keys...`);
             
-            // If we have more keys, don't increment attempt, just retry with new key
-            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-            const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-            if (currentExhausted.size < allKeys.length) {
+            if (exhaustedKeysRef.current.size < allKeys.length) {
               attempt--; // Don't count this as a failed attempt for the whole process
               continue;
             }
@@ -1453,14 +1463,16 @@ export default function App() {
     setDubbingStep("Reading file...");
 
     try {
-      let currentExhausted = new Set(exhaustedKeys);
       let attempt = 0;
-      const maxRetries = 5;
+      const maxRetries = 10;
       let processedText = "";
       let base64Audio = "";
 
       while (attempt < maxRetries) {
-        let apiKey = getAvailableApiKey(currentExhausted);
+        const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+        const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+        
+        let apiKey = getAvailableApiKey();
         if (!apiKey) throw new Error("API Key not configured. Please add your key in API Settings.");
 
         try {
@@ -1571,13 +1583,12 @@ export default function App() {
           const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota");
           
           if (isRateLimit) {
-            currentExhausted.add(apiKey);
-            setExhaustedKeys(new Set(currentExhausted));
+            markKeyAsExhausted(apiKey);
             console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted during dubbing. Switching...`);
             
             const baseKey = userApiKey || process.env.GEMINI_API_KEY;
             const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-            if (currentExhausted.size < allKeys.length) {
+            if (exhaustedKeysRef.current.size < allKeys.length) {
               attempt--;
               continue;
             }
@@ -1693,13 +1704,15 @@ export default function App() {
     setCaptionStep("Analyzing video audio...");
 
     try {
-      let currentExhausted = new Set(exhaustedKeys);
       let attempt = 0;
-      const maxRetries = 5;
+      const maxRetries = 10;
       let srtContent = "";
 
       while (attempt < maxRetries) {
-        let apiKey = getAvailableApiKey(currentExhausted);
+        const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+        const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
+        
+        let apiKey = getAvailableApiKey();
         if (!apiKey) throw new Error("API Key not configured.");
 
         try {
@@ -1746,13 +1759,12 @@ export default function App() {
           const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota");
           
           if (isRateLimit) {
-            currentExhausted.add(apiKey);
-            setExhaustedKeys(new Set(currentExhausted));
+            markKeyAsExhausted(apiKey);
             console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted during captioning. Switching...`);
             
             const baseKey = userApiKey || process.env.GEMINI_API_KEY;
             const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-            if (currentExhausted.size < allKeys.length) {
+            if (exhaustedKeysRef.current.size < allKeys.length) {
               attempt--;
               continue;
             }
@@ -1964,14 +1976,36 @@ export default function App() {
                         </div>
                         <span className="text-sm font-medium">Gemini API Keys</span>
                       </div>
-                      <a 
-                        href="https://aistudio.google.com/app/apikey" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-[10px] font-bold text-blue-500 hover:underline uppercase"
-                      >
-                        Get Keys
-                      </a>
+                      <div className="flex items-center gap-2">
+                        {userApiKey && (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-zinc-100 rounded-full">
+                            <div className={`w-1.5 h-1.5 rounded-full ${exhaustedCount === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            <span className="text-[9px] font-bold text-zinc-600 uppercase">
+                              {userApiKey.split(',').filter(k => k.trim()).length - exhaustedCount} Active
+                            </span>
+                          </div>
+                        )}
+                        {exhaustedCount > 0 && (
+                          <button 
+                            onClick={() => {
+                              exhaustedKeysRef.current.clear();
+                              setExhaustedCount(0);
+                            }}
+                            className="p-1.5 hover:bg-zinc-100 rounded-lg text-amber-500 transition-all"
+                            title="Reset Exhausted Keys"
+                          >
+                            <RefreshCw size={14} />
+                          </button>
+                        )}
+                        <a 
+                          href="https://aistudio.google.com/app/apikey" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-bold text-blue-500 hover:underline uppercase"
+                        >
+                          Get Keys
+                        </a>
+                      </div>
                     </div>
                     <textarea
                       value={userApiKey}
@@ -1979,7 +2013,8 @@ export default function App() {
                         const val = e.target.value;
                         setUserApiKey(val);
                         localStorage.setItem('voxnova_api_key', val);
-                        setExhaustedKeys(new Set()); // Reset exhausted keys when user updates keys
+                        exhaustedKeysRef.current.clear(); // Reset exhausted keys ref
+                        setExhaustedCount(0); // Reset exhausted keys count
                       }}
                       placeholder="Enter multiple API keys separated by commas..."
                       className="w-full h-24 p-3 text-xs bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none font-mono"
