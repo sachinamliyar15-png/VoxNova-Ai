@@ -69,7 +69,8 @@ import {
   doc, 
   updateDoc,
   serverTimestamp,
-  orderBy
+  orderBy,
+  getDocs
 } from 'firebase/firestore';
 import { db, auth, googleProvider, analytics, logEvent } from './firebase';
 
@@ -160,6 +161,7 @@ const base64ToArrayBuffer = (base64: any) => {
     }
 
     const binaryString = window.atob(sanitized);
+    console.log(`Decoded base64, length: ${binaryString.length}`);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
@@ -307,12 +309,24 @@ export default function App() {
   }, [currentAudio]);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
   const [showLimitToast, setShowLimitToast] = useState(false);
+  const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
+  const exhaustedKeysRef = useRef<Set<string>>(new Set());
+  const [exhaustedCount, setExhaustedCount] = useState(0);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'dubbing' | 'voice-changer' | 'captions' | 'script-writer'>('generate');
   const [rawScript, setRawScript] = useState('');
   const [viralScript, setViralScript] = useState('');
   const [isWritingScript, setIsWritingScript] = useState(false);
   const [scriptTone, setScriptTone] = useState<'viral' | 'storytelling' | 'educational'>('viral');
   const [chatMessages, setChatMessages] = useState<{ id?: number, role: 'user' | 'model', content: string, type?: 'text' | 'image', imageUrl?: string, timestamp?: Date }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [currentScriptId, setCurrentScriptId] = useState<string | null>(null);
+  const [scriptHistory, setScriptHistory] = useState<any[]>([]);
+  const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
+  const [playingId, setPlayingId] = useState<string | number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isWebResearchEnabled, setIsWebResearchEnabled] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -329,10 +343,92 @@ export default function App() {
     setLoadingStep(0);
     setGenerationProgress(0);
   };
-  const [scriptHistory, setScriptHistory] = useState<{ id: string, title: string, content: string, messages?: any[], createdAt: any }[]>([]);
-  const [currentScriptId, setCurrentScriptId] = useState<string | null>(null);
-  const [chatInput, setChatInput] = useState('');
-  const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  // Fetch script history from Firestore
+  const fetchScriptHistory = async () => {
+    if (!currentUser) return;
+    setIsHistoryLoading(true);
+    try {
+      const q = query(
+        collection(db, 'scripts'),
+        where('userId', '==', currentUser.uid),
+        orderBy('updatedAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const history = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      setScriptHistory(history);
+    } catch (error) {
+      console.error("Error fetching script history:", error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  // Save or update script in Firestore
+  const saveScriptToFirestore = async (title: string, content: string, messages: any[]) => {
+    if (!currentUser) return;
+    try {
+      const scriptData = {
+        userId: currentUser.uid,
+        title,
+        content,
+        messages,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (currentScriptId) {
+        const scriptRef = doc(db, 'scripts', currentScriptId);
+        await updateDoc(scriptRef, scriptData);
+      } else {
+        const docRef = await addDoc(collection(db, 'scripts'), {
+          ...scriptData,
+          createdAt: serverTimestamp()
+        });
+        setCurrentScriptId(docRef.id);
+      }
+      fetchScriptHistory();
+    } catch (error) {
+      console.error("Error saving script:", error);
+    }
+  };
+
+  const handleDeleteScript = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'scripts', id));
+      if (currentScriptId === id) {
+        setCurrentScriptId(null);
+        setChatMessages([]);
+        setViralScript('');
+      }
+      fetchScriptHistory();
+      showToast("Script deleted");
+    } catch (error) {
+      console.error("Error deleting script:", error);
+    }
+  };
+
+  const handleRenameScript = async (id: string, newTitle: string) => {
+    try {
+      await updateDoc(doc(db, 'scripts', id), { title: newTitle });
+      fetchScriptHistory();
+      showToast("Script renamed");
+    } catch (error) {
+      console.error("Error renaming script:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchScriptHistory();
+    } else {
+      setScriptHistory([]);
+      setCurrentScriptId(null);
+    }
+  }, [currentUser]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -359,16 +455,32 @@ export default function App() {
     setShowShareToast(true);
     setTimeout(() => setShowShareToast(false), 3000);
   };
-  const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
-  const exhaustedKeysRef = useRef<Set<string>>(new Set());
-  const [exhaustedCount, setExhaustedCount] = useState(0);
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [playingId, setPlayingId] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast("File too large (max 5MB)");
+        return;
+      }
+      setFileToUpload(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setFilePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeFile = () => {
+    setFileToUpload(null);
+    setFilePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isFeatureMenuOpen, setIsFeatureMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isProMode, setIsProMode] = useState(false);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -489,10 +601,17 @@ export default function App() {
     stopGenerationRef.current = false;
     setError(null);
     
-    const newUserMessage = { role: 'user' as const, content: input, type: 'text' as const };
+    const newUserMessage = { 
+      role: 'user' as const, 
+      content: input, 
+      type: fileToUpload ? 'image' as const : 'text' as const,
+      imageUrl: filePreview || undefined
+    };
     const updatedMessages = [...chatMessages, newUserMessage];
     setChatMessages(updatedMessages);
     setChatInput('');
+    setFileToUpload(null);
+    setFilePreview(null);
 
     const maxRetries = 15;
     let attempt = 0;
@@ -527,13 +646,27 @@ export default function App() {
           
           Always aim for "Hollywood Quality" in every response.`;
 
+          const contents = updatedMessages.map(m => {
+            if (m.type === 'image' && m.imageUrl) {
+              const base64Data = m.imageUrl.split(',')[1];
+              return {
+                role: m.role,
+                parts: [
+                  { inlineData: { data: base64Data, mimeType: 'image/png' } },
+                  { text: m.content }
+                ]
+              };
+            }
+            return {
+              role: m.role,
+              parts: [{ text: m.content }]
+            };
+          });
+
           const modelParams: any = {
             model: "gemini-3-flash-preview",
             config: { systemInstruction, temperature: 0.9, topP: 0.95 },
-            contents: updatedMessages.filter(m => m.type !== 'image').map(m => ({
-              role: m.role,
-              parts: [{ text: m.content }]
-            }))
+            contents
           };
 
           if (isWebResearchEnabled) {
@@ -733,27 +866,6 @@ export default function App() {
       setError(`Image Generation Failed: ${error.message}`);
     } finally {
       setIsGeneratingImage(false);
-    }
-  };
-
-  const handleRenameScript = async (id: string, newTitle: string) => {
-    try {
-      await updateDoc(doc(db, 'scripts', id), { title: newTitle });
-    } catch (err) {
-      console.error("Rename error:", err);
-    }
-  };
-
-  const handleDeleteScript = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'scripts', id));
-      if (currentScriptId === id) {
-        setCurrentScriptId(null);
-        setChatMessages([]);
-        setViralScript('');
-      }
-    } catch (err) {
-      console.error("Delete error:", err);
     }
   };
 
@@ -1262,6 +1374,7 @@ export default function App() {
         }
 
         try {
+          console.log(`TTS Attempt ${attempt + 1} with key ${apiKey.substring(0, 8)}...`);
           const ai = new GoogleGenAI({ apiKey });
           
           const voiceMapping: Record<string, string> = {
@@ -3537,159 +3650,165 @@ export default function App() {
                       <Menu size={24} />
                     </button>
                     <div className="flex flex-col">
-                      <h2 className="text-sm md:text-base font-bold text-zinc-900 truncate max-w-[150px] md:max-w-md">
-                        {currentScriptId ? scriptHistory.find(s => s.id === currentScriptId)?.title : 'Smart Workspace'}
-                      </h2>
+                      <h1 className="text-base md:text-lg font-bold text-zinc-900 leading-none">
+                        Smart <span className="text-emerald-500">Workspace</span>
+                      </h1>
+                      <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-widest mt-1">
+                        AI Powered Content Studio
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <button 
-                      onClick={() => {
-                        const newTitle = prompt("Rename this workspace:", currentScriptId ? scriptHistory.find(s => s.id === currentScriptId)?.title : 'Smart Workspace');
-                        if (newTitle && currentScriptId) handleRenameScript(currentScriptId, newTitle);
-                      }}
-                      className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
-                    >
-                      <Edit2 size={20} />
-                    </button>
-                    <button 
-                      onClick={() => {
-                        navigator.clipboard.writeText(window.location.href);
-                        showToast("Link copied to clipboard!");
-                      }}
-                      className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
-                    >
-                      <Share2 size={20} />
-                    </button>
-                    <div className="relative">
-                      <button 
-                        onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-                        className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
-                      >
-                        <MoreVertical size={20} />
-                      </button>
-                      <AnimatePresence>
-                        {isMoreMenuOpen && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 mt-2 w-48 bg-white border border-zinc-100 rounded-2xl shadow-2xl py-2 z-50"
+                    <div className="flex items-center gap-1">
+                      {chatMessages.length > 0 && (
+                        <>
+                          <button 
+                            onClick={() => {
+                              const newTitle = prompt("Rename this workspace:", currentScriptId ? scriptHistory.find(s => s.id === currentScriptId)?.title : 'Smart Workspace');
+                              if (newTitle && currentScriptId) handleRenameScript(currentScriptId, newTitle);
+                            }}
+                            className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
+                            title="Rename"
                           >
-                            <button 
-                              onClick={() => {
-                                setChatMessages([]);
-                                setViralScript('');
-                                setCurrentScriptId(null);
-                                setIsMoreMenuOpen(false);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                            <Edit2 size={20} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setChatMessages([]);
+                              setViralScript('');
+                              setCurrentScriptId(null);
+                              setChatInput('');
+                              showToast("Workspace cleared!");
+                            }}
+                            className="p-2 hover:bg-red-50 rounded-full text-red-500 transition-all active:scale-90"
+                            title="Clear Workspace"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const shareUrl = window.location.href;
+                              navigator.clipboard.writeText(shareUrl);
+                              showToast("Link copied to clipboard!");
+                            }}
+                            className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
+                            title="Share"
+                          >
+                            <Share2 size={20} />
+                          </button>
+                        </>
+                      )}
+                      <div className="relative">
+                        <button 
+                          onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                          className="p-2 hover:bg-zinc-100 rounded-full text-zinc-500 transition-all active:scale-90"
+                        >
+                          <MoreVertical size={20} />
+                        </button>
+                        <AnimatePresence>
+                          {isMoreMenuOpen && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                              className="absolute right-0 mt-2 w-48 bg-white border border-zinc-100 rounded-2xl shadow-2xl py-2 z-50"
                             >
-                              <Trash2 size={16} /> Clear Workspace
-                            </button>
-                            <button 
-                              onClick={() => {
-                                const text = chatMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
-                                const blob = new Blob([text], { type: 'text/plain' });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `script-export-${Date.now()}.txt`;
-                                a.click();
-                                setIsMoreMenuOpen(false);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center gap-2"
-                            >
-                              <Download size={16} /> Export as Text
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                              <button 
+                                onClick={() => {
+                                  const text = chatMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+                                  const blob = new Blob([text], { type: 'text/plain' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `script-export-${Date.now()}.txt`;
+                                  a.click();
+                                  setIsMoreMenuOpen(false);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center gap-2"
+                              >
+                                <Download size={16} /> Export as Text
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
+                </div>
+
+                {/* Mode Switcher - Directly below header */}
+                <div className="bg-white border-b border-zinc-100 py-4 flex justify-center sticky top-16 z-10">
+                  <div className="flex flex-wrap items-center justify-center gap-3 p-2 bg-zinc-50 border border-zinc-100 rounded-[2rem] shadow-sm">
+                    <button 
+                      onClick={() => setScriptTone('viral')}
+                      className={`px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all ${scriptTone === 'viral' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600'}`}
+                    >
+                      Viral
+                    </button>
+                    <button 
+                      onClick={() => setScriptTone('storytelling')}
+                      className={`px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all ${scriptTone === 'storytelling' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600'}`}
+                    >
+                      Storytelling
+                    </button>
+                    <button 
+                      onClick={() => setScriptTone('educational')}
+                      className={`px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all ${scriptTone === 'educational' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600'}`}
+                    >
+                      Education
+                    </button>
+                    <div className="w-px h-6 bg-zinc-200 mx-2" />
+                    <button 
+                      onClick={() => setIsWebResearchEnabled(!isWebResearchEnabled)}
+                      className={`px-6 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${isWebResearchEnabled ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600'}`}
+                    >
+                      <Globe size={14} /> Web Search
+                    </button>
                   </div>
                 </div>
 
                 {/* Chat Messages Area - Single Scrollable Page */}
                 <div className="flex-1 overflow-y-auto px-4 py-8 md:px-20 bg-zinc-50/30 scroll-smooth">
                   <div className="max-w-4xl mx-auto space-y-12 pb-20">
-                    {/* Logo & Title - Always at Top of Scrollable Area */}
-                    <div className="space-y-6 text-center pt-10">
-                      <motion.div 
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="w-24 h-24 bg-zinc-900 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl mx-auto mb-8"
-                      >
-                        <Mic size={48} />
-                      </motion.div>
-                      <div className="space-y-4">
-                        <h1 className="text-5xl font-display font-bold text-zinc-900 tracking-tight">
-                          VoxNova <span className="text-emerald-500">Text to Speech</span>
-                        </h1>
-                        <p className="text-zinc-500 text-xl max-w-2xl mx-auto font-medium">
-                          The ultimate viral script engine. Describe your vision, we build the legend.
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Mode Switcher - Always below Logo */}
-                    <div className="flex flex-wrap items-center justify-center gap-3 p-2 bg-white border border-zinc-100 rounded-[2rem] shadow-xl">
-                      <button 
-                        onClick={() => setScriptTone('viral')}
-                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${scriptTone === 'viral' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
-                      >
-                        Viral
-                      </button>
-                      <button 
-                        onClick={() => setScriptTone('storytelling')}
-                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${scriptTone === 'storytelling' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
-                      >
-                        Storytelling
-                      </button>
-                      <button 
-                        onClick={() => setScriptTone('educational')}
-                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all ${scriptTone === 'educational' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
-                      >
-                        Education
-                      </button>
-                      <div className="w-px h-6 bg-zinc-100 mx-2" />
-                      <button 
-                        onClick={() => setIsWebResearchEnabled(!isWebResearchEnabled)}
-                        className={`px-6 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${isWebResearchEnabled ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600'}`}
-                      >
-                        <Globe size={14} /> Web Search
-                      </button>
-                    </div>
-
-                    {chatMessages.length === 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
-                        {[
-                          { icon: <TrendingUp size={18} />, text: "Write a viral fitness hook", prompt: "Write a viral hook for a fitness video that stops the scroll in 1 second." },
-                          { icon: <ImageIcon size={18} />, text: "Generate a fitness thumbnail", prompt: "Generate a high-CTR fitness thumbnail image with a muscular athlete and vibrant neon lighting." },
-                          { icon: <PenTool size={18} />, text: "Storytelling script for business", prompt: "Create an emotional storytelling script about a failed entrepreneur who made it big." },
-                          { icon: <Zap size={18} />, text: "Quick value-packed reel", prompt: "Write a 30-second educational script about 3 productivity hacks." }
-                        ].map((item, i) => (
-                          <button 
-                            key={i}
-                            onClick={() => item.text.includes('Generate') ? handleGenerateImage(item.prompt.replace('Generate ', '')) : handleViralScriptWriter(item.prompt)}
-                            className="p-6 bg-white border border-zinc-100 rounded-[2rem] text-sm font-medium text-zinc-700 hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/5 transition-all text-left flex items-start gap-4 group"
-                          >
-                            <div className="p-3 bg-zinc-50 rounded-2xl text-zinc-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-colors">
-                              {item.icon}
+                        {chatMessages.length === 0 ? (
+                          <>
+                            {/* Large Blank Box for Guidance */}
+                            <div className="w-full p-12 bg-white border-2 border-dashed border-zinc-200 rounded-[3rem] flex flex-col items-center justify-center text-center min-h-[200px]">
+                              {/* Blank box as requested */}
                             </div>
-                            <span className="pt-1">{item.text}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-10">
-                        {chatMessages.map((msg, i) => (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          key={i} 
-                          className={`flex gap-6 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-                        >
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
+                            {[
+                              { icon: <TrendingUp size={18} />, text: "Create Script", prompt: "Write a high-engagement script for a video about..." },
+                              { icon: <ImageIcon size={18} />, text: "Create Thumbnail", prompt: "Generate a high-CTR thumbnail image for a video about..." },
+                              { icon: <PenTool size={18} />, text: "Writing Help", prompt: "Help me write a compelling story about..." },
+                              { icon: <Zap size={18} />, text: "Deep Research", prompt: "Perform deep research on the topic of..." }
+                            ].map((item, i) => (
+                              <button 
+                                key={i}
+                                onClick={() => {
+                                  setChatInput(item.prompt);
+                                  chatInputRef.current?.focus();
+                                }}
+                                className="p-6 bg-white border border-zinc-100 rounded-[2rem] text-sm font-medium text-zinc-700 hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/5 transition-all text-left flex items-start gap-4 group"
+                              >
+                                <div className="p-3 bg-zinc-50 rounded-2xl text-zinc-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-colors">
+                                  {item.icon}
+                                </div>
+                                <span className="pt-1">{item.text}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-10">
+                          {chatMessages.map((msg, i) => (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              key={i} 
+                              className={`flex gap-6 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                            >
                           <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold shadow-sm ${msg.role === 'user' ? 'bg-zinc-900 text-white' : 'bg-emerald-500 text-white'}`}>
                             {msg.role === 'user' ? (userProfile?.displayName?.[0] || 'U') : <Sparkles size={20} />}
                           </div>
@@ -3802,67 +3921,158 @@ export default function App() {
                         className="relative group"
                       >
                         <div className={`absolute inset-0 bg-zinc-900/5 blur-3xl rounded-[2.5rem] transition-all duration-500 ${isInputFocused ? 'opacity-100 bg-emerald-500/10' : 'opacity-0'}`} />
+                        {/* File Preview */}
+                        <AnimatePresence>
+                          {filePreview && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                              className="mb-4 relative inline-block"
+                            >
+                              <img 
+                                src={filePreview} 
+                                alt="Upload preview" 
+                                className="h-32 w-auto rounded-2xl border-2 border-emerald-500/20 shadow-lg object-cover"
+                              />
+                              <button 
+                                onClick={removeFile}
+                                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
                         <div className={`
-                          relative bg-white border rounded-[2.5rem] p-2 md:p-3 flex items-end gap-2 md:gap-3 transition-all w-full
+                          relative bg-white border rounded-[2.5rem] p-4 md:p-6 flex items-end gap-3 md:gap-4 transition-all w-full
                           ${isInputFocused ? 'border-emerald-500/40 shadow-2xl ring-8 ring-emerald-500/5' : 'border-zinc-200 shadow-lg hover:border-zinc-300'}
                         `}>
-                          <button 
-                            onClick={() => showToast("File upload coming soon!")}
-                            className="p-3 md:p-4 hover:bg-zinc-100 rounded-full text-zinc-400 transition-all flex-shrink-0 active:scale-95"
-                          >
-                            <Plus size={22} />
-                          </button>
-                          <button 
-                            onClick={() => handleGenerateImage(chatInput || "A viral YouTube thumbnail")}
-                            className="p-3 md:p-4 hover:bg-emerald-50 rounded-full text-emerald-500 transition-all flex-shrink-0 active:scale-95"
-                            title="Generate Thumbnail"
-                          >
-                            <Sparkles size={22} />
-                          </button>
-                            <textarea
-                              ref={chatInputRef}
-                              value={chatInput}
-                              onFocus={() => setIsInputFocused(true)}
-                              onBlur={() => setIsInputFocused(false)}
-                              onChange={(e) => {
-                                setChatInput(e.target.value);
-                                // Auto-resize
-                                e.target.style.height = 'auto';
-                                e.target.style.height = `${Math.max(e.target.scrollHeight, 120)}px`;
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleViralScriptWriter();
-                                  // Reset height
-                                  if (chatInputRef.current) chatInputRef.current.style.height = 'auto';
-                                }
-                              }}
-                              placeholder="Describe your command..."
-                              className="flex-1 bg-transparent border-none focus:ring-0 text-lg md:text-xl py-4 md:py-6 px-2 md:px-4 min-h-[120px] md:min-h-[150px] max-h-[500px] resize-none leading-relaxed min-w-0"
-                              rows={1}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <input 
+                              type="file"
+                              ref={fileInputRef}
+                              onChange={handleFileSelect}
+                              accept="image/*"
+                              className="hidden"
                             />
-                          <div className="flex items-center gap-3 pb-1 pr-1 flex-shrink-0">
+                            <button 
+                              onClick={() => fileInputRef.current?.click()}
+                              className={`p-3 md:p-4 hover:bg-zinc-100 rounded-full transition-all active:scale-95 ${fileToUpload ? 'text-emerald-500 bg-emerald-50' : 'text-zinc-400'}`}
+                              title="Upload Image"
+                            >
+                              <Plus size={24} />
+                            </button>
+                            <div className="relative">
+                              <button 
+                                onClick={() => setIsFeatureMenuOpen(!isFeatureMenuOpen)}
+                                className="p-3 md:p-4 hover:bg-zinc-100 rounded-full text-zinc-400 transition-all active:scale-95"
+                                title="Features"
+                              >
+                                <div className="flex flex-col gap-1">
+                                  <div className="w-6 h-0.5 bg-current rounded-full" />
+                                  <div className="w-6 h-0.5 bg-current rounded-full" />
+                                </div>
+                              </button>
+                              <AnimatePresence>
+                                {isFeatureMenuOpen && (
+                                  <motion.div 
+                                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                    animate={{ opacity: 1, y: -20, scale: 1 }}
+                                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                    className="absolute bottom-full left-0 mb-4 w-64 bg-white border border-zinc-100 rounded-3xl shadow-2xl py-4 z-50"
+                                  >
+                                    <div className="px-4 pb-2 mb-2 border-b border-zinc-50">
+                                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">AI Features</p>
+                                    </div>
+                                    <button 
+                                      onClick={() => {
+                                        setChatInput("Perform deep research on a trending topic and provide insights.");
+                                        chatInputRef.current?.focus();
+                                        setIsFeatureMenuOpen(false);
+                                      }}
+                                      className="w-full text-left px-6 py-3 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center gap-3"
+                                    >
+                                      <Globe size={16} className="text-blue-500" /> Deep Research
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setChatInput("Help me write a compelling story for my next video.");
+                                        chatInputRef.current?.focus();
+                                        setIsFeatureMenuOpen(false);
+                                      }}
+                                      className="w-full text-left px-6 py-3 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center gap-3"
+                                    >
+                                      <PenTool size={16} className="text-emerald-500" /> Writing Help
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setChatInput("Generate a high-CTR thumbnail image for a video about...");
+                                        chatInputRef.current?.focus();
+                                        setIsFeatureMenuOpen(false);
+                                      }}
+                                      className="w-full text-left px-6 py-3 text-sm text-zinc-600 hover:bg-zinc-50 flex items-center gap-3"
+                                    >
+                                      <ImageIcon size={16} className="text-purple-500" /> Thumbnail Maker
+                                    </button>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                            <button 
+                              onClick={() => handleGenerateImage(chatInput || "A viral YouTube thumbnail")}
+                              className="p-3 md:p-4 hover:bg-emerald-50 rounded-full text-emerald-500 transition-all active:scale-95"
+                              title="Generate Thumbnail"
+                            >
+                              <Sparkles size={24} />
+                            </button>
+                          </div>
+
+                          <textarea
+                            ref={chatInputRef}
+                            value={chatInput}
+                            onFocus={() => setIsInputFocused(true)}
+                            onBlur={() => setIsInputFocused(false)}
+                            onChange={(e) => {
+                              setChatInput(e.target.value);
+                              // Auto-resize
+                              e.target.style.height = 'auto';
+                              e.target.style.height = `${Math.max(e.target.scrollHeight, 180)}px`;
+                            }}
+                            onKeyDown={(e) => {
+                              // Enter key only adds a new line, sending is handled by the button
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                // Default behavior for textarea is adding a new line
+                                // We explicitly do NOT call handleViralScriptWriter here
+                              }
+                            }}
+                            placeholder="Describe your question..."
+                            className="flex-1 bg-transparent border-none focus:ring-0 text-xl md:text-2xl py-6 md:py-8 px-4 md:px-6 min-h-[180px] md:min-h-[220px] max-h-[600px] resize-none leading-relaxed min-w-0"
+                            rows={1}
+                          />
+
+                          <div className="flex items-center gap-4 pb-2 pr-2 flex-shrink-0">
                             <button 
                               onClick={() => setIsProMode(!isProMode)}
-                              className={`hidden md:block px-6 py-2.5 border rounded-full text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm ${isProMode ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-100'}`}
+                              className={`hidden md:block px-8 py-3 border rounded-full text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm ${isProMode ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-100'}`}
                             >
                               {isProMode ? 'Pro' : 'Fast'}
                             </button>
                             {isWritingScript || isGeneratingImage ? (
                               <button 
                                 onClick={stopGeneration}
-                                className="p-4 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition-all flex-shrink-0 active:scale-90"
+                                className="p-5 md:p-6 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition-all flex-shrink-0 active:scale-90"
                               >
-                                <Square size={24} fill="currentColor" />
+                                <Square size={28} fill="currentColor" />
                               </button>
                             ) : (
                               <button 
                                 onClick={() => handleViralScriptWriter()}
-                                disabled={!chatInput.trim() || isWritingScript || isGeneratingImage}
-                                className={`p-4 rounded-full transition-all ${chatInput.trim() && !isWritingScript && !isGeneratingImage ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:scale-105' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'}`}
+                                disabled={(!chatInput.trim() && !fileToUpload) || isWritingScript || isGeneratingImage}
+                                className={`p-5 md:p-6 rounded-full transition-all ${(chatInput.trim() || fileToUpload) && !isWritingScript && !isGeneratingImage ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:scale-105' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'}`}
                               >
-                                <ArrowUp size={24} />
+                                <ArrowUp size={28} />
                               </button>
                             )}
                           </div>
