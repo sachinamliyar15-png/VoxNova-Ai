@@ -309,8 +309,27 @@ export default function App() {
   }, [currentAudio]);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
   const [showLimitToast, setShowLimitToast] = useState(false);
-  const [userApiKey, setUserApiKey] = useState<string>(() => localStorage.getItem('voxnova_api_key') || '');
   const exhaustedKeysRef = useRef<Set<string>>(new Set());
+
+  const getAvailableApiKey = () => {
+    const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
+    if (!baseKey) return null;
+    const allKeys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    const availableKeys = allKeys.filter(k => !exhaustedKeysRef.current.has(k));
+    if (availableKeys.length === 0) return null;
+    return availableKeys[Math.floor(Math.random() * availableKeys.length)];
+  };
+
+  const markKeyAsExhausted = (key: string) => {
+    if (!key) return;
+    exhaustedKeysRef.current.add(key);
+    setExhaustedCount(prev => prev + 1);
+    setTimeout(() => {
+      exhaustedKeysRef.current.delete(key);
+      setExhaustedCount(prev => prev - 1);
+    }, 120000); // 2 minutes
+  };
+
   const [exhaustedCount, setExhaustedCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -486,32 +505,6 @@ export default function App() {
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const stopGenerationRef = useRef(false);
 
-  const getAvailableApiKey = () => {
-    const baseKey = userApiKey || process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
-    if (!baseKey) return null;
-    
-    const allKeys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-    const availableKeys = allKeys.filter(k => !exhaustedKeysRef.current.has(k));
-    
-    if (availableKeys.length === 0) {
-      return null;
-    }
-    
-    // Randomly pick an available key
-    return availableKeys[Math.floor(Math.random() * availableKeys.length)];
-  };
-
-  const markKeyAsExhausted = (key: string) => {
-    if (!key) return;
-    exhaustedKeysRef.current.add(key);
-    setExhaustedCount(exhaustedKeysRef.current.size);
-    
-    // Clear exhausted keys after 2 minutes (increased from 1 min for better safety)
-    setTimeout(() => {
-      exhaustedKeysRef.current.delete(key);
-      setExhaustedCount(exhaustedKeysRef.current.size);
-    }, 120000);
-  };
   const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
   const isWhitelisted = (email: string | null | undefined) => email ? WHITELISTED_EMAILS.includes(email) : false;
 
@@ -557,28 +550,22 @@ export default function App() {
 
     setIsPolishing(true);
     try {
-      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error("API Key not configured.");
-
-      const keys = apiKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const activeKey = keys[Math.floor(Math.random() * keys.length)];
-      const ai = new GoogleGenAI({ apiKey: activeKey });
-
-      const prompt = `Rewrite and optimize the following script for a high-retention social media video (Shorts/Reels style). 
-      Make it punchy, engaging, and viral-ready. 
-      Maintain the original language (${language === 'hi' ? 'Hindi' : 'English'}).
-      Keep it under 5,000 characters.
-      Return ONLY the optimized script. Do not include any notes or explanations.
-
-      SCRIPT:
-      ${text}`;
-
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [{ parts: [{ text: prompt }] }]
+      const token = await currentUser!.getIdToken();
+      const response = await fetch('/api/polish-script', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ text, language })
       });
 
-      const polishedText = result.text;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to polish script via backend");
+      }
+
+      const { polishedText } = await response.json();
       if (polishedText) {
         setText(polishedText.trim().slice(0, 5000));
       }
@@ -755,108 +742,72 @@ export default function App() {
     let attempt = 0;
 
     const executeImageGen = async () => {
-      while (attempt < maxRetries) {
-        const apiKey = getAvailableApiKey();
-        if (!apiKey) {
-          const waitTime = 5000;
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          attempt++;
-          continue;
+      try {
+        if (stopGenerationRef.current) return;
+        
+        const token = await currentUser!.getIdToken();
+        const response = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ prompt, aspectRatio })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to generate image via backend");
         }
 
-        try {
-          if (stopGenerationRef.current) break;
-          const ai = new GoogleGenAI({ apiKey });
-          const imagePrompt = `World-class professional YouTube thumbnail, high-CTR, cinematic lighting, psychological hook visual. ${prompt}. 8k resolution, cinematic composition, vibrant colors, trending on ArtStation style, highly detailed, sharp focus.`;
+        const { imageUrl } = await response.json();
 
-          const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: [{ text: imagePrompt }],
-            config: {
-              imageConfig: {
-                aspectRatio,
-              }
-            }
+        const newModelMessage = { 
+          role: 'model' as const, 
+          content: `Generated ${aspectRatio} professional thumbnail for: ${prompt}`, 
+          type: 'image' as const, 
+          imageUrl 
+        };
+        
+        const finalMessages = [...updatedMessages, newModelMessage];
+        setChatMessages(finalMessages);
+
+        if (currentUser) {
+          // Deduct credits
+          await fetch('/api/user/deduct-credits', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ amount: 500 })
           });
+          setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - 500 }));
 
-          let imageUrl = '';
-          for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-              imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-              break;
-            }
-          }
-
-          if (!imageUrl) throw new Error("Failed to generate image data.");
-
-          const newModelMessage = { 
-            role: 'model' as const, 
-            content: `Generated ${aspectRatio} professional thumbnail for: ${prompt}`, 
-            type: 'image' as const, 
-            imageUrl 
-          };
-          
-          const finalMessages = [...updatedMessages, newModelMessage];
-          setChatMessages(finalMessages);
-
-          if (currentUser) {
-            // Deduct credits
-            const token = await currentUser.getIdToken();
-            await fetch('/api/user/deduct-credits', {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({ amount: 500 })
+          // Save to Firestore
+          if (currentScriptId) {
+            await updateDoc(doc(db, 'scripts', currentScriptId), {
+              messages: finalMessages,
+              updatedAt: serverTimestamp()
             });
-            setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - 500 }));
-
-            // Save to Firestore
-            if (currentScriptId) {
-              await updateDoc(doc(db, 'scripts', currentScriptId), {
-                messages: finalMessages,
-                updatedAt: serverTimestamp()
-              });
-            } else {
-              const docRef = await addDoc(collection(db, 'scripts'), {
-                userId: currentUser.uid,
-                title: `Image: ${prompt.substring(0, 20)}...`,
-                content: prompt,
-                messages: finalMessages,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-              });
-              setCurrentScriptId(docRef.id);
-            }
+          } else {
+            const docRef = await addDoc(collection(db, 'scripts'), {
+              userId: currentUser.uid,
+              title: `Image: ${prompt.substring(0, 20)}...`,
+              content: prompt,
+              messages: finalMessages,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+            setCurrentScriptId(docRef.id);
           }
-          return;
-
-        } catch (error: any) {
-          const errStr = error.message || "";
-          if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED")) {
-            markKeyAsExhausted(apiKey!);
-            attempt++;
-            continue;
-          }
-          if (errStr.includes("403") || errStr.includes("PERMISSION_DENIED")) {
-            if (window.aistudio?.openSelectKey) {
-              setError("Permission Denied: Your API key doesn't have access to image generation. Please select a paid API key from the AI Studio dialog.");
-              await window.aistudio.openSelectKey();
-              const newKey = (process.env as any).API_KEY || '';
-              if (newKey) {
-                setUserApiKey(newKey);
-                localStorage.setItem('voxnova_api_key', newKey);
-              }
-            } else {
-              setError("Permission Denied: Your API key doesn't have access to image generation. Please add a valid API key in Settings.");
-            }
-            break;
-          }
-          throw error;
         }
+      } catch (error: any) {
+        console.error("Image generation error:", error);
+        setError(error.message || "Failed to generate image. Please try again.");
+      } finally {
+        setIsGeneratingImage(false);
       }
-      throw new Error("All API keys are busy. Please try again in 1 minute.");
     };
 
     try {
@@ -885,32 +836,24 @@ export default function App() {
     setError(null);
 
     try {
-      const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-      if (!baseKey) throw new Error("API Key not configured");
-      const keys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-      const apiKey = keys[Math.floor(Math.random() * keys.length)];
-      const ai = new GoogleGenAI({ apiKey });
-
-      const prompt = `Analyze the following script and suggest 'Visual Emphasis Points' for video captions. 
-      Identify keywords or phrases that should be highlighted with specific colors, emojis, or font-size increases based on the emotional tone.
-      
-      Return ONLY a JSON array of objects with this structure:
-      [
-        { "word": "keyword", "color": "hex_color", "emoji": "🔥", "size": "large|normal" }
-      ]
-      
-      SCRIPT:
-      ${text}`;
-
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [{ parts: [{ text: prompt }] }],
-        config: { responseMimeType: "application/json" }
+      const token = await currentUser!.getIdToken();
+      const response = await fetch('/api/analyze-captions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ text })
       });
 
-      const output = result.text;
-      if (output) {
-        const parsed = JSON.parse(output);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to analyze captions via backend");
+      }
+
+      const { analysis } = await response.json();
+      if (analysis) {
+        const parsed = JSON.parse(analysis);
         setAiHighlights(parsed);
       }
     } catch (err: any) {
@@ -1350,214 +1293,87 @@ export default function App() {
     let attempt = 0;
 
     const generateWithRetry = async (chunkText: string): Promise<string> => {
-      let attempt = 0;
-      const maxRetries = 15; // Increased retries for better failover
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/generate-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          text: chunkText,
+          voice_name: selectedVoice.name,
+          style,
+          speed,
+          pitch,
+          language,
+          studioClarity,
+          pause
+        })
+      });
 
-      while (attempt < maxRetries) {
-        let apiKey = getAvailableApiKey();
-        
-        if (!apiKey) {
-          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-          const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-          
-          if (allKeys.length > 0 && exhaustedKeysRef.current.size >= allKeys.length) {
-            // All keys exhausted, wait and retry if we have attempts left
-            const waitTime = 10000; // Increased wait time
-            console.warn(`All ${allKeys.length} keys exhausted. Waiting ${waitTime}ms...`);
-            setError(`All API keys exhausted. Waiting ${waitTime/1000}s before retrying...`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-            setError(null);
-            attempt++;
-            continue;
-          }
-          throw new Error("Gemini API Key is not configured. Please enter your API key by clicking the 'Key' icon.");
-        }
-
-        try {
-          console.log(`TTS Attempt ${attempt + 1} with key ${apiKey.substring(0, 8)}...`);
-          const ai = new GoogleGenAI({ apiKey });
-          
-          const voiceMapping: Record<string, string> = {
-            'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
-            'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-            'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
-            'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
-            'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon'
-          };
-
-          const targetVoice = voiceMapping[selectedVoice.name] || 'Puck';
-          
-          const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
-          
-          PERFORMANCE GUIDELINES:
-          - Use natural human prosody, complex intonation, and realistic rhythm.
-          - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
-          - Avoid any robotic, monotone, or repetitive cadence.
-          - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
-          - Sound like a real person speaking in a high-end professional studio, not a computer.
-          - Pay close attention to the emotional weight of the text.
-          
-          TECHNICAL STANDARDS:
-          - NO background noise, hums, or digital artifacts.
-          - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-          - Ensure crystal-clear, 48kHz studio-quality audio.
-          `;
-          
-          let promptPrefix = "";
-          
-          if (studioClarity) {
-            promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
-          }
-          
-          const voiceTraits: Record<string, string> = {
-            'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.',
-            'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.',
-            'Daniel': 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.',
-            'Josh': 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.',
-            'Liam': 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.',
-            'Michael': 'Mature, wise, and sophisticated. Slow, deliberate professional narration.',
-            'Ryan': 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.',
-            'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
-            'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
-            'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
-            'Frank': 'Natural, balanced, and clear. Perfect for long-form narration with consistent energy.',
-            'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
-            'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
-            'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
-            'Matilda': 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.',
-            'Emily': 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.',
-            'Bella': 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.',
-            'Rachel': 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.',
-            'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
-            'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
-            'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
-            'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
-            'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
-          };
-
-          promptPrefix += `${voiceTraits[selectedVoice.name] || ''} `;
-
-          if (style === 'documentary' || style === 'doc-pro' || selectedVoice.name === 'Documentary Pro') {
-            promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
-            
-            CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
-            1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
-            2. EMOTIONAL MODULATION: 
-               - For normal parts: Calm, steady, and informative.
-               - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
-               - For intense/war parts: Sound stronger, brave, and commanding.
-               - For emotional parts: Sound warm, respectful, and inspiring.
-               - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
-            3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
-            4. PACING: Medium pace generally, but slow down for dramatic effect.
-            5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
-          } else if (style === 'emotional') {
-            promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
-          } else if (style === 'storytelling') {
-            promptPrefix += `Use a rhythmic, engaging, and warm tone to bring the narrative to life. `;
-          } else if (style === 'motivational') {
-            promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
-          }
-
-          // Granular pitch control
-          if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
-          else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
-          else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
-          else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
-
-          // Granular speed control
-          promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-          if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
-          else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
-          else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
-          else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
-          else promptPrefix += "Speak at a natural, medium pace. ";
-          
-          // Add pause gap instructions
-          if (pause > 0.1) {
-            promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
-          }
-          
-          const finalPrompt = `${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunkText}`;
-
-          let currentPrompt = finalPrompt;
-          if (attempt > 0) {
-            currentPrompt = `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunkText}`;
-          }
-
-          const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: currentPrompt }] }],
-            config: {
-              systemInstruction: systemInstruction,
-              responseModalities: [Modality.AUDIO],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: targetVoice as any },
-                },
-              },
-            },
-          });
-
-          const candidate = response.candidates?.[0];
-          const base64 = candidate?.content?.parts?.[0]?.inlineData?.data;
-          
-          if (!base64) {
-            if (candidate?.finishReason === 'SAFETY') {
-              throw new Error("The generation was blocked by safety filters. This often happens with long scripts containing sensitive words. Please try a shorter or cleaner script.");
-            }
-            if (candidate?.finishReason === 'RECITATION') {
-              throw new Error("The generation was blocked due to recitation filters (copyrighted content detected).");
-            }
-            if (candidate?.finishReason === 'OTHER' || !candidate) {
-              throw new Error("AI model failed to generate audio data. The script might be too complex or contain unsupported characters.");
-            }
-            throw new Error("AI model failed to generate audio data. Please try again with a simpler script.");
-          }
-          return base64;
-
-        } catch (err: any) {
-          attempt++;
-          const errStr = err.message || JSON.stringify(err);
-          const isNetworkError = errStr.includes("Rpc failed") || errStr.includes("xhr error") || errStr.includes("fetch");
-          const isGenerationError = errStr.includes("failed to generate audio data");
-          const isRateLimit = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota");
-          const isInternalError = errStr.includes("500") || errStr.includes("INTERNAL") || errStr.includes("Internal error");
-          
-          if (isRateLimit) {
-            markKeyAsExhausted(apiKey);
-            console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted. Switching keys...`);
-            
-            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-            const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-            
-            if (exhaustedKeysRef.current.size < allKeys.length) {
-              attempt--; // Don't count this as a failed attempt for the whole process
-              continue;
-            }
-          }
-
-          if ((isNetworkError || isGenerationError || isRateLimit || isInternalError) && attempt < maxRetries) {
-            const baseDelay = isRateLimit ? 10000 : (isInternalError ? 5000 : 1000);
-            const delay = Math.pow(2, attempt) * baseDelay + Math.random() * 2000;
-            
-            console.warn(`Attempt ${attempt} failed for chunk. Retrying in ${Math.round(delay)}ms...`, err);
-            
-            if (isRateLimit) {
-              setError(`All API keys exhausted. Waiting ${Math.round(delay/1000)}s before retrying...`);
-              setErrorType('rate-limit');
-            }
-            
-            await new Promise(resolve => setTimeout(resolve, delay));
-            if (isRateLimit) setError(null);
-            continue;
-          }
-          throw err;
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate speech via backend");
       }
-      throw new Error("Maximum retry attempts reached. Please try again later.");
+
+      const data = await response.json();
+      return data.audioData;
     };
+
+    try {
+      // Split text into chunks if it's too long (Gemini TTS has limits)
+      const chunks = text.match(/[^.!?]+[.!?]+/g) || [text];
+      const audioChunks: string[] = [];
+      
+      for (const chunk of chunks) {
+        const audioData = await generateWithRetry(chunk.trim());
+        audioChunks.push(audioData);
+      }
+      
+      // Combine audio chunks (for now we just take the first one or play them sequentially)
+      // In a real app, you'd want to concatenate the base64 or use a buffer
+      const finalAudioData = audioChunks[0]; 
+      
+      setAudioData(finalAudioData);
+      
+      if (currentUser) {
+        // Save to history and deduct credits
+        const token = await currentUser.getIdToken();
+        await fetch('/api/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            text,
+            voice: selectedVoice.name,
+            style,
+            speed,
+            pitch,
+            audioData: finalAudioData,
+            creditCost
+          })
+        });
+        
+        // Refresh history
+        const historyRes = await fetch('/api/history', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const historyData = await historyRes.json();
+        setScriptHistory(historyData);
+        
+        // Update local user profile credits
+        setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - creditCost }));
+      }
+    } catch (err: any) {
+      console.error("Generation error:", err);
+      setError(err.message || "Failed to generate voice. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
     try {
       // Sanitize text: remove problematic characters that might crash the TTS model
@@ -2300,6 +2116,7 @@ export default function App() {
               </div>
 
               {/* API Configuration Section */}
+{/* API Configuration - Hidden as requested */ false && (
               <div className="space-y-4">
                 <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">API Configuration</h3>
                 <div className="space-y-3">
@@ -2311,55 +2128,11 @@ export default function App() {
                         </div>
                         <span className="text-sm font-medium">Gemini API Keys</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {userApiKey && (
-                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-zinc-100 rounded-full">
-                            <div className={`w-1.5 h-1.5 rounded-full ${exhaustedCount === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                            <span className="text-[9px] font-bold text-zinc-600 uppercase">
-                              {userApiKey.split(',').filter(k => k.trim()).length - exhaustedCount} Active
-                            </span>
-                          </div>
-                        )}
-                        {exhaustedCount > 0 && (
-                          <button 
-                            onClick={() => {
-                              exhaustedKeysRef.current.clear();
-                              setExhaustedCount(0);
-                            }}
-                            className="p-1.5 hover:bg-zinc-100 rounded-lg text-amber-500 transition-all"
-                            title="Reset Exhausted Keys"
-                          >
-                            <RefreshCw size={14} />
-                          </button>
-                        )}
-                        <a 
-                          href="https://aistudio.google.com/app/apikey" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-[10px] font-bold text-blue-500 hover:underline uppercase"
-                        >
-                          Get Keys
-                        </a>
-                      </div>
                     </div>
-                    <textarea
-                      value={userApiKey}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setUserApiKey(val);
-                        localStorage.setItem('voxnova_api_key', val);
-                        exhaustedKeysRef.current.clear(); // Reset exhausted keys ref
-                        setExhaustedCount(0); // Reset exhausted keys count
-                      }}
-                      placeholder="Enter multiple API keys separated by commas..."
-                      className="w-full h-24 p-3 text-xs bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all resize-none font-mono"
-                    />
-                    <p className="text-[10px] text-zinc-400 leading-relaxed">
-                      Pro Tip: Enter 10-20 free API keys separated by commas. Our system will automatically switch to the next key if one hits a rate limit, ensuring continuous generation.
-                    </p>
                   </div>
                 </div>
               </div>
+              )}
 
               {/* System Section */}
               <div className="space-y-4">

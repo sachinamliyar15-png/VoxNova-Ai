@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
@@ -11,6 +11,34 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 
 dotenv.config();
+
+// API Key Rotation Logic
+const exhaustedKeys = new Set<string>();
+
+const getAvailableApiKey = () => {
+  const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
+  if (!baseKey) return null;
+  
+  const allKeys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
+  const availableKeys = allKeys.filter(k => !exhaustedKeys.has(k));
+  
+  if (availableKeys.length === 0) {
+    return null;
+  }
+  
+  // Randomly pick an available key
+  return availableKeys[Math.floor(Math.random() * availableKeys.length)];
+};
+
+const markKeyAsExhausted = (key: string) => {
+  if (!key) return;
+  exhaustedKeys.add(key);
+  
+  // Clear exhausted keys after 2 minutes
+  setTimeout(() => {
+    exhaustedKeys.delete(key);
+  }, 120000);
+};
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -292,6 +320,353 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
       res.status(400).json({ error: "Invalid signature" });
     }
   });
+
+// Generate Speech via Gemini API
+app.post("/api/generate-speech", authenticate, async (req: any, res) => {
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause } = req.body;
+  
+  if (!text) {
+    return res.status(400).json({ error: "Text is required" });
+  }
+
+  const maxRetries = 15;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    const apiKey = getAvailableApiKey();
+    
+    if (!apiKey) {
+      return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const voiceMapping: Record<string, string> = {
+        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon'
+      };
+
+      const targetVoice = voiceMapping[voice_name] || 'Puck';
+      
+      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
+      
+      PERFORMANCE GUIDELINES:
+      - Use natural human prosody, complex intonation, and realistic rhythm.
+      - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
+      - Avoid any robotic, monotone, or repetitive cadence.
+      - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
+      - Sound like a real person speaking in a high-end professional studio, not a computer.
+      - Pay close attention to the emotional weight of the text.
+      
+      TECHNICAL STANDARDS:
+      - NO background noise, hums, or digital artifacts.
+      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
+      - Ensure crystal-clear, 48kHz studio-quality audio.
+      `;
+      
+      let promptPrefix = "";
+      
+      if (studioClarity) {
+        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
+      }
+      
+      const voiceTraits: Record<string, string> = {
+        'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.',
+        'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.',
+        'Daniel': 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.',
+        'Josh': 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.',
+        'Liam': 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.',
+        'Michael': 'Mature, wise, and sophisticated. Slow, deliberate professional narration.',
+        'Ryan': 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.',
+        'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
+        'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
+        'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
+        'Frank': 'Natural, balanced, and clear. Perfect for long-form narration with consistent energy.',
+        'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
+        'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
+        'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
+        'Matilda': 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.',
+        'Emily': 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.',
+        'Bella': 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.',
+        'Rachel': 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.',
+        'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
+        'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
+        'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
+        'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
+        'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
+      };
+
+      promptPrefix += `${voiceTraits[voice_name] || ''} `;
+
+      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro') {
+        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
+        
+        CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
+        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
+        2. EMOTIONAL MODULATION: 
+           - For normal parts: Calm, steady, and informative.
+           - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
+           - For intense/war parts: Sound stronger, brave, and commanding.
+           - For emotional parts: Sound warm, respectful, and inspiring.
+           - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
+        3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
+        4. PACING: Medium pace generally, but slow down for dramatic effect.
+        5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
+      } else if (style === 'emotional') {
+        promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
+      } else if (style === 'storytelling') {
+        promptPrefix += `Use a rhythmic, engaging, and warm tone to bring the narrative to life. `;
+      } else if (style === 'motivational') {
+        promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
+      }
+
+      if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
+      else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
+      else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
+      else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
+
+      promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
+      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
+      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
+      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
+      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
+      else promptPrefix += "Speak at a natural, medium pace. ";
+      
+      if (pause > 0.1) {
+        promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
+      }
+      
+      const currentPrompt = attempt === 0 
+        ? `${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
+        : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: currentPrompt }] }],
+        config: {
+          systemInstruction: systemInstruction,
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+            },
+          },
+        },
+      });
+
+      const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (audioData) {
+        return res.json({ audioData });
+      } else {
+        throw new Error("No audio data generated");
+      }
+    } catch (error: any) {
+      console.error(`TTS Attempt ${attempt + 1} failed:`, error.message);
+      if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
+        markKeyAsExhausted(apiKey);
+        attempt++;
+        continue;
+      }
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
+});
+
+// Polish Script via Gemini API
+app.post("/api/polish-script", authenticate, async (req: any, res) => {
+  const { text, language } = req.body;
+  if (!text) return res.status(400).json({ error: "Text is required" });
+
+  const apiKey = getAvailableApiKey();
+  if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: `Rewrite and optimize the following script for a high-retention social media video (Shorts/Reels style). 
+      Make it punchy, engaging, and viral-ready. 
+      Maintain the original language (${language === 'hi' ? 'Hindi' : 'English'}).
+      Keep it under 5,000 characters.
+      Return ONLY the optimized script. Do not include any notes or explanations.
+
+      SCRIPT:
+      ${text}` }] }]
+    });
+    res.json({ polishedText: response.text });
+  } catch (error: any) {
+    console.error("Polish script error:", error.message);
+    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
+      markKeyAsExhausted(apiKey);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Analyze Captions via Gemini API
+app.post("/api/analyze-captions", authenticate, async (req: any, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: "Text is required" });
+
+  const apiKey = getAvailableApiKey();
+  if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: `Analyze the following script and suggest 'Visual Emphasis Points' for video captions. 
+      Identify keywords or phrases that should be highlighted with specific colors, emojis, or font-size increases based on the emotional tone.
+      
+      Return ONLY a JSON array of objects with this structure:
+      [
+        { "word": "keyword", "color": "hex_color", "emoji": "🔥", "size": "large|normal" }
+      ]
+      
+      SCRIPT:
+      ${text}` }] }],
+      config: { responseMimeType: "application/json" }
+    });
+    res.json({ analysis: response.text });
+  } catch (error: any) {
+    console.error("Analyze captions error:", error.message);
+    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
+      markKeyAsExhausted(apiKey);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate Script via Gemini API (Streaming)
+app.post("/api/generate-script", authenticate, async (req: any, res) => {
+  const { messages, isWebResearchEnabled } = req.body;
+  
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: "Messages are required" });
+  }
+
+  const apiKey = getAvailableApiKey();
+  if (!apiKey) {
+    return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const systemInstruction = `You are a World-Class Movie Scriptwriter and Viral Content Strategist. 
+    Your goal is to write scripts that use deep psychological hooks to keep the audience "locked in" from the first second.
+    
+    STORYTELLING RULES:
+    1. OPENING: Start with a high-stakes psychological hook.
+    2. RETENTION: Use "Open Loops" to keep viewers curious.
+    3. PACING: Fast-paced but emotionally resonant.
+    4. LANGUAGE: Use powerful, evocative words that paint a picture.
+    5. FORMAT: Use professional script formatting with scene directions and emotional cues.
+    
+    THUMBNAIL RULES (If asked for image/thumbnail):
+    - Create high-CTR, high-competition YouTube thumbnails.
+    - Focus on "Storytelling through a single frame".
+    - Use vibrant colors, high contrast, and clear focal points.
+    
+    Always aim for "Hollywood Quality" in every response.`;
+
+    const contents = messages.map((m: any) => {
+      if (m.type === 'image' && m.imageUrl) {
+        const base64Data = m.imageUrl.split(',')[1];
+        return {
+          role: m.role,
+          parts: [
+            { inlineData: { data: base64Data, mimeType: 'image/png' } },
+            { text: m.content }
+          ]
+        };
+      }
+      return {
+        role: m.role,
+        parts: [{ text: m.content }]
+      };
+    });
+
+    const modelParams: any = {
+      model: "gemini-3-flash-preview",
+      config: { systemInstruction, temperature: 0.9, topP: 0.95 },
+      contents
+    };
+
+    if (isWebResearchEnabled) {
+      modelParams.config.tools = [{ googleSearch: {} }];
+    }
+
+    const stream = await ai.models.generateContentStream(modelParams);
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    for await (const chunk of stream) {
+      const chunkText = chunk.text || '';
+      res.write(chunkText);
+    }
+    res.end();
+  } catch (error: any) {
+    console.error("Script generation error:", error.message);
+    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
+      markKeyAsExhausted(apiKey);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate Image via Gemini API
+app.post("/api/generate-image", authenticate, async (req: any, res) => {
+  const { prompt, aspectRatio } = req.body;
+  
+  if (!prompt) {
+    return res.status(400).json({ error: "Prompt is required" });
+  }
+
+  const apiKey = getAvailableApiKey();
+  if (!apiKey) {
+    return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const imagePrompt = `World-class professional YouTube thumbnail, high-CTR, cinematic lighting, psychological hook visual. ${prompt}. 8k resolution, cinematic composition, vibrant colors, trending on ArtStation style, highly detailed, sharp focus.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: [{ text: imagePrompt }],
+      config: {
+        imageConfig: {
+          aspectRatio: aspectRatio || '16:9',
+        }
+      }
+    });
+
+    let imageUrl = '';
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+
+    if (!imageUrl) throw new Error("Failed to generate image data.");
+    res.json({ imageUrl });
+  } catch (error: any) {
+    console.error("Image generation error:", error.message);
+    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
+      markKeyAsExhausted(apiKey);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Save generation to history & Deduct Credits
 app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
