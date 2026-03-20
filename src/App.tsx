@@ -392,10 +392,10 @@ export default function App() {
     if (!currentUser) return;
     try {
       const scriptData = {
-        userId: currentUser.uid,
-        title,
-        content,
-        messages,
+        userId: currentUser.uid || "unknown",
+        title: title || "Untitled Script",
+        content: content || "",
+        messages: messages || [],
         updatedAt: serverTimestamp(),
       };
 
@@ -432,7 +432,7 @@ export default function App() {
 
   const handleRenameScript = async (id: string, newTitle: string) => {
     try {
-      await updateDoc(doc(db, 'scripts', id), { title: newTitle });
+      await updateDoc(doc(db, 'scripts', id), { title: newTitle || "Untitled Script" });
       fetchScriptHistory();
       showToast("Script renamed");
     } catch (error) {
@@ -589,10 +589,11 @@ export default function App() {
     setError(null);
     
     const newUserMessage = { 
+      id: Date.now(),
       role: 'user' as const, 
-      content: input, 
+      content: input || "", 
       type: fileToUpload ? 'image' as const : 'text' as const,
-      imageUrl: filePreview || undefined
+      imageUrl: filePreview || ""
     };
     const updatedMessages = [...chatMessages, newUserMessage];
     setChatMessages(updatedMessages);
@@ -633,7 +634,10 @@ export default function App() {
           
           Always aim for "Hollywood Quality" in every response.`;
 
-          const contents = updatedMessages.map(m => {
+          // Limit history to last 10 messages to avoid token limits
+          const limitedMessages = updatedMessages.slice(-10);
+
+          const contents = limitedMessages.map(m => {
             if (m.type === 'image' && m.imageUrl) {
               const base64Data = m.imageUrl.split(',')[1];
               return {
@@ -686,16 +690,16 @@ export default function App() {
             const finalMessages = [...updatedMessages, { id: aiMessageId, role: 'model', content: fullResponse, type: 'text' }];
             if (currentScriptId) {
               await updateDoc(doc(db, 'scripts', currentScriptId), {
-                content: fullResponse,
-                messages: finalMessages,
+                content: fullResponse || "",
+                messages: finalMessages || [],
                 updatedAt: serverTimestamp()
               });
             } else {
               const docRef = await addDoc(collection(db, 'scripts'), {
-                userId: currentUser.uid,
-                title: input.substring(0, 30) + (input.length > 30 ? '...' : ''),
-                content: fullResponse,
-                messages: finalMessages,
+                userId: currentUser.uid || "unknown",
+                title: (input || "").substring(0, 30) + ((input || "").length > 30 ? '...' : ''),
+                content: fullResponse || "",
+                messages: finalMessages || [],
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
               });
@@ -734,7 +738,13 @@ export default function App() {
     stopGenerationRef.current = false;
     setError(null);
     
-    const newUserMessage = { role: 'user' as const, content: `Generate ${aspectRatio} thumbnail: ${prompt}`, type: 'text' as const };
+    const newUserMessage = { 
+      id: Date.now(),
+      role: 'user' as const, 
+      content: `Generate ${aspectRatio} thumbnail: ${prompt}`, 
+      type: 'text' as const,
+      imageUrl: ""
+    };
     const updatedMessages = [...chatMessages, newUserMessage];
     setChatMessages(updatedMessages);
 
@@ -763,10 +773,11 @@ export default function App() {
         const { imageUrl } = await response.json();
 
         const newModelMessage = { 
+          id: Date.now() + 1,
           role: 'model' as const, 
           content: `Generated ${aspectRatio} professional thumbnail for: ${prompt}`, 
           type: 'image' as const, 
-          imageUrl 
+          imageUrl: imageUrl || ""
         };
         
         const finalMessages = [...updatedMessages, newModelMessage];
@@ -787,15 +798,15 @@ export default function App() {
           // Save to Firestore
           if (currentScriptId) {
             await updateDoc(doc(db, 'scripts', currentScriptId), {
-              messages: finalMessages,
+              messages: finalMessages || [],
               updatedAt: serverTimestamp()
             });
           } else {
             const docRef = await addDoc(collection(db, 'scripts'), {
-              userId: currentUser.uid,
-              title: `Image: ${prompt.substring(0, 20)}...`,
-              content: prompt,
-              messages: finalMessages,
+              userId: currentUser.uid || "unknown",
+              title: `Image: ${(prompt || "").substring(0, 20)}...`,
+              content: prompt || "",
+              messages: finalMessages || [],
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             });
@@ -822,7 +833,7 @@ export default function App() {
 
   const handleOpenScript = (script: any) => {
     setCurrentScriptId(script.id);
-    setChatMessages(script.messages || [{ role: 'model', content: script.content }]);
+    setChatMessages(script.messages || [{ id: Date.now(), role: 'model', content: script.content, type: 'text' }]);
     setViralScript(script.content);
   };
 
