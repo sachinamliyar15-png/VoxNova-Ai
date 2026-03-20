@@ -1288,10 +1288,8 @@ export default function App() {
     setIsGenerating(true);
     setError(null);
     setErrorType(null);
+    setGenerationProgress(0);
     
-    const maxRetries = 3;
-    let attempt = 0;
-
     const generateWithRetry = async (chunkText: string): Promise<string> => {
       const token = await currentUser.getIdToken();
       const response = await fetch('/api/generate-speech', {
@@ -1320,60 +1318,6 @@ export default function App() {
       const data = await response.json();
       return data.audioData;
     };
-
-    try {
-      // Split text into chunks if it's too long (Gemini TTS has limits)
-      const chunks = text.match(/[^.!?]+[.!?]+/g) || [text];
-      const audioChunks: string[] = [];
-      
-      for (const chunk of chunks) {
-        const audioData = await generateWithRetry(chunk.trim());
-        audioChunks.push(audioData);
-      }
-      
-      // Combine audio chunks (for now we just take the first one or play them sequentially)
-      // In a real app, you'd want to concatenate the base64 or use a buffer
-      const finalAudioData = audioChunks[0]; 
-      
-      setAudioData(finalAudioData);
-      
-      if (currentUser) {
-        // Save to history and deduct credits
-        const token = await currentUser.getIdToken();
-        await fetch('/api/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            text,
-            voice: selectedVoice.name,
-            style,
-            speed,
-            pitch,
-            audioData: finalAudioData,
-            creditCost
-          })
-        });
-        
-        // Refresh history
-        const historyRes = await fetch('/api/history', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const historyData = await historyRes.json();
-        setScriptHistory(historyData);
-        
-        // Update local user profile credits
-        setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - creditCost }));
-      }
-    } catch (err: any) {
-      console.error("Generation error:", err);
-      setError(err.message || "Failed to generate voice. Please try again.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
     try {
       // Sanitize text: remove problematic characters that might crash the TTS model
@@ -1524,8 +1468,8 @@ export default function App() {
           });
         }
         
-        fetchHistory();
-        fetchUserProfile(currentUser!);
+        fetchHistory(currentUser);
+        fetchUserProfile(currentUser);
       } catch (saveErr: any) {
         console.error("Failed to save to history:", saveErr);
         setError(`Saved locally, but failed to sync: ${saveErr.message}`);
@@ -1536,7 +1480,6 @@ export default function App() {
       if (errStr.includes("API key not valid")) {
         setError("Invalid API Key: Please check your API key settings.");
         setErrorType('auth');
-        setHasApiKey(false);
       } else if (errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota")) {
         setError("Our AI servers are currently at capacity due to high demand. Please try again in a few minutes.");
         setErrorType('rate-limit');
@@ -1606,17 +1549,14 @@ export default function App() {
       let base64Audio = "";
 
       while (attempt < maxRetries) {
-        const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-        const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-        
         let apiKey = getAvailableApiKey();
         if (!apiKey) {
-          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+          const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
           const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
           if (allKeys.length > 0 && exhaustedKeysRef.current.size >= allKeys.length) {
-            throw new Error("429: All API keys exhausted.");
+            throw new Error("429: All AI servers are currently at capacity. Please try again in a few minutes.");
           }
-          throw new Error("API Key not configured. Please add your key in API Settings.");
+          throw new Error("AI Service is temporarily unavailable. Please try again later.");
         }
 
         try {
@@ -1728,9 +1668,9 @@ export default function App() {
           
           if (isRateLimit) {
             markKeyAsExhausted(apiKey);
-            console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted during dubbing. Switching...`);
+            console.warn(`API Key exhausted during dubbing. Switching...`);
             
-            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+            const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
             const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
             if (exhaustedKeysRef.current.size < allKeys.length) {
               attempt--;
@@ -1797,7 +1737,8 @@ export default function App() {
             creditCost: creditCost
           })
         });
-        fetchHistory();
+        fetchHistory(currentUser);
+        fetchUserProfile(currentUser);
       } catch (e) {
         console.warn("Failed to save dubbing to history", e);
       }
@@ -1853,17 +1794,14 @@ export default function App() {
       let srtContent = "";
 
       while (attempt < maxRetries) {
-        const baseKey = userApiKey || process.env.GEMINI_API_KEY;
-        const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
-        
         let apiKey = getAvailableApiKey();
         if (!apiKey) {
-          const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+          const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
           const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
           if (allKeys.length > 0 && exhaustedKeysRef.current.size >= allKeys.length) {
-            throw new Error("429: All API keys exhausted.");
+            throw new Error("429: All AI servers are currently at capacity. Please try again in a few minutes.");
           }
-          throw new Error("API Key not configured.");
+          throw new Error("AI Service is temporarily unavailable.");
         }
 
         try {
@@ -1911,9 +1849,9 @@ export default function App() {
           
           if (isRateLimit) {
             markKeyAsExhausted(apiKey);
-            console.warn(`API Key ${apiKey.substring(0, 8)}... exhausted during captioning. Switching...`);
+            console.warn(`API Key exhausted during captioning. Switching...`);
             
-            const baseKey = userApiKey || process.env.GEMINI_API_KEY;
+            const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
             const allKeys = baseKey?.split(',').map(k => k.trim()).filter(k => k.length > 0) || [];
             if (exhaustedKeysRef.current.size < allKeys.length) {
               attempt--;
@@ -1932,33 +1870,31 @@ export default function App() {
       setCaptionProgress(100);
       setCaptionStep("Complete!");
 
-      // Deduct credits
-      await fetch('/api/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await currentUser.getIdToken()}`
-        },
-        body: JSON.stringify({
-          text: "AI Captioning Generation",
-          voice: "System",
-          style: captionStyle,
-          speed: 1,
-          pitch: 1,
-          audioData: "caption_gen",
-          creditCost: captionCost
-        })
-      });
-
-      // Refresh profile
-      const profileRes = await fetch('/api/user/profile', {
-        headers: { 'Authorization': `Bearer ${await currentUser.getIdToken()}` }
-      });
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        setUserProfile(profile);
+      // Save to history & Deduct Credits
+      try {
+        const token = await currentUser!.getIdToken();
+        await fetch('/api/save', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            text: "AI Captioning Generation",
+            voice: "System",
+            style: captionStyle,
+            speed: 1,
+            pitch: 1,
+            audioData: "caption_gen",
+            creditCost: captionCost
+          })
+        });
+        
+        fetchHistory(currentUser);
+        fetchUserProfile(currentUser);
+      } catch (e) {
+        console.warn("Failed to save captioning to history", e);
       }
-
     } catch (err: any) {
       console.error("Captioning error:", err);
       setError(err.message || "Failed to generate captions.");
@@ -2114,25 +2050,6 @@ export default function App() {
                   </button>
                 )}
               </div>
-
-              {/* API Configuration Section */}
-{/* API Configuration - Hidden as requested */ false && (
-              <div className="space-y-4">
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">API Configuration</h3>
-                <div className="space-y-3">
-                  <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500">
-                          <Key size={18} />
-                        </div>
-                        <span className="text-sm font-medium">Gemini API Keys</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              )}
 
               {/* System Section */}
               <div className="space-y-4">

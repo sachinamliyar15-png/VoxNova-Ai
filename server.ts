@@ -63,11 +63,18 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
       
       // Replace escaped newlines with actual newlines
       // This handles the common case where the key is provided as a single line with \n strings
+      // We use a global regex to replace all occurrences of \n (escaped) with actual newlines
       privateKey = privateKey.replace(/\\n/g, '\n');
       
-      // Ensure the key has the correct PEM headers
+      // If the key still doesn't have actual newlines, it might be double-escaped or just a single line
+      if (!privateKey.includes('\n') && privateKey.includes(' ')) {
+        // Some systems might replace newlines with spaces, though rare for PEM
+        // But more likely it's just one long string that needs the headers/footers fixed
+      }
+
+      // Ensure the key has the correct PEM headers and footers
       if (privateKey && !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
-        console.error("FIREBASE_PRIVATE_KEY appears to be missing PEM headers");
+        privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
       }
       
       admin.initializeApp({
