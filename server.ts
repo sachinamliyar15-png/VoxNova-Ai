@@ -483,8 +483,8 @@ app.post("/api/generate-speech", authenticate, async (req: any, res) => {
     }
   }
 
-  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys
-    });
+  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
+});
 
 // Polish Script via Gemini API
 app.post("/api/polish-script", authenticate, async (req: any, res) => {
@@ -755,4 +755,3 @@ async function startServer() {
 }
 
 startServer();
-          
