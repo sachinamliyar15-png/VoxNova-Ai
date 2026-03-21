@@ -453,7 +453,7 @@ app.post("/api/generate-speech", authenticate, async (req: any, res) => {
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash-preview-tts",
+        model: "gemini-1.5-flash",
         contents: [{ parts: [{ text: currentPrompt }] }],
         config: {
           systemInstruction: systemInstruction,
@@ -483,8 +483,8 @@ app.post("/api/generate-speech", authenticate, async (req: any, res) => {
     }
   }
 
-  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
-});
+  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys
+    });
 
 // Polish Script via Gemini API
 app.post("/api/polish-script", authenticate, async (req: any, res) => {
@@ -755,3 +755,4 @@ async function startServer() {
 }
 
 startServer();
+          
