@@ -453,7 +453,7 @@ app.post("/api/generate-speech", authenticate, async (req: any, res) => {
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         contents: [{ parts: [{ text: currentPrompt }] }],
         config: {
           systemInstruction: systemInstruction,
