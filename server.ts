@@ -166,6 +166,30 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 };
 
+// Auth Middleware (Optional)
+const maybeAuthenticate = async (req: any, res: any, next: any) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    req.user = null;
+    return next();
+  }
+
+  if (admin.apps.length === 0) {
+    req.user = null;
+    return next();
+  }
+
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    req.user = null;
+    next();
+  }
+};
+
 // API Routes
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
@@ -328,12 +352,47 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
     }
   });
 
-// Generate Speech via Gemini API
-app.post("/api/generate-speech", authenticate, async (req: any, res) => {
+// Guest Rate Limiter
+const guestRateLimit = new Map<string, { count: number, lastReset: number }>();
+
+const checkGuestLimit = (ip: string) => {
+  const now = Date.now();
+  const limit = guestRateLimit.get(ip);
+  
+  if (!limit || now - limit.lastReset > 24 * 60 * 60 * 1000) {
+    // Reset limit every 24 hours
+    guestRateLimit.set(ip, { count: 1, lastReset: now });
+    return true;
+  }
+  
+  if (limit.count >= 10) { // 10 generations per day for guests
+    return false;
+  }
+  
+  limit.count++;
+  guestRateLimit.set(ip, limit);
+  return true;
+};
+
+// Generate Speech via Gemini API (Guest)
+app.post("/api/generate-speech-guest", async (req: any, res) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  
+  if (!checkGuestLimit(ip)) {
+    return res.status(429).json({ 
+      error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
+    });
+  }
+
   const { text, voice_name, style, speed, pitch, language, studioClarity, pause } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
+  }
+
+  // Limit text length for guests to prevent abuse
+  if (text.length > 1000) {
+    return res.status(400).json({ error: "Guest scripts are limited to 1000 characters. Please sign up for longer scripts." });
   }
 
   const maxRetries = 15;
@@ -449,14 +508,178 @@ app.post("/api/generate-speech", authenticate, async (req: any, res) => {
       }
       
       const currentPrompt = attempt === 0 
-        ? `${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
+        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: currentPrompt }] }],
         config: {
-          systemInstruction: systemInstruction,
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+            },
+          },
+        },
+      });
+
+      const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (audioData) {
+        return res.json({ audioData });
+      } else {
+        throw new Error("No audio data generated");
+      }
+    } catch (error: any) {
+      console.error(`TTS Attempt ${attempt + 1} failed:`, error.message);
+      if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
+        markKeyAsExhausted(apiKey);
+        attempt++;
+        continue;
+      }
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
+});
+
+// Generate Speech via Gemini API
+app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause } = req.body;
+  
+  if (!text) {
+    return res.status(400).json({ error: "Text is required" });
+  }
+
+  // Rate limit for guests
+  if (!req.user) {
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    if (!checkGuestLimit(ip as string)) {
+      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
+    }
+  }
+
+  const maxRetries = 15;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    const apiKey = getAvailableApiKey();
+    
+    if (!apiKey) {
+      return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const voiceMapping: Record<string, string> = {
+        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon'
+      };
+
+      const targetVoice = voiceMapping[voice_name] || 'Puck';
+      
+      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
+      
+      PERFORMANCE GUIDELINES:
+      - Use natural human prosody, complex intonation, and realistic rhythm.
+      - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
+      - Avoid any robotic, monotone, or repetitive cadence.
+      - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
+      - Sound like a real person speaking in a high-end professional studio, not a computer.
+      - Pay close attention to the emotional weight of the text.
+      
+      TECHNICAL STANDARDS:
+      - NO background noise, hums, or digital artifacts.
+      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
+      - Ensure crystal-clear, 48kHz studio-quality audio.
+      `;
+      
+      let promptPrefix = "";
+      
+      if (studioClarity) {
+        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
+      }
+      
+      const voiceTraits: Record<string, string> = {
+        'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.',
+        'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.',
+        'Daniel': 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.',
+        'Josh': 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.',
+        'Liam': 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.',
+        'Michael': 'Mature, wise, and sophisticated. Slow, deliberate professional narration.',
+        'Ryan': 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.',
+        'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
+        'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
+        'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
+        'Frank': 'Natural, balanced, and clear. Perfect for long-form narration with consistent energy.',
+        'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
+        'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
+        'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
+        'Matilda': 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.',
+        'Emily': 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.',
+        'Bella': 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.',
+        'Rachel': 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.',
+        'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
+        'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
+        'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
+        'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
+        'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
+      };
+
+      promptPrefix += `${voiceTraits[voice_name] || ''} `;
+
+      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro') {
+        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
+        
+        CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
+        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
+        2. EMOTIONAL MODULATION: 
+           - For normal parts: Calm, steady, and informative.
+           - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
+           - For intense/war parts: Sound stronger, brave, and commanding.
+           - For emotional parts: Sound warm, respectful, and inspiring.
+           - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
+        3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
+        4. PACING: Medium pace generally, but slow down for dramatic effect.
+        5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
+      } else if (style === 'emotional') {
+        promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
+      } else if (style === 'storytelling') {
+        promptPrefix += `Use a rhythmic, engaging, and warm tone to bring the narrative to life. `;
+      } else if (style === 'motivational') {
+        promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
+      }
+
+      if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
+      else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
+      else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
+      else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
+
+      promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
+      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
+      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
+      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
+      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
+      else promptPrefix += "Speak at a natural, medium pace. ";
+      
+      if (pause > 0.1) {
+        promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
+      }
+      
+      const currentPrompt = attempt === 0 
+        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
+        : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: currentPrompt }] }],
+        config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
@@ -487,9 +710,17 @@ app.post("/api/generate-speech", authenticate, async (req: any, res) => {
 });
 
 // Polish Script via Gemini API
-app.post("/api/polish-script", authenticate, async (req: any, res) => {
+app.post("/api/polish-script", maybeAuthenticate, async (req: any, res) => {
   const { text, language } = req.body;
   if (!text) return res.status(400).json({ error: "Text is required" });
+
+  // Rate limit for guests
+  if (!req.user) {
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    if (!checkGuestLimit(ip as string)) {
+      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
+    }
+  }
 
   const apiKey = getAvailableApiKey();
   if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
@@ -518,9 +749,17 @@ app.post("/api/polish-script", authenticate, async (req: any, res) => {
 });
 
 // Analyze Captions via Gemini API
-app.post("/api/analyze-captions", authenticate, async (req: any, res) => {
+app.post("/api/analyze-captions", maybeAuthenticate, async (req: any, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "Text is required" });
+
+  // Rate limit for guests
+  if (!req.user) {
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    if (!checkGuestLimit(ip as string)) {
+      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
+    }
+  }
 
   const apiKey = getAvailableApiKey();
   if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
@@ -552,11 +791,19 @@ app.post("/api/analyze-captions", authenticate, async (req: any, res) => {
 });
 
 // Generate Script via Gemini API (Streaming)
-app.post("/api/generate-script", authenticate, async (req: any, res) => {
+app.post("/api/generate-script", maybeAuthenticate, async (req: any, res) => {
   const { messages, isWebResearchEnabled } = req.body;
   
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: "Messages are required" });
+  }
+
+  // Rate limit for guests
+  if (!req.user) {
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    if (!checkGuestLimit(ip as string)) {
+      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
+    }
   }
 
   const apiKey = getAvailableApiKey();
@@ -675,6 +922,38 @@ app.post("/api/generate-image", authenticate, async (req: any, res) => {
   }
 });
 
+// Preview Voice via Gemini API
+app.post("/api/preview-voice", async (req: any, res) => {
+  const { voice_id, voice_name } = req.body;
+  if (!voice_id) return res.status(400).json({ error: "Voice ID is required" });
+
+  const apiKey = getAvailableApiKey();
+  if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voice_id }
+          }
+        }
+      }
+    });
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    res.json({ audioData: base64Audio });
+  } catch (error: any) {
+    console.error("Preview voice error:", error.message);
+    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
+      markKeyAsExhausted(apiKey);
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
 // Save generation to history & Deduct Credits
 app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
   const { text, voice, style, speed, pitch, audioData, creditCost } = req.body;
