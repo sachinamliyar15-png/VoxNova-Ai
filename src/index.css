@@ -33,3 +33,39 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-zinc-200 rounded-full hover:bg-zinc-300;
 }
+
+.markdown-body {
+  @apply text-zinc-800 leading-relaxed space-y-4;
+}
+
+.markdown-body h1 {
+  @apply text-3xl font-bold text-zinc-900 mt-8 mb-4;
+}
+
+.markdown-body h2 {
+  @apply text-2xl font-bold text-zinc-900 mt-6 mb-3;
+}
+
+.markdown-body h3 {
+  @apply text-xl font-bold text-zinc-900 mt-4 mb-2;
+}
+
+.markdown-body p {
+  @apply mb-4;
+}
+
+.markdown-body ul, .markdown-body ol {
+  @apply ml-6 mb-4 list-disc;
+}
+
+.markdown-body li {
+  @apply mb-1;
+}
+
+.markdown-body strong {
+  @apply font-bold text-zinc-900;
+}
+
+.markdown-body blockquote {
+  @apply border-l-4 border-zinc-200 pl-4 italic text-zinc-600 my-4;
+}

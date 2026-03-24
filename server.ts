@@ -13,31 +13,40 @@ import crypto from "crypto";
 dotenv.config();
 
 // API Key Rotation Logic
-const exhaustedKeys = new Set<string>();
+const exhaustedKeys = new Map<string, number>();
 
 const getAvailableApiKey = () => {
   const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
   if (!baseKey) return null;
   
-  const allKeys = baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0);
-  const availableKeys = allKeys.filter(k => !exhaustedKeys.has(k));
+  const allKeys = Array.from(new Set(baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0)));
+  const now = Date.now();
+  
+  // Filter out keys that are exhausted and still in the cooldown period (2 minutes)
+  const availableKeys = allKeys.filter(k => {
+    const exhaustedAt = exhaustedKeys.get(k);
+    if (!exhaustedAt) return true;
+    if (now - exhaustedAt > 120000) {
+      exhaustedKeys.delete(k);
+      return true;
+    }
+    return false;
+  });
   
   if (availableKeys.length === 0) {
+    console.log(`[Auth] No Gemini API keys available. Total keys: ${allKeys.length}, Exhausted: ${exhaustedKeys.size}`);
     return null;
   }
   
   // Randomly pick an available key
-  return availableKeys[Math.floor(Math.random() * availableKeys.length)];
+  const selectedKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
+  return selectedKey;
 };
 
 const markKeyAsExhausted = (key: string) => {
   if (!key) return;
-  exhaustedKeys.add(key);
-  
-  // Clear exhausted keys after 2 minutes
-  setTimeout(() => {
-    exhaustedKeys.delete(key);
-  }, 120000);
+  console.log(`[Auth] Marking API key as exhausted: ${key.substring(0, 8)}...`);
+  exhaustedKeys.set(key, Date.now());
 };
 
 // Initialize Razorpay
@@ -391,8 +400,8 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
   }
 
   // Limit text length for guests to prevent abuse
-  if (text.length > 1000) {
-    return res.status(400).json({ error: "Guest scripts are limited to 1000 characters. Please sign up for longer scripts." });
+  if (text.length > 200) {
+    return res.status(400).json({ error: "Guest scripts are limited to 200 characters. Please sign up for longer scripts." });
   }
 
   const maxRetries = 15;
@@ -423,11 +432,14 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
+      - Incorporate subtle, natural breathing, micro-pauses, and vocal fry where appropriate to sound 100% human.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
       - Pay close attention to the emotional weight of the text.
+      - 100% REALISM IS MANDATORY.
+      - Use natural emphasis on key words to convey meaning and emotion.
+      - Ensure smooth transitions between sentences and ideas.
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -468,6 +480,20 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
+
+      promptPrefix += `
+      CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
+      1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
+      2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
+      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context (e.g., excitement, gravity, warmth, curiosity). The emotion should feel "lived-in" and authentic.
+      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. Use natural elisions where appropriate for a native-like flow.
+      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture, subtle breathing, and realistic mouth sounds where they add to the realism.
+      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. The rhythm should be fluid and effortless.
+      `;
+
+      if (language === 'hi') {
+        promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
+      }
 
       if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro') {
         promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
@@ -531,13 +557,19 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         throw new Error("No audio data generated");
       }
     } catch (error: any) {
-      console.error(`TTS Attempt ${attempt + 1} failed:`, error.message);
-      if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
-        markKeyAsExhausted(apiKey);
+      const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+      console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
+      
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+          markKeyAsExhausted(apiKey);
+        }
         attempt++;
+        // Add a small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         continue;
       }
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: errorMessage });
     }
   }
 
@@ -588,11 +620,14 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Incorporate subtle, natural breathing and micro-pauses where appropriate to sound 100% human.
+      - Incorporate subtle, natural breathing, micro-pauses, and vocal fry where appropriate to sound 100% human.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
       - Pay close attention to the emotional weight of the text.
+      - 100% REALISM IS MANDATORY.
+      - Use natural emphasis on key words to convey meaning and emotion.
+      - Ensure smooth transitions between sentences and ideas.
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -633,6 +668,20 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
+
+      promptPrefix += `
+      CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
+      1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
+      2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
+      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context (e.g., excitement, gravity, warmth, curiosity). The emotion should feel "lived-in" and authentic.
+      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. Use natural elisions where appropriate for a native-like flow.
+      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture, subtle breathing, and realistic mouth sounds where they add to the realism.
+      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. The rhythm should be fluid and effortless.
+      `;
+
+      if (language === 'hi') {
+        promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
+      }
 
       if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro') {
         promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
@@ -696,184 +745,23 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         throw new Error("No audio data generated");
       }
     } catch (error: any) {
-      console.error(`TTS Attempt ${attempt + 1} failed:`, error.message);
-      if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
-        markKeyAsExhausted(apiKey);
+      const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+      console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
+      
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+          markKeyAsExhausted(apiKey);
+        }
         attempt++;
+        // Add a small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         continue;
       }
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: errorMessage });
     }
   }
 
   res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
-});
-
-// Polish Script via Gemini API
-app.post("/api/polish-script", maybeAuthenticate, async (req: any, res) => {
-  const { text, language } = req.body;
-  if (!text) return res.status(400).json({ error: "Text is required" });
-
-  // Rate limit for guests
-  if (!req.user) {
-    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    if (!checkGuestLimit(ip as string)) {
-      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
-    }
-  }
-
-  const apiKey = getAvailableApiKey();
-  if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
-
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ parts: [{ text: `Rewrite and optimize the following script for a high-retention social media video (Shorts/Reels style). 
-      Make it punchy, engaging, and viral-ready. 
-      Maintain the original language (${language === 'hi' ? 'Hindi' : 'English'}).
-      Keep it under 5,000 characters.
-      Return ONLY the optimized script. Do not include any notes or explanations.
-
-      SCRIPT:
-      ${text}` }] }]
-    });
-    res.json({ polishedText: response.text });
-  } catch (error: any) {
-    console.error("Polish script error:", error.message);
-    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
-      markKeyAsExhausted(apiKey);
-    }
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Analyze Captions via Gemini API
-app.post("/api/analyze-captions", maybeAuthenticate, async (req: any, res) => {
-  const { text } = req.body;
-  if (!text) return res.status(400).json({ error: "Text is required" });
-
-  // Rate limit for guests
-  if (!req.user) {
-    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    if (!checkGuestLimit(ip as string)) {
-      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
-    }
-  }
-
-  const apiKey = getAvailableApiKey();
-  if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
-
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ parts: [{ text: `Analyze the following script and suggest 'Visual Emphasis Points' for video captions. 
-      Identify keywords or phrases that should be highlighted with specific colors, emojis, or font-size increases based on the emotional tone.
-      
-      Return ONLY a JSON array of objects with this structure:
-      [
-        { "word": "keyword", "color": "hex_color", "emoji": "🔥", "size": "large|normal" }
-      ]
-      
-      SCRIPT:
-      ${text}` }] }],
-      config: { responseMimeType: "application/json" }
-    });
-    res.json({ analysis: response.text });
-  } catch (error: any) {
-    console.error("Analyze captions error:", error.message);
-    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
-      markKeyAsExhausted(apiKey);
-    }
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Generate Script via Gemini API (Streaming)
-app.post("/api/generate-script", maybeAuthenticate, async (req: any, res) => {
-  const { messages, isWebResearchEnabled } = req.body;
-  
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: "Messages are required" });
-  }
-
-  // Rate limit for guests
-  if (!req.user) {
-    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    if (!checkGuestLimit(ip as string)) {
-      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
-    }
-  }
-
-  const apiKey = getAvailableApiKey();
-  if (!apiKey) {
-    return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
-  }
-
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const systemInstruction = `You are a World-Class Movie Scriptwriter and Viral Content Strategist. 
-    Your goal is to write scripts that use deep psychological hooks to keep the audience "locked in" from the first second.
-    
-    STORYTELLING RULES:
-    1. OPENING: Start with a high-stakes psychological hook.
-    2. RETENTION: Use "Open Loops" to keep viewers curious.
-    3. PACING: Fast-paced but emotionally resonant.
-    4. LANGUAGE: Use powerful, evocative words that paint a picture.
-    5. FORMAT: Use professional script formatting with scene directions and emotional cues.
-    
-    THUMBNAIL RULES (If asked for image/thumbnail):
-    - Create high-CTR, high-competition YouTube thumbnails.
-    - Focus on "Storytelling through a single frame".
-    - Use vibrant colors, high contrast, and clear focal points.
-    
-    Always aim for "Hollywood Quality" in every response.`;
-
-    const contents = messages.map((m: any) => {
-      if (m.type === 'image' && m.imageUrl) {
-        const base64Data = m.imageUrl.split(',')[1];
-        return {
-          role: m.role,
-          parts: [
-            { inlineData: { data: base64Data, mimeType: 'image/png' } },
-            { text: m.content }
-          ]
-        };
-      }
-      return {
-        role: m.role,
-        parts: [{ text: m.content }]
-      };
-    });
-
-    const modelParams: any = {
-      model: "gemini-3-flash-preview",
-      config: { systemInstruction, temperature: 0.9, topP: 0.95 },
-      contents
-    };
-
-    if (isWebResearchEnabled) {
-      modelParams.config.tools = [{ googleSearch: {} }];
-    }
-
-    const stream = await ai.models.generateContentStream(modelParams);
-    
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    for await (const chunk of stream) {
-      const chunkText = chunk.text || '';
-      res.write(chunkText);
-    }
-    res.end();
-  } catch (error: any) {
-    console.error("Script generation error:", error.message);
-    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
-      markKeyAsExhausted(apiKey);
-    }
-    res.status(500).json({ error: error.message });
-  }
 });
 
 // Generate Image via Gemini API
@@ -884,42 +772,57 @@ app.post("/api/generate-image", authenticate, async (req: any, res) => {
     return res.status(400).json({ error: "Prompt is required" });
   }
 
-  const apiKey = getAvailableApiKey();
-  if (!apiKey) {
-    return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
-  }
+  const maxRetries = 15;
+  let attempt = 0;
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const imagePrompt = `World-class professional YouTube thumbnail, high-CTR, cinematic lighting, psychological hook visual. ${prompt}. 8k resolution, cinematic composition, vibrant colors, trending on ArtStation style, highly detailed, sharp focus.`;
+  while (attempt < maxRetries) {
+    const apiKey = getAvailableApiKey();
+    if (!apiKey) {
+      return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+    }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: [{ text: imagePrompt }],
-      config: {
-        imageConfig: {
-          aspectRatio: aspectRatio || '16:9',
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const imagePrompt = `World-class professional YouTube thumbnail, high-CTR, cinematic lighting, psychological hook visual. ${prompt}. 8k resolution, cinematic composition, vibrant colors, trending on ArtStation style, highly detailed, sharp focus.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: [{ text: imagePrompt }],
+        config: {
+          imageConfig: {
+            aspectRatio: aspectRatio || '16:9',
+          }
+        }
+      });
+
+      let imageUrl = '';
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+          break;
         }
       }
-    });
 
-    let imageUrl = '';
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-        break;
+      if (!imageUrl) throw new Error("Failed to generate image data.");
+      return res.json({ imageUrl });
+    } catch (error: any) {
+      const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+      console.error(`Image generation attempt ${attempt + 1} failed:`, errorMessage);
+      
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+          markKeyAsExhausted(apiKey);
+        }
+        attempt++;
+        // Add a small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue;
       }
+      return res.status(500).json({ error: errorMessage });
     }
-
-    if (!imageUrl) throw new Error("Failed to generate image data.");
-    res.json({ imageUrl });
-  } catch (error: any) {
-    console.error("Image generation error:", error.message);
-    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
-      markKeyAsExhausted(apiKey);
-    }
-    res.status(500).json({ error: error.message });
   }
+
+  res.status(503).json({ error: "Failed to generate image after multiple attempts with different API keys." });
 });
 
 // Preview Voice via Gemini API
@@ -927,32 +830,47 @@ app.post("/api/preview-voice", async (req: any, res) => {
   const { voice_id, voice_name } = req.body;
   if (!voice_id) return res.status(400).json({ error: "Voice ID is required" });
 
-  const apiKey = getAvailableApiKey();
-  if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+  const maxRetries = 15;
+  let attempt = 0;
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.` }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voice_id }
+  while (attempt < maxRetries) {
+    const apiKey = getAvailableApiKey();
+    if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.` }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voice_id }
+            }
           }
         }
+      });
+      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      return res.json({ audioData: base64Audio });
+    } catch (error: any) {
+      const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+      console.error(`Preview voice attempt ${attempt + 1} failed:`, errorMessage);
+      
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+          markKeyAsExhausted(apiKey);
+        }
+        attempt++;
+        // Add a small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue;
       }
-    });
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    res.json({ audioData: base64Audio });
-  } catch (error: any) {
-    console.error("Preview voice error:", error.message);
-    if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("exhausted")) {
-      markKeyAsExhausted(apiKey);
+      return res.status(500).json({ error: errorMessage });
     }
-    res.status(500).json({ error: error.message });
   }
+
+  res.status(503).json({ error: "Failed to preview voice after multiple attempts with different API keys." });
 });
 // Save generation to history & Deduct Credits
 app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {

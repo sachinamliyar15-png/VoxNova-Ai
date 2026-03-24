@@ -279,23 +279,12 @@ export default function App() {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [loadingStep, setLoadingStep] = useState(0);
   const loadingMessages = [
-    "Analyzing script and context...",
-    "Selecting professional voice profile...",
-    "Synthesizing high-fidelity audio...",
-    "Applying cinematic emotional layers...",
-    "Finalizing professional narration..."
+    "Analyzing text...",
+    "Synthesizing voice...",
+    "Applying studio clarity...",
+    "Optimizing audio quality...",
+    "Finalizing generation..."
   ];
-
-  useEffect(() => {
-    let interval: any;
-    if (isGenerating) {
-      setLoadingStep(0);
-      interval = setInterval(() => {
-        setLoadingStep(prev => (prev + 1) % loadingMessages.length);
-      }, 2000);
-    }
-    return () => clearInterval(interval);
-  }, [isGenerating]);
   const [history, setHistory] = useState<Generation[]>([]);
   const [currentAudio, setCurrentAudio] = useState<string | null>(null);
 
@@ -313,7 +302,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'script-writer'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'dubbing'>('generate');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   const [showShareToast, setShowShareToast] = useState(false);
@@ -351,7 +340,6 @@ export default function App() {
   const [isFeatureMenuOpen, setIsFeatureMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isProMode, setIsProMode] = useState(false);
-  const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const stopGenerationRef = useRef(false);
 
   const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
@@ -361,17 +349,8 @@ export default function App() {
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
-  const [isPolishing, setIsPolishing] = useState(false);
-  const [isWritingScript, setIsWritingScript] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [viralScript, setViralScript] = useState('');
-  const [currentScriptId, setCurrentScriptId] = useState<string | null>(null);
-  const [isWebResearchEnabled, setIsWebResearchEnabled] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [isAnalyzingCaptions, setIsAnalyzingCaptions] = useState(false);
-  const [aiHighlights, setAiHighlights] = useState<any[]>([]);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [captionFile, setCaptionFile] = useState<File | null>(null);
@@ -386,6 +365,8 @@ export default function App() {
   const [isDubbing, setIsDubbing] = useState(false);
   const [dubbingProgress, setDubbingProgress] = useState(0);
   const [dubbingStep, setDubbingStep] = useState('');
+  const [dubbingLanguage, setDubbingLanguage] = useState('Hindi');
+  const [sourceLanguage, setSourceLanguage] = useState('English');
 
   // Auto-save feature
   useEffect(() => {
@@ -404,312 +385,12 @@ export default function App() {
 
 
 
-  const handleViralMagic = async () => {
-    if (!text || text.trim().length < 10) {
-      setError("Please enter a script of at least 10 characters to optimize.");
-      return;
-    }
-
-    setIsPolishing(true);
-    try {
-      const token = currentUser ? await currentUser.getIdToken() : null;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('/api/polish-script', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ text, language })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to polish script via backend");
-      }
-
-      const { polishedText } = await response.json();
-      if (polishedText) {
-        setText(polishedText.trim().slice(0, 5000));
-      }
-    } catch (err: any) {
-      console.error("Viral Magic error:", err);
-      setError(`Failed to polish script: ${err.message}`);
-    } finally {
-      setIsPolishing(false);
-    }
-  };
-
-  const handleViralScriptWriter = async (followUpInput?: string) => {
-    const input = followUpInput || chatInput;
-    if (!input.trim() && chatMessages.length === 0) {
-      setError("Please enter a raw script or instruction first.");
-      return;
-    }
-
-    setIsWritingScript(true);
-    stopGenerationRef.current = false;
-    setError(null);
-    
-    const newUserMessage = { 
-      id: Date.now(),
-      role: 'user' as const, 
-      content: input || "", 
-      type: fileToUpload ? 'image' as const : 'text' as const,
-      imageUrl: filePreview || ""
-    };
-    const updatedMessages = [...chatMessages, newUserMessage];
-    setChatMessages(updatedMessages);
-    setChatInput('');
-    setFileToUpload(null);
-    setFilePreview(null);
-
-    try {
-      const token = currentUser ? await currentUser.getIdToken() : null;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('/api/generate-script', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ 
-          messages: updatedMessages, 
-          isWebResearchEnabled 
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate script via backend");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("Failed to get reader from response");
-
-      const aiMessageId = Date.now() + 1;
-      setChatMessages(prev => [...prev, { 
-        id: aiMessageId, 
-        role: 'model', 
-        content: '', 
-        type: 'text' 
-      }]);
-
-      let fullResponse = '';
-      const decoder = new TextDecoder();
-      while (true) {
-        if (stopGenerationRef.current) {
-          reader.cancel();
-          break;
-        }
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value, { stream: true });
-        fullResponse += chunk;
-        
-        setChatMessages(prev => prev.map(m => 
-          m.id === aiMessageId ? { ...m, content: fullResponse } : m
-        ));
-      }
-
-      if (stopGenerationRef.current) return;
-
-      setViralScript(fullResponse);
-
-      if (currentUser) {
-        const finalMessages = [...updatedMessages, { id: aiMessageId, role: 'model', content: fullResponse, type: 'text' }];
-        if (currentScriptId) {
-          await updateDoc(doc(db, 'scripts', currentScriptId), {
-            content: fullResponse || "",
-            messages: finalMessages || [],
-            updatedAt: serverTimestamp()
-          });
-        } else {
-          const docRef = await addDoc(collection(db, 'scripts'), {
-            userId: currentUser.uid || "unknown",
-            title: (input || "").substring(0, 30) + ((input || "").length > 30 ? '...' : ''),
-            content: fullResponse || "",
-            messages: finalMessages || [],
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
-          setCurrentScriptId(docRef.id);
-        }
-      }
-
-    } catch (err: any) {
-      console.error("Script Writer error:", err);
-      setError(`Failed to generate script: ${err.message}`);
-    } finally {
-      setIsWritingScript(false);
-    }
-  };
-
-  const handleGenerateImage = async (prompt: string, aspectRatio: "1:1" | "16:9" | "9:16" = "16:9") => {
-    if (!prompt.trim()) return;
-    
-    if (!currentUser) {
-      setError("Please sign in to generate professional thumbnails.");
-      setShowPricing(true);
-      return;
-    }
-
-    setIsGeneratingImage(true);
-    stopGenerationRef.current = false;
-    setError(null);
-    
-    const newUserMessage = { 
-      id: Date.now(),
-      role: 'user' as const, 
-      content: `Generate ${aspectRatio} thumbnail: ${prompt}`, 
-      type: 'text' as const,
-      imageUrl: ""
-    };
-    const updatedMessages = [...chatMessages, newUserMessage];
-    setChatMessages(updatedMessages);
-
-    const maxRetries = 15;
-    let attempt = 0;
-
-    const executeImageGen = async () => {
-      try {
-        if (stopGenerationRef.current) return;
-        
-        const token = await currentUser!.getIdToken();
-        const response = await fetch('/api/generate-image', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ prompt, aspectRatio })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to generate image via backend");
-        }
-
-        const { imageUrl } = await response.json();
-
-        const newModelMessage = { 
-          id: Date.now() + 1,
-          role: 'model' as const, 
-          content: `Generated ${aspectRatio} professional thumbnail for: ${prompt}`, 
-          type: 'image' as const, 
-          imageUrl: imageUrl || ""
-        };
-        
-        const finalMessages = [...updatedMessages, newModelMessage];
-        setChatMessages(finalMessages);
-
-        if (currentUser) {
-          // Deduct credits
-          await fetch('/api/user/deduct-credits', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ amount: 500 })
-          });
-          setUserProfile((prev: any) => ({ ...prev, credits: prev.credits - 500 }));
-
-          // Save to Firestore
-          if (currentScriptId) {
-            await updateDoc(doc(db, 'scripts', currentScriptId), {
-              messages: finalMessages || [],
-              updatedAt: serverTimestamp()
-            });
-          } else {
-            const docRef = await addDoc(collection(db, 'scripts'), {
-              userId: currentUser.uid || "unknown",
-              title: `Image: ${(prompt || "").substring(0, 20)}...`,
-              content: prompt || "",
-              messages: finalMessages || [],
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp()
-            });
-            setCurrentScriptId(docRef.id);
-          }
-        }
-      } catch (error: any) {
-        console.error("Image generation error:", error);
-        setError(error.message || "Failed to generate image. Please try again.");
-      } finally {
-        setIsGeneratingImage(false);
-      }
-    };
-
-    try {
-      await executeImageGen();
-    } catch (error: any) {
-      console.error("Image generation error:", error);
-      setError(`Image Generation Failed: ${error.message}`);
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  };
-
-  const handleOpenScript = (script: any) => {
-    setCurrentScriptId(script.id);
-    setChatMessages(script.messages || [{ id: Date.now(), role: 'model', content: script.content, type: 'text' }]);
-    setViralScript(script.content);
-  };
-
-  const handleAnalyzeCaptions = async () => {
-    if (!text.trim()) {
-      setError("Please enter or generate a script first.");
-      return;
-    }
-
-    setIsAnalyzingCaptions(true);
-    setError(null);
-
-    try {
-      const token = currentUser ? await currentUser.getIdToken() : null;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('/api/analyze-captions', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ text })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to analyze captions via backend");
-      }
-
-      const { analysis } = await response.json();
-      if (analysis) {
-        const parsed = JSON.parse(analysis);
-        setAiHighlights(parsed);
-      }
-    } catch (err: any) {
-      console.error("Caption Analysis error:", err);
-      setError(`Failed to analyze captions: ${err.message}`);
-    } finally {
-      setIsAnalyzingCaptions(false);
-    }
-  };
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
-    if (val.length <= 5000) {
+    const limit = currentUser ? 5000 : 200;
+    if (val.length <= limit) {
       setText(val);
-      if (val.length === 5000) {
+      if (val.length === limit) {
         setShowLimitToast(true);
         setTimeout(() => setShowLimitToast(false), 3000);
       }
@@ -1011,12 +692,20 @@ export default function App() {
     setDubbingStep('Extracting original dialogue...');
     
     try {
-      for (let i = 0; i <= 100; i += 10) {
-        setDubbingProgress(i);
-        if (i === 30) setDubbingStep('Translating to Hindi...');
-        if (i === 60) setDubbingStep('Synthesizing professional voice...');
-        if (i === 90) setDubbingStep('Merging audio with video...');
-        await new Promise(r => setTimeout(r, 600));
+      const steps = [
+        { progress: 10, message: "Analyzing original audio track..." },
+        { progress: 25, message: "Extracting vocal characteristics..." },
+        { progress: 40, message: `Translating content to ${dubbingLanguage === 'hi' ? 'Hindi' : dubbingLanguage === 'en' ? 'English' : dubbingLanguage}...` },
+        { progress: 60, message: "Synthesizing AI voice with original tone..." },
+        { progress: 80, message: "Syncing dubbed audio with video timeline..." },
+        { progress: 95, message: "Finalizing high-quality render..." },
+        { progress: 100, message: "Dubbing Complete!" }
+      ];
+
+      for (const step of steps) {
+        setDubbingProgress(step.progress);
+        setDubbingStep(step.message);
+        await new Promise(r => setTimeout(r, step.progress === 100 ? 1000 : 1200));
       }
       
       setDubbingResult({
@@ -1769,8 +1458,29 @@ export default function App() {
             onClick={() => { setActiveTab('generate'); setIsMobileMenuOpen(false); }}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'generate' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
-            <Sparkles size={20} />
+            <Mic size={20} />
             Text to Speech Voice
+          </button>
+          <button 
+            onClick={() => { setActiveTab('dubbing'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+          >
+            <Languages size={20} />
+            AI Dubbing
+          </button>
+          <button 
+            onClick={() => { setActiveTab('voice-changer'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'voice-changer' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+          >
+            <RefreshCw size={20} />
+            Voice Changer
+          </button>
+          <button 
+            onClick={() => { setActiveTab('captions'); setIsMobileMenuOpen(false); }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'captions' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+          >
+            <Video size={20} />
+            Animated Captions
           </button>
           <button 
             onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
@@ -2079,7 +1789,7 @@ export default function App() {
                   <textarea 
                     value={text}
                     onChange={handleTextChange}
-                    placeholder="Enter your script here... (up to 5,000 characters)"
+                    placeholder={`Enter your script here... (up to ${currentUser ? '5,000' : '200'} characters)`}
                     className="w-full h-80 bg-white border-2 border-zinc-100 rounded-3xl p-8 text-xl leading-relaxed resize-none focus:outline-none focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 transition-all placeholder:text-zinc-300 text-zinc-900 shadow-sm"
                   />
                   
@@ -2103,7 +1813,7 @@ export default function App() {
                             className="stroke-emerald-500"
                             strokeWidth="3"
                             strokeDasharray="100"
-                            animate={{ strokeDashoffset: 100 - (text.length / 5000) * 100 }}
+                            animate={{ strokeDashoffset: 100 - (text.length / (currentUser ? 5000 : 200)) * 100 }}
                             transition={{ type: "spring", bounce: 0, duration: 0.5 }}
                           />
                         </svg>
@@ -2518,34 +2228,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">3. AI Visual Emphasis</label>
-                      <button 
-                        onClick={handleAnalyzeCaptions}
-                        disabled={isAnalyzingCaptions || !text}
-                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 disabled:opacity-50"
-                      >
-                        {isAnalyzingCaptions ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
-                        AI Suggest Highlights
-                      </button>
-                    </div>
-                    
-                    {aiHighlights.length > 0 && (
-                      <div className="flex flex-wrap gap-2 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-                        {aiHighlights.map((h, i) => (
-                          <span 
-                            key={i}
-                            className="px-2 py-1 rounded-lg bg-white border border-zinc-200 text-[10px] font-bold flex items-center gap-1 shadow-sm"
-                            style={{ color: h.color }}
-                          >
-                            {h.word} {h.emoji}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
                   <button 
                     onClick={handleCaptioning}
                     disabled={isCaptioning || !captionFile}
@@ -2773,6 +2455,138 @@ export default function App() {
                   </div>
                 </motion.div>
               )}
+            </motion.div>
+          ) : activeTab === 'dubbing' ? (
+            <motion.div 
+              key="dubbing"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-4xl mx-auto space-y-8"
+            >
+              <div className="space-y-2">
+                <h2 className="text-3xl font-display font-bold text-zinc-900">AI Video Dubbing</h2>
+                <p className="text-zinc-500">Translate and dub your videos into multiple languages while preserving the original speaker's voice characteristics.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload Video</label>
+                    <div 
+                      onClick={() => document.getElementById('video-upload-dubbing')?.click()}
+                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
+                    >
+                      <input 
+                        type="file" id="video-upload-dubbing" hidden accept="video/*" 
+                        onChange={(e) => {
+                          setDubbingFile(e.target.files?.[0] || null);
+                          setDubbingResult(null);
+                          setDubbingMode('dub');
+                        }}
+                      />
+                      {dubbingFile ? (
+                        <>
+                          <div className="p-4 bg-emerald-100 rounded-2xl text-emerald-600">
+                            <Video size={32} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-emerald-600">{dubbingFile.name}</p>
+                            <p className="text-xs text-zinc-500">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-4 bg-zinc-100 rounded-2xl text-zinc-400">
+                            <Upload size={32} />
+                          </div>
+                          <p className="text-sm text-zinc-500">Click to upload video</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Source Language</label>
+                      <select 
+                        value={sourceLanguage}
+                        onChange={(e) => setSourceLanguage(e.target.value)}
+                        className="w-full p-3 bg-white border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition-all"
+                      >
+                        {['English', 'Hindi', 'Spanish', 'French', 'German', 'Japanese'].map((lang) => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">3. Target Language</label>
+                      <select 
+                        value={dubbingLanguage}
+                        onChange={(e) => setDubbingLanguage(e.target.value)}
+                        className="w-full p-3 bg-white border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition-all"
+                      >
+                        {['Hindi', 'English', 'Spanish', 'French', 'German', 'Japanese'].map((lang) => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleDubbing}
+                    disabled={isDubbing || !dubbingFile}
+                    className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isDubbing ? (
+                      <>
+                        <Loader2 className="animate-spin" size={20} />
+                        {dubbingStep} ({dubbingProgress}%)
+                      </>
+                    ) : (
+                      <>
+                        <Languages size={20} />
+                        Start Dubbing
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
+                  <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">Preview & Export</label>
+                  
+                  {dubbingResult ? (
+                    <div className="space-y-6">
+                      <div className="aspect-video bg-zinc-900 rounded-3xl overflow-hidden relative group">
+                        <video src={dubbingResult.videoUrl} controls className="w-full h-full object-contain" />
+                      </div>
+                      <button 
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = dubbingResult.videoUrl;
+                          a.download = `dubbed-video-${Date.now()}.mp4`;
+                          a.click();
+                        }}
+                        className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Download size={18} />
+                        Download Dubbed Video
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
+                      <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center text-zinc-300">
+                        <Languages size={32} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-zinc-400">No Video Dubbed</p>
+                        <p className="text-xs text-zinc-400">Upload a video and select target language to start.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div 
