@@ -52,7 +52,8 @@ import {
   MoreVertical,
   Folder,
   Square,
-  LayoutGrid
+  LayoutGrid,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VOICES, Voice, Generation } from './types';
@@ -280,7 +281,188 @@ interface CaptionStyle {
   backgroundColor?: string;
   outlineColor?: string;
   case: 'original' | 'uppercase' | 'lowercase';
+  wordsPerLine: number;
 }
+
+interface CaptionPreset {
+  id: string;
+  name: string;
+  style: CaptionStyle;
+  animation: string;
+}
+
+const CAPTION_PRESETS: CaptionPreset[] = [
+  {
+    id: 'viral-reel',
+    name: 'Viral Reel',
+    style: {
+      fontSize: 48,
+      color: '#fbbf24', // Amber 400
+      glow: true,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 1
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'minimalist',
+    name: 'Minimalist',
+    style: {
+      fontSize: 32,
+      color: '#ffffff',
+      glow: false,
+      border: 'none',
+      font: 'Inter',
+      position: 'bottom' as const,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      outlineColor: '#000000',
+      case: 'original' as const,
+      wordsPerLine: 3
+    },
+    animation: 'fade'
+  },
+  {
+    id: 'bold-white',
+    name: 'Bold White',
+    style: {
+      fontSize: 40,
+      color: '#ffffff',
+      glow: false,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 2
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'typewriter',
+    name: 'Typewriter',
+    style: {
+      fontSize: 28,
+      color: '#00ff00',
+      glow: true,
+      border: 'none',
+      font: 'JetBrains Mono',
+      position: 'bottom' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'lowercase' as const,
+      wordsPerLine: 1
+    },
+    animation: 'glow'
+  },
+  {
+    id: 'glow-yellow',
+    name: 'Glow Yellow',
+    style: {
+      fontSize: 44,
+      color: '#ffff00',
+      glow: true,
+      border: 'none',
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 1
+    },
+    animation: 'glow'
+  },
+  {
+    id: 'classic-white',
+    name: 'Classic White',
+    style: {
+      fontSize: 30,
+      color: '#ffffff',
+      glow: false,
+      border: 'thin',
+      font: 'Inter',
+      position: 'bottom' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'original' as const,
+      wordsPerLine: 5
+    },
+    animation: 'fade'
+  },
+  {
+    id: 'neon-pink',
+    name: 'Neon Pink',
+    style: {
+      fontSize: 48,
+      color: '#ff00ff',
+      glow: true,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#ffffff',
+      case: 'uppercase' as const,
+      wordsPerLine: 1
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'subtitles-pro',
+    name: 'Subtitles Pro',
+    style: {
+      fontSize: 24,
+      color: '#ffffff',
+      glow: false,
+      border: 'none',
+      font: 'Inter',
+      position: 'bottom' as const,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      outlineColor: '#000000',
+      case: 'original' as const,
+      wordsPerLine: 8
+    },
+    animation: 'none'
+  },
+  {
+    id: 'comic-style',
+    name: 'Comic Style',
+    style: {
+      fontSize: 42,
+      color: '#000000',
+      glow: false,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: '#ffffff',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 2
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'cyberpunk',
+    name: 'Cyberpunk',
+    style: {
+      fontSize: 36,
+      color: '#00ffff',
+      glow: true,
+      border: 'thin',
+      font: 'JetBrains Mono',
+      position: 'top' as const,
+      backgroundColor: 'rgba(0,0,0,0.3)',
+      outlineColor: '#ff00ff',
+      case: 'uppercase' as const,
+      wordsPerLine: 1
+    },
+    animation: 'glow'
+  }
+];
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -289,6 +471,21 @@ const fileToBase64 = (file: File): Promise<string> => {
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = error => reject(error);
   });
+};
+
+const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number): CaptionWord[] => {
+  if (wordsPerLine <= 1) return words;
+  
+  const grouped: CaptionWord[] = [];
+  for (let i = 0; i < words.length; i += wordsPerLine) {
+    const chunk = words.slice(i, i + wordsPerLine);
+    grouped.push({
+      word: chunk.map(w => w.word).join(' '),
+      start: chunk[0].start,
+      end: chunk[chunk.length - 1].end
+    });
+  }
+  return grouped;
 };
 
 const CaptionOverlay = ({ 
@@ -302,7 +499,8 @@ const CaptionOverlay = ({
   style: CaptionStyle, 
   animation: string 
 }) => {
-  const currentWord = words.find(w => currentTime >= w.start && currentTime <= w.end);
+  const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine), [words, style.wordsPerLine]);
+  const currentWord = displayWords.find(w => currentTime >= w.start && currentTime <= w.end);
   
   if (!currentWord) return null;
 
@@ -505,7 +703,8 @@ export default function App() {
     position: 'bottom',
     backgroundColor: 'transparent',
     outlineColor: '#000000',
-    case: 'uppercase'
+    case: 'uppercase',
+    wordsPerLine: 1
   });
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -823,6 +1022,114 @@ export default function App() {
     }
   };
 
+  const ffmpegRef = useRef<any>(null);
+  const [isFFmpegLoaded, setIsFFmpegLoaded] = useState(false);
+
+  const loadFFmpeg = async () => {
+    if (ffmpegRef.current) return;
+    const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+    const { toBlobURL } = await import('@ffmpeg/util');
+    const ffmpeg = new FFmpeg();
+    
+    // Load ffmpeg.wasm from CDN for better performance and reliability
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    });
+    
+    ffmpegRef.current = ffmpeg;
+    setIsFFmpegLoaded(true);
+  };
+
+  useEffect(() => {
+    loadFFmpeg();
+  }, []);
+
+  const generateASS = (words: CaptionWord[], style: CaptionStyle) => {
+    const displayWords = groupWordsIntoLines(words, style.wordsPerLine);
+    const formatTime = (seconds: number) => {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 100);
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+    };
+
+    const alignment = style.position === 'top' ? 8 : style.position === 'middle' ? 5 : 2;
+    const fontName = style.font === 'JetBrains Mono' ? 'Courier New' : 'Arial'; // Fallback for ffmpeg
+    const color = style.color.replace('#', '');
+    // ASS color format is AABBGGRR (hex)
+    const assColor = `&H00${color.substring(4, 6)}${color.substring(2, 4)}${color.substring(0, 2)}`;
+    const outlineColor = style.outlineColor?.replace('#', '') || '000000';
+    const assOutlineColor = `&H00${outlineColor.substring(4, 6)}${outlineColor.substring(2, 4)}${outlineColor.substring(0, 2)}`;
+    
+    let ass = `[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,${fontName},${style.fontSize},${assColor},&H000000FF,${assOutlineColor},&H00000000,1,0,0,0,100,100,0,0,1,${style.border === 'thick' ? 2 : 1},0,${alignment},10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+    displayWords.forEach(w => {
+      const text = style.case === 'uppercase' ? w.word.toUpperCase() : style.case === 'lowercase' ? w.word.toLowerCase() : w.word;
+      ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${text}\n`;
+    });
+
+    return ass;
+  };
+
+  const burnCaptions = async (videoFile: File, words: CaptionWord[], style: CaptionStyle) => {
+    if (!ffmpegRef.current) await loadFFmpeg();
+    const ffmpeg = ffmpegRef.current;
+    
+    const { fetchFile } = await import('@ffmpeg/util');
+    const inputName = 'input.mp4';
+    const outputName = 'output.mp4';
+    const assName = 'subtitles.ass';
+    
+    await ffmpeg.writeFile(inputName, await fetchFile(videoFile));
+    setCaptionProgress(30);
+    await ffmpeg.writeFile(assName, generateASS(words, style));
+    setCaptionProgress(50);
+    
+    // Run ffmpeg command to burn subtitles
+    await ffmpeg.exec(['-i', inputName, '-vf', `ass=${assName}`, '-c:a', 'copy', outputName]);
+    setCaptionProgress(90);
+    
+    const data = await ffmpeg.readFile(outputName);
+    return new Blob([data], { type: 'video/mp4' });
+  };
+
+  const mergeDubbing = async (videoFile: File, audioData: string) => {
+    if (!ffmpegRef.current) await loadFFmpeg();
+    const ffmpeg = ffmpegRef.current;
+    
+    const { fetchFile } = await import('@ffmpeg/util');
+    const inputVideo = 'video.mp4';
+    const inputAudio = 'audio.wav';
+    const outputName = 'dubbed.mp4';
+    
+    setDubbingProgress(30);
+    await ffmpeg.writeFile(inputVideo, await fetchFile(videoFile));
+    setDubbingProgress(50);
+    await ffmpeg.writeFile(inputAudio, await fetchFile(audioData));
+    setDubbingProgress(70);
+    
+    // Merge audio and video, replacing original audio
+    await ffmpeg.exec(['-i', inputVideo, '-i', inputAudio, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-shortest', outputName]);
+    setDubbingProgress(90);
+    
+    const data = await ffmpeg.readFile(outputName);
+    return new Blob([data], { type: 'video/mp4' });
+  };
+
   const handleCaptioning = async () => {
     if (!captionFile) return;
     setIsCaptioning(true);
@@ -875,13 +1182,36 @@ export default function App() {
 
       setCaptionResult({
         videoUrl: URL.createObjectURL(captionFile),
-        srt
+        srt,
+        words: data.words
       });
       
       setCaptionProgress(100);
       setCaptionStep('Captions ready!');
     } catch (err: any) {
       setError(`Captioning failed: ${err.message}`);
+    } finally {
+      setIsCaptioning(false);
+    }
+  };
+
+  const handleExportCaptions = async () => {
+    if (!captionFile || captionWords.length === 0) return;
+    setIsCaptioning(true);
+    setCaptionProgress(0);
+    setDubbingStep('Burning captions into video...'); // Reuse dubbingStep or add new state
+    
+    try {
+      const videoBlob = await burnCaptions(captionFile, captionWords, captionStyle);
+      const url = URL.createObjectURL(videoBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `captioned-${captionFile.name}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Video exported successfully!");
+    } catch (err: any) {
+      setError(`Export failed: ${err.message}`);
     } finally {
       setIsCaptioning(false);
     }
@@ -939,6 +1269,28 @@ export default function App() {
       setDubbingStep('Dubbing Complete!');
     } catch (err: any) {
       setError(`Dubbing failed: ${err.message}`);
+    } finally {
+      setIsDubbing(false);
+    }
+  };
+
+  const handleExportDubbing = async () => {
+    if (!dubbingFile || !dubbingResult?.audioUrl) return;
+    setIsDubbing(true);
+    setDubbingProgress(0);
+    setDubbingStep('Merging audio and video...');
+    
+    try {
+      const videoBlob = await mergeDubbing(dubbingFile, dubbingResult.audioUrl);
+      const url = URL.createObjectURL(videoBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dubbed-${dubbingFile.name}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Video exported successfully!");
+    } catch (err: any) {
+      setError(`Export failed: ${err.message}`);
     } finally {
       setIsDubbing(false);
     }
@@ -1669,7 +2021,7 @@ export default function App() {
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'captions' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
           >
             <Video size={20} />
-            Animated Captions
+            Auto Caption
           </button>
           <button 
             onClick={() => { setActiveTab('history'); setIsMobileMenuOpen(false); }}
@@ -2339,7 +2691,7 @@ export default function App() {
             >
               <div className="flex justify-between items-end">
                 <div className="space-y-2">
-                  <h2 className="text-3xl font-display font-bold text-zinc-900">Animated Captions</h2>
+                  <h2 className="text-3xl font-display font-bold text-zinc-900">Auto Caption</h2>
                   <p className="text-zinc-500">Generate stylish, time-synced captions for your videos automatically.</p>
                 </div>
                 {captionResult && (
@@ -2350,6 +2702,29 @@ export default function App() {
                     >
                       <Edit2 size={16} />
                       {isEditingCaptions ? 'Finish Editing' : 'Edit Captions'}
+                    </button>
+                    <button 
+                      onClick={handleExportCaptions}
+                      disabled={isCaptioning}
+                      className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
+                    >
+                      <Download size={16} />
+                      Export Video
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const blob = new Blob([captionResult.srt], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'captions.srt';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-bold hover:bg-zinc-200 transition-all"
+                    >
+                      <FileText size={16} />
+                      SRT
                     </button>
                   </div>
                 )}
@@ -2453,6 +2828,40 @@ export default function App() {
                   <div className="glass-panel p-6 rounded-[2.5rem] border-zinc-100 space-y-8">
                     <div className="space-y-4">
                       <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        <Sparkles size={14} className="text-emerald-500" /> Style Presets
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {CAPTION_PRESETS.map(preset => (
+                          <button
+                            key={preset.id}
+                            onClick={() => {
+                              setCaptionStyle(preset.style);
+                              setCaptionAnimation(preset.animation);
+                            }}
+                            className="flex flex-col items-center gap-2 p-3 rounded-2xl text-xs font-bold transition-all border bg-white border-zinc-100 text-zinc-600 hover:border-emerald-200 hover:bg-emerald-50/30 group"
+                          >
+                            <div className="w-full aspect-video bg-zinc-900 rounded-lg flex items-center justify-center overflow-hidden relative">
+                               <div 
+                                 className="font-bold text-[10px] text-center px-1"
+                                 style={{
+                                   color: preset.style.color,
+                                   fontFamily: preset.style.font,
+                                   textTransform: preset.style.case === 'uppercase' ? 'uppercase' : preset.style.case === 'lowercase' ? 'lowercase' : 'none',
+                                   textShadow: preset.style.glow ? `0 0 5px ${preset.style.color}` : 'none',
+                                   WebkitTextStroke: preset.style.border !== 'none' ? `0.5px ${preset.style.outlineColor}` : 'none',
+                                 }}
+                               >
+                                 {preset.name}
+                               </div>
+                            </div>
+                            <span className="group-hover:text-emerald-600">{preset.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                         <LayoutGrid size={14} /> Animation Style
                       </label>
                       <div className="grid grid-cols-2 gap-2">
@@ -2488,6 +2897,19 @@ export default function App() {
                             type="range" min="16" max="120" 
                             value={captionStyle.fontSize} 
                             onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
+                            className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[10px] text-zinc-500">
+                            <span>Words Per Line</span>
+                            <span>{captionStyle.wordsPerLine}</span>
+                          </div>
+                          <input 
+                            type="range" min="1" max="10" 
+                            value={captionStyle.wordsPerLine} 
+                            onChange={(e) => setCaptionStyle({...captionStyle, wordsPerLine: parseInt(e.target.value)})}
                             className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
                           />
                         </div>
@@ -2888,7 +3310,7 @@ export default function App() {
                         </div>
                         <audio ref={dubbingAudioRef} src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
                         
-                        <div className="pt-2">
+                        <div className="pt-2 space-y-4">
                           <button 
                             onClick={() => {
                               const v = dubbingVideoRef.current;
@@ -2921,9 +3343,15 @@ export default function App() {
                             {isSyncPlaying ? <Pause size={20} /> : <Play size={20} />}
                             {isSyncPlaying ? 'Stop Preview' : 'Play Dubbed Video'}
                           </button>
-                          <p className="text-[10px] text-center mt-3 text-emerald-600/60 font-bold uppercase tracking-widest">
-                            {isSyncPlaying ? 'Playing Dubbed Audio over Video' : 'Click to sync video with dubbed audio'}
-                          </p>
+
+                          <button 
+                            onClick={handleExportDubbing}
+                            disabled={isDubbing}
+                            className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
+                          >
+                            {isDubbing ? <Loader2 size={18} className="animate-spin" /> : <Video size={18} />}
+                            Export Dubbed Video
+                          </button>
                         </div>
 
                         {dubbingResult.text && (
@@ -2935,10 +3363,6 @@ export default function App() {
                           </div>
                         )}
                       </div>
-
-                      <p className="text-[10px] text-zinc-400 text-center italic">
-                        Note: For the best experience, play the dubbed audio alongside the video. Full video merging is available in the Pro version.
-                      </p>
                     </div>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
