@@ -264,6 +264,139 @@ const createWavHeader = (pcmData: ArrayBuffer, sampleRate: number = 44100) => {
   return buffer;
 };
 
+interface CaptionWord {
+  word: string;
+  start: number;
+  end: number;
+}
+
+interface CaptionStyle {
+  fontSize: number;
+  color: string;
+  glow: boolean;
+  border: string;
+  font: string;
+  position: 'top' | 'middle' | 'bottom';
+  backgroundColor?: string;
+  outlineColor?: string;
+  case: 'original' | 'uppercase' | 'lowercase';
+}
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
+const CaptionOverlay = ({ 
+  words, 
+  currentTime, 
+  style, 
+  animation 
+}: { 
+  words: CaptionWord[], 
+  currentTime: number, 
+  style: CaptionStyle, 
+  animation: string 
+}) => {
+  const currentWord = words.find(w => currentTime >= w.start && currentTime <= w.end);
+  
+  if (!currentWord) return null;
+
+  const getAnimationProps = () => {
+    switch (animation) {
+      case 'pop':
+        return {
+          initial: { scale: 0.5, opacity: 0 },
+          animate: { scale: 1, opacity: 1 },
+          transition: { type: 'spring' as const, stiffness: 300, damping: 20 }
+        };
+      case 'fade':
+        return {
+          initial: { opacity: 0, y: 10 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.2 }
+        };
+      case 'glow':
+        return {
+          initial: { opacity: 0, filter: 'blur(10px)' },
+          animate: { opacity: 1, filter: 'blur(0px)' },
+          transition: { duration: 0.3 }
+        };
+      default:
+        return {
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          transition: { duration: 0.1 }
+        };
+    }
+  };
+
+  const textStyle: React.CSSProperties = {
+    fontSize: `${style.fontSize}px`,
+    color: style.color,
+    fontFamily: style.font,
+    textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
+    textShadow: style.glow ? `0 0 10px ${style.color}, 0 0 20px ${style.color}` : 'none',
+    WebkitTextStroke: style.border !== 'none' ? `1px ${style.outlineColor}` : 'none',
+    backgroundColor: style.backgroundColor,
+    padding: style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
+    borderRadius: '8px',
+  };
+
+  const positionClass = style.position === 'top' ? 'top-10' : style.position === 'middle' ? 'top-1/2 -translate-y-1/2' : 'bottom-10';
+
+  return (
+    <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentWord.word + currentWord.start}
+          {...getAnimationProps()}
+          style={textStyle}
+          className="font-bold text-center px-4"
+        >
+          {currentWord.word}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const CaptionEditor = ({ 
+  words, 
+  onUpdate 
+}: { 
+  words: CaptionWord[], 
+  onUpdate: (words: CaptionWord[]) => void 
+}) => {
+  return (
+    <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+      {words.map((word, idx) => (
+        <div key={idx} className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100">
+          <input 
+            type="text" 
+            value={word.word} 
+            onChange={(e) => {
+              const newWords = [...words];
+              newWords[idx].word = e.target.value;
+              onUpdate(newWords);
+            }}
+            className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
+          />
+          <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+            <span>{word.start.toFixed(2)}s</span>
+            <span>-</span>
+            <span>{word.end.toFixed(2)}s</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function App() {
   const [text, setText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<Voice>(VOICES[0]);
@@ -351,10 +484,27 @@ export default function App() {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [showPricing, setShowPricing] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [playingId, setPlayingId] = useState<string | number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [captionFile, setCaptionFile] = useState<File | null>(null);
   const [captionResult, setCaptionResult] = useState<any>(null);
+  const [captionWords, setCaptionWords] = useState<CaptionWord[]>([]);
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>({
+    fontSize: 32,
+    color: '#ffffff',
+    glow: true,
+    border: 'none',
+    font: 'Inter',
+    position: 'bottom',
+    backgroundColor: 'transparent',
+    outlineColor: '#000000',
+    case: 'uppercase'
+  });
+  const [isEditingCaptions, setIsEditingCaptions] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const dubbingVideoRef = useRef<HTMLVideoElement>(null);
+  const dubbingAudioRef = useRef<HTMLAudioElement>(null);
   const [captionAnimation, setCaptionAnimation] = useState('none');
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionStep, setCaptionStep] = useState('');
@@ -367,6 +517,9 @@ export default function App() {
   const [dubbingStep, setDubbingStep] = useState('');
   const [dubbingLanguage, setDubbingLanguage] = useState('Hindi');
   const [sourceLanguage, setSourceLanguage] = useState('English');
+  const [showConfigError, setShowConfigError] = useState(false);
+  const [dubbingCurrentTime, setDubbingCurrentTime] = useState(0);
+  const [isSyncPlaying, setIsSyncPlaying] = useState(false);
 
   // Auto-save feature
   useEffect(() => {
@@ -662,22 +815,59 @@ export default function App() {
     if (!captionFile) return;
     setIsCaptioning(true);
     setCaptionProgress(0);
-    setCaptionStep('Analyzing audio tracks...');
+    setCaptionStep('Preparing video data...');
     
     try {
-      // Mocking the process for now as it requires complex video processing
-      for (let i = 0; i <= 100; i += 10) {
-        setCaptionProgress(i);
-        if (i === 30) setCaptionStep('Generating time-synced SRT...');
-        if (i === 60) setCaptionStep('Applying visual styles...');
-        if (i === 90) setCaptionStep('Finalizing export...');
-        await new Promise(r => setTimeout(r, 500));
+      const videoData = await fileToBase64(captionFile);
+      setCaptionProgress(20);
+      setCaptionStep('Uploading to AI engine...');
+
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch('/api/generate-captions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          videoData,
+          language: language === 'hi' ? 'Hindi' : 'English'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.code === 'AUTH_CONFIG_MISSING') {
+          setShowConfigError(true);
+          return;
+        }
+        throw new Error(errorData.error || 'Failed to generate captions');
       }
+
+      setCaptionProgress(70);
+      setCaptionStep('Processing word timestamps...');
+
+      const data = await response.json();
+      setCaptionWords(data.words);
       
+      // Generate a basic SRT for download compatibility
+      let srt = '';
+      data.words.forEach((w: any, i: number) => {
+        const formatTime = (seconds: number) => {
+          const date = new Date(0);
+          date.setSeconds(seconds);
+          return date.toISOString().substr(11, 12).replace('.', ',');
+        };
+        srt += `${i + 1}\n${formatTime(w.start)} --> ${formatTime(w.end)}\n${w.word}\n\n`;
+      });
+
       setCaptionResult({
         videoUrl: URL.createObjectURL(captionFile),
-        srt: `1\n00:00:01,000 --> 00:00:04,000\nWelcome to VoxNova AI Captions.\n\n2\n00:00:04,500 --> 00:00:08,000\nProfessional, viral, and high-energy.`
+        srt
       });
+      
+      setCaptionProgress(100);
+      setCaptionStep('Captions ready!');
     } catch (err: any) {
       setError(`Captioning failed: ${err.message}`);
     } finally {
@@ -689,28 +879,52 @@ export default function App() {
     if (!dubbingFile) return;
     setIsDubbing(true);
     setDubbingProgress(0);
-    setDubbingStep('Extracting original dialogue...');
+    setDubbingStep('Preparing video data...');
     
     try {
-      const steps = [
-        { progress: 10, message: "Analyzing original audio track..." },
-        { progress: 25, message: "Extracting vocal characteristics..." },
-        { progress: 40, message: `Translating content to ${dubbingLanguage === 'hi' ? 'Hindi' : dubbingLanguage === 'en' ? 'English' : dubbingLanguage}...` },
-        { progress: 60, message: "Synthesizing AI voice with original tone..." },
-        { progress: 80, message: "Syncing dubbed audio with video timeline..." },
-        { progress: 95, message: "Finalizing high-quality render..." },
-        { progress: 100, message: "Dubbing Complete!" }
-      ];
+      const videoData = await fileToBase64(dubbingFile);
+      setDubbingProgress(20);
+      setDubbingStep('Uploading to AI engine...');
 
-      for (const step of steps) {
-        setDubbingProgress(step.progress);
-        setDubbingStep(step.message);
-        await new Promise(r => setTimeout(r, step.progress === 100 ? 1000 : 1200));
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch('/api/generate-dubbing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          videoData,
+          sourceLanguage,
+          targetLanguage: dubbingLanguage,
+          voiceName: selectedVoice.name,
+          mode: dubbingMode
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.code === 'AUTH_CONFIG_MISSING') {
+          setShowConfigError(true);
+          return;
+        }
+        throw new Error(errorData.error || 'Failed to generate dubbing');
       }
+
+      setDubbingProgress(70);
+      setDubbingStep('Synthesizing AI voice...');
+
+      const data = await response.json();
       
       setDubbingResult({
-        videoUrl: URL.createObjectURL(dubbingFile)
+        videoUrl: URL.createObjectURL(dubbingFile),
+        audioUrl: `data:audio/wav;base64,${data.audioData}`,
+        text: data.translatedText,
+        segments: data.segments
       });
+      
+      setDubbingProgress(100);
+      setDubbingStep('Dubbing Complete!');
     } catch (err: any) {
       setError(`Dubbing failed: ${err.message}`);
     } finally {
@@ -1021,11 +1235,11 @@ export default function App() {
     }
   };
 
-  const deleteHistoryItem = async (id: number) => {
+  const deleteHistoryItem = async (id: string | number, type?: string) => {
     if (!window.confirm("Are you sure you want to delete this generation?")) return;
     try {
       const token = await currentUser!.getIdToken();
-      const res = await fetch(`/api/history/${id}`, {
+      const res = await fetch(`/api/history/${id}${type ? `?type=${type}` : ''}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1043,7 +1257,7 @@ export default function App() {
     }
   };
 
-  const playFromHistory = (audioData: string, id: number) => {
+  const playFromHistory = (audioData: string, id: string | number) => {
     try {
       if (playingId === id) {
         if (audioRef.current) {
@@ -1310,7 +1524,7 @@ export default function App() {
                           <Download size={18} />
                         </button>
                         <button 
-                          onClick={() => deleteHistoryItem(item.id)}
+                          onClick={() => deleteHistoryItem(item.id, item.type)}
                           className="p-3 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all border border-red-100"
                         >
                           <Trash2 size={18} />
@@ -1385,9 +1599,16 @@ export default function App() {
     }
   };
 
-  const handleDeleteHistory = async (id: number) => {
+  const handleDeleteHistory = async (id: string | number, type?: string) => {
     try {
-      await fetch(`/api/history/${id}`, { method: 'DELETE' });
+      const token = currentUser ? await currentUser.getIdToken() : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      await fetch(`/api/history/${id}${type ? `?type=${type}` : ''}`, { 
+        method: 'DELETE',
+        headers
+      });
       fetchHistory();
     } catch (err) {
       console.error('Delete failed', err);
@@ -2146,162 +2367,254 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto space-y-8"
+              className="max-w-6xl mx-auto space-y-8"
             >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold text-zinc-900">AI Video Captions</h2>
-                <p className="text-zinc-500">Generate stylish, time-synced captions for your videos automatically.</p>
+              <div className="flex justify-between items-end">
+                <div className="space-y-2">
+                  <h2 className="text-3xl font-display font-bold text-zinc-900">Animated Captions</h2>
+                  <p className="text-zinc-500">Generate stylish, time-synced captions for your videos automatically.</p>
+                </div>
+                {captionResult && (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsEditingCaptions(!isEditingCaptions)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${isEditingCaptions ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                    >
+                      <Edit2 size={16} />
+                      {isEditingCaptions ? 'Finish Editing' : 'Edit Captions'}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
-                  <div className="space-y-4">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload Video</label>
-                    <div 
-                      onClick={() => document.getElementById('video-upload-captions')?.click()}
-                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${captionFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
-                    >
-                      <input 
-                        type="file" id="video-upload-captions" hidden accept="video/*" 
-                        onChange={(e) => {
-                          setCaptionFile(e.target.files?.[0] || null);
-                          setCaptionResult(null);
-                        }}
-                      />
-                      {captionFile ? (
-                        <>
-                          <div className="p-4 bg-emerald-100 rounded-2xl text-emerald-600">
-                            <Video size={32} />
-                          </div>
-                          <div className="text-center">
-                            <p className="text-sm font-bold text-emerald-600">{captionFile.name}</p>
-                            <p className="text-xs text-zinc-500">{(captionFile.size / (1024 * 1024)).toFixed(2)} MB</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="p-4 bg-zinc-100 rounded-2xl text-zinc-400">
-                            <Upload size={32} />
-                          </div>
-                          <p className="text-sm text-zinc-500">Click to upload video</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Select Animation Style</label>
-                    <div className="grid grid-cols-2 gap-4">
-                      {[
-                        { id: 'fade', name: 'Fade In', color: 'from-blue-400 to-blue-600', preview: 'Smooth & Professional' },
-                        { id: 'pop', name: 'Pop Up', color: 'from-purple-400 to-purple-600', preview: 'High Energy & Viral' },
-                        { id: 'karaoke', name: 'Karaoke', color: 'from-emerald-400 to-emerald-600', preview: 'Word-by-Word Sync' },
-                        { id: 'glow', name: 'Glow', color: 'from-orange-400 to-orange-600', preview: 'Cinematic Highlights' }
-                      ].map((anim) => (
-                        <button
-                          key={anim.id}
-                          onClick={() => setCaptionAnimation(anim.id as any)}
-                          className={`relative overflow-hidden p-6 rounded-3xl border-2 transition-all text-left ${captionAnimation === anim.id ? 'border-emerald-500 bg-emerald-50/50' : 'border-zinc-100 bg-white hover:border-zinc-200'}`}
-                        >
-                          <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${anim.color} opacity-5 blur-2xl`} />
-                          <div className="relative space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className={`text-sm font-bold ${captionAnimation === anim.id ? 'text-emerald-700' : 'text-zinc-900'}`}>{anim.name}</span>
-                              {captionAnimation === anim.id && <Check size={16} className="text-emerald-500" />}
-                            </div>
-                            <div className="p-3 bg-zinc-900 rounded-xl overflow-hidden relative h-12 flex items-center justify-center">
-                              <motion.span 
-                                animate={captionAnimation === anim.id ? 
-                                  (anim.id === 'pop' ? { scale: [1, 1.2, 1] } : 
-                                   anim.id === 'fade' ? { opacity: [0, 1] } :
-                                   anim.id === 'glow' ? { textShadow: ["0 0 0px #fff", "0 0 10px #fff", "0 0 0px #fff"] } :
-                                   { x: [-20, 20] }) : {}}
-                                transition={{ repeat: Infinity, duration: 1.5 }}
-                                className={`text-[10px] font-bold text-white text-center ${anim.id === 'karaoke' ? 'bg-gradient-to-r from-emerald-400 to-white bg-clip-text text-transparent' : ''}`}
-                              >
-                                {anim.preview}
-                              </motion.span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={handleCaptioning}
-                    disabled={isCaptioning || !captionFile}
-                    className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isCaptioning ? (
-                      <>
-                        <Loader2 className="animate-spin" size={20} />
-                        {captionStep} ({captionProgress}%)
-                      </>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Video Preview Area */}
+                  <div className="glass-panel p-4 rounded-[2.5rem] border-zinc-100 bg-zinc-900 relative overflow-hidden aspect-video flex items-center justify-center">
+                    {captionFile ? (
+                      <div className="relative w-full h-full">
+                        <video 
+                          ref={videoRef}
+                          src={captionResult ? captionResult.videoUrl : URL.createObjectURL(captionFile)} 
+                          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                          controls 
+                          className="w-full h-full object-contain" 
+                        />
+                        {captionWords.length > 0 && (
+                          <CaptionOverlay 
+                            words={captionWords} 
+                            currentTime={currentTime} 
+                            style={captionStyle} 
+                            animation={captionAnimation} 
+                          />
+                        )}
+                      </div>
                     ) : (
-                      <>
-                        <Sparkles size={20} />
-                        Generate Captions
-                      </>
+                      <div 
+                        onClick={() => document.getElementById('video-upload-captions')?.click()}
+                        className="flex flex-col items-center justify-center gap-4 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors"
+                      >
+                        <div className="p-6 bg-zinc-800 rounded-3xl">
+                          <Upload size={48} />
+                        </div>
+                        <p className="font-bold">Click to upload video</p>
+                        <p className="text-xs opacity-50">MP4, MOV or WEBM (Max 50MB)</p>
+                      </div>
                     )}
-                  </button>
-                </div>
+                    <input 
+                      type="file" id="video-upload-captions" hidden accept="video/*" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setCaptionFile(file);
+                        setCaptionResult(null);
+                        setCaptionWords([]);
+                      }}
+                    />
+                  </div>
 
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
-                  <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">Preview & Export</label>
-                  
-                  {captionResult ? (
-                    <div className="space-y-6">
-                      <div className="aspect-video bg-zinc-900 rounded-3xl overflow-hidden relative group">
-                        <video src={captionResult.videoUrl} controls className="w-full h-full object-contain" />
+                  {/* Controls & Editor */}
+                  {captionWords.length > 0 && isEditingCaptions && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="glass-panel p-8 rounded-[2.5rem] border-zinc-100 space-y-6"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold flex items-center gap-2">
+                          <PenTool size={20} className="text-emerald-500" />
+                          Edit Word Timestamps
+                        </h3>
+                        <p className="text-xs text-zinc-400">Changes are saved locally for preview</p>
                       </div>
-                      
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-bold text-zinc-900">SRT Content</h4>
-                          <button 
-                            onClick={() => {
-                              const blob = new Blob([captionResult.srt], { type: 'text/plain' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `captions-${Date.now()}.srt`;
-                              a.click();
-                            }}
-                            className="flex items-center gap-2 text-xs font-bold text-emerald-600 hover:text-emerald-700"
-                          >
-                            <Download size={14} />
-                            Download SRT
-                          </button>
+                      <CaptionEditor words={captionWords} onUpdate={setCaptionWords} />
+                    </motion.div>
+                  )}
+
+                  {!captionResult && !isCaptioning && captionFile && (
+                    <button 
+                      onClick={handleCaptioning}
+                      className="w-full py-5 bg-emerald-500 text-white rounded-3xl font-bold text-xl hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3"
+                    >
+                      <Sparkles size={24} />
+                      Generate AI Captions
+                    </button>
+                  )}
+
+                  {isCaptioning && (
+                    <div className="glass-panel p-8 rounded-[2.5rem] border-zinc-100 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <Loader2 className="animate-spin text-emerald-500" size={24} />
+                          <span className="font-bold text-zinc-900">{captionStep}</span>
                         </div>
-                        <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 h-48 overflow-y-auto">
-                          <pre className="text-[10px] font-mono text-zinc-500 whitespace-pre-wrap">
-                            {captionResult.srt}
-                          </pre>
-                        </div>
+                        <span className="font-mono text-emerald-600 font-bold">{captionProgress}%</span>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
-                      <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center text-zinc-300">
-                        <Video size={32} />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-zinc-400">No Video Processed</p>
-                        <p className="text-xs text-zinc-400">Upload a video and click generate to see captions here.</p>
+                      <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${captionProgress}%` }}
+                          className="h-full bg-emerald-500"
+                        />
                       </div>
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100">
-                <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-zinc-900">
-                  <Sparkles size={16} className="text-emerald-500" /> Pro Tip
-                </h4>
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  For the best results with "Bold Hindi" style, ensure your video has clear audio. Our AI will automatically detect the language and generate time-synced SRT files that you can use in any video editor.
-                </p>
+                <div className="space-y-6">
+                  {/* Style Sidebar */}
+                  <div className="glass-panel p-6 rounded-[2.5rem] border-zinc-100 space-y-8">
+                    <div className="space-y-4">
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        <LayoutGrid size={14} /> Animation Style
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'none', name: 'Static', icon: <Square size={14} /> },
+                          { id: 'pop', name: 'Pop Up', icon: <Zap size={14} /> },
+                          { id: 'fade', name: 'Fade', icon: <Monitor size={14} /> },
+                          { id: 'glow', name: 'Glow', icon: <Sparkles size={14} /> }
+                        ].map(anim => (
+                          <button
+                            key={anim.id}
+                            onClick={() => setCaptionAnimation(anim.id)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${captionAnimation === anim.id ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'}`}
+                          >
+                            {anim.icon}
+                            {anim.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        <Type size={14} /> Typography
+                      </label>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[10px] text-zinc-500">
+                            <span>Font Size</span>
+                            <span>{captionStyle.fontSize}px</span>
+                          </div>
+                          <input 
+                            type="range" min="16" max="120" 
+                            value={captionStyle.fontSize} 
+                            onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
+                            className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <span className="text-[10px] text-zinc-500 uppercase">Text Color</span>
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="color" 
+                                value={captionStyle.color}
+                                onChange={(e) => setCaptionStyle({...captionStyle, color: e.target.value})}
+                                className="w-8 h-8 rounded-lg cursor-pointer border-none bg-transparent"
+                              />
+                              <span className="text-[10px] font-mono uppercase">{captionStyle.color}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <span className="text-[10px] text-zinc-500 uppercase">Glow Effect</span>
+                            <button 
+                              onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
+                              className={`w-full py-2 rounded-xl text-[10px] font-bold border transition-all ${captionStyle.glow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                            >
+                              {captionStyle.glow ? 'Enabled' : 'Disabled'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="text-[10px] text-zinc-500 uppercase">Position</span>
+                          <div className="flex gap-1 p-1 bg-zinc-50 rounded-xl border border-zinc-100">
+                            {(['top', 'middle', 'bottom'] as const).map(pos => (
+                              <button
+                                key={pos}
+                                onClick={() => setCaptionStyle({...captionStyle, position: pos})}
+                                className={`flex-1 py-2 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.position === pos ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                              >
+                                {pos}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="text-[10px] text-zinc-500 uppercase">Case Style</span>
+                          <div className="flex gap-1 p-1 bg-zinc-50 rounded-xl border border-zinc-100">
+                            {(['original', 'uppercase', 'lowercase'] as const).map(c => (
+                              <button
+                                key={c}
+                                onClick={() => setCaptionStyle({...captionStyle, case: c})}
+                                className={`flex-1 py-2 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.case === c ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                              >
+                                {c}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {captionResult && (
+                      <div className="pt-6 border-t border-zinc-100 space-y-4">
+                        <button 
+                          onClick={() => {
+                            const blob = new Blob([captionResult.srt], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `captions-${Date.now()}.srt`;
+                            a.click();
+                          }}
+                          className="w-full py-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Download size={14} />
+                          Download SRT
+                        </button>
+                        <button 
+                          className="w-full py-4 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20"
+                        >
+                          <Video size={18} />
+                          Export Video
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-6 bg-emerald-50 rounded-[2rem] border border-emerald-100">
+                    <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-emerald-900">
+                      <Sparkles size={16} className="text-emerald-500" /> Pro Tip
+                    </h4>
+                    <p className="text-xs text-emerald-700 leading-relaxed">
+                      Use "Uppercase" and "Pop Up" animation for viral reel style captions. Our AI handles Hindi script perfectly!
+                    </p>
+                  </div>
+                </div>
               </div>
             </motion.div>
           ) : activeTab === 'voice-changer' ? (
@@ -2534,6 +2847,25 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">4. Voice Character</label>
+                    <button 
+                      onClick={() => setShowVoiceLibrary(true)}
+                      className="w-full p-4 bg-white border border-zinc-100 rounded-2xl flex items-center justify-between group hover:border-emerald-500/30 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-white font-bold`}>
+                          {selectedVoice.name[0]}
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-zinc-900">{selectedVoice.name}</p>
+                          <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest">{selectedVoice.gender} • {selectedVoice.isPremium ? 'Pro' : 'Standard'}</p>
+                        </div>
+                      </div>
+                      <ChevronDown size={18} className="text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                    </button>
+                  </div>
+
                   <button 
                     onClick={handleDubbing}
                     disabled={isDubbing || !dubbingFile}
@@ -2558,21 +2890,87 @@ export default function App() {
                   
                   {dubbingResult ? (
                     <div className="space-y-6">
-                      <div className="aspect-video bg-zinc-900 rounded-3xl overflow-hidden relative group">
-                        <video src={dubbingResult.videoUrl} controls className="w-full h-full object-contain" />
+                      <div className="space-y-4">
+                        <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest">Original Video</label>
+                        <div className="aspect-video bg-zinc-900 rounded-3xl overflow-hidden relative group">
+                          <video 
+                            ref={dubbingVideoRef} 
+                            src={dubbingResult.videoUrl} 
+                            onTimeUpdate={() => setDubbingCurrentTime(dubbingVideoRef.current?.currentTime || 0)}
+                            className="w-full h-full object-contain" 
+                          />
+                        </div>
                       </div>
-                      <button 
-                        onClick={() => {
-                          const a = document.createElement('a');
-                          a.href = dubbingResult.videoUrl;
-                          a.download = `dubbed-video-${Date.now()}.mp4`;
-                          a.click();
-                        }}
-                        className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
-                      >
-                        <Download size={18} />
-                        Download Dubbed Video
-                      </button>
+
+                      <div className="space-y-4 p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-bold text-emerald-600 uppercase tracking-widest">Dubbed Audio ({dubbingLanguage})</label>
+                          <button 
+                            onClick={() => {
+                              const a = document.createElement('a');
+                              a.href = dubbingResult.audioUrl;
+                              a.download = `dubbed-audio-${dubbingLanguage}-${Date.now()}.wav`;
+                              a.click();
+                            }}
+                            className="text-emerald-600 hover:text-emerald-700 transition-all"
+                            title="Download Dubbed Audio"
+                          >
+                            <Download size={18} />
+                          </button>
+                        </div>
+                        <audio ref={dubbingAudioRef} src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
+                        
+                        <div className="pt-2">
+                          <button 
+                            onClick={() => {
+                              const v = dubbingVideoRef.current;
+                              const a = dubbingAudioRef.current;
+                              if (v && a) {
+                                if (isSyncPlaying) {
+                                  v.pause();
+                                  a.pause();
+                                  setIsSyncPlaying(false);
+                                } else {
+                                  v.currentTime = 0;
+                                  a.currentTime = 0;
+                                  v.muted = true;
+                                  v.play();
+                                  a.play();
+                                  setIsSyncPlaying(true);
+                                  a.onended = () => {
+                                    v.pause();
+                                    setIsSyncPlaying(false);
+                                  };
+                                  v.onended = () => {
+                                    a.pause();
+                                    setIsSyncPlaying(false);
+                                  };
+                                }
+                              }
+                            }}
+                            className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg ${isSyncPlaying ? 'bg-zinc-900 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20'}`}
+                          >
+                            {isSyncPlaying ? <Pause size={20} /> : <Play size={20} />}
+                            {isSyncPlaying ? 'Stop Preview' : 'Play Dubbed Video'}
+                          </button>
+                          <p className="text-[10px] text-center mt-3 text-emerald-600/60 font-bold uppercase tracking-widest">
+                            {isSyncPlaying ? 'Playing Dubbed Audio over Video' : 'Click to sync video with dubbed audio'}
+                          </p>
+                        </div>
+
+                        {dubbingResult.text && (
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Translated Script</label>
+                            <p className="text-sm text-emerald-900 leading-relaxed italic">
+                              "{dubbingResult.text}"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-[10px] text-zinc-400 text-center italic">
+                        Note: For the best experience, play the dubbed audio alongside the video. Full video merging is available in the Pro version.
+                      </p>
                     </div>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
@@ -2612,37 +3010,51 @@ export default function App() {
                     <div key={item.id} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
-                          <span className="px-2 py-0.5 bg-zinc-100 rounded text-[10px] font-bold uppercase tracking-wider text-zinc-600">{item.voice_name}</span>
-                          <span className="px-2 py-0.5 bg-zinc-50 rounded text-[10px] text-zinc-400 uppercase tracking-wider">{item.style}</span>
-                          <span className="text-[10px] text-zinc-500">{new Date(item.created_at).toLocaleDateString()}</span>
+                          {item.type === 'caption' ? (
+                            <span className="px-2 py-0.5 bg-blue-100 rounded text-[10px] font-bold uppercase tracking-wider text-blue-600">Captions</span>
+                          ) : (
+                            <>
+                              <span className="px-2 py-0.5 bg-zinc-100 rounded text-[10px] font-bold uppercase tracking-wider text-zinc-600">{item.voice_name}</span>
+                              <span className="px-2 py-0.5 bg-zinc-50 rounded text-[10px] text-zinc-400 uppercase tracking-wider">{item.style}</span>
+                            </>
+                          )}
+                          <span className="text-[10px] text-zinc-500">
+                            {item.timestamp ? new Date(item.timestamp._seconds * 1000).toLocaleDateString() : new Date(item.created_at || '').toLocaleDateString()}
+                          </span>
                         </div>
-                        <p className="text-sm text-zinc-600 line-clamp-2 italic">"{item.text}"</p>
+                        <p className="text-sm text-zinc-600 line-clamp-2 italic">
+                          {item.type === 'caption' ? `${item.words?.length} words transcribed` : `"${item.text}"`}
+                        </p>
                       </div>
                       
                       <div className="flex items-center gap-2 shrink-0">
+                        {item.type !== 'caption' && item.audio_data && (
+                          <>
+                            <button 
+                              onClick={() => playFromHistory(item.audio_data!, item.id)}
+                              className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600'}`}
+                            >
+                              {playingId === item.id ? (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-1 h-3 bg-white animate-pulse" />
+                                  <div className="w-1 h-4 bg-white animate-pulse delay-75" />
+                                  <div className="w-1 h-2 bg-white animate-pulse delay-150" />
+                                  <Pause size={18} />
+                                </div>
+                              ) : (
+                                <Play size={20} />
+                              )}
+                            </button>
+                            <button 
+                              onClick={() => downloadAudio(item.audio_data!, `voice-${item.id}`)}
+                              className="p-3 hover:bg-zinc-100 rounded-xl transition-all text-zinc-400 hover:text-zinc-600"
+                            >
+                              <Download size={20} />
+                            </button>
+                          </>
+                        )}
                         <button 
-                          onClick={() => playFromHistory(item.audio_data, item.id)}
-                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600'}`}
-                        >
-                          {playingId === item.id ? (
-                            <div className="flex items-center gap-1">
-                              <div className="w-1 h-3 bg-white animate-pulse" />
-                              <div className="w-1 h-4 bg-white animate-pulse delay-75" />
-                              <div className="w-1 h-2 bg-white animate-pulse delay-150" />
-                              <Pause size={18} />
-                            </div>
-                          ) : (
-                            <Play size={20} />
-                          )}
-                        </button>
-                        <button 
-                          onClick={() => downloadAudio(item.audio_data, `voice-${item.id}`)}
-                          className="p-3 hover:bg-zinc-100 rounded-xl transition-all text-zinc-400 hover:text-zinc-600"
-                        >
-                          <Download size={20} />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteHistory(item.id)}
+                          onClick={() => handleDeleteHistory(item.id, item.type)}
                           className="p-3 hover:bg-red-50 rounded-xl transition-all text-zinc-400 hover:text-red-500"
                         >
                           <Trash2 size={20} />
@@ -3101,6 +3513,59 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Configuration Error Modal */}
+      <AnimatePresence>
+        {showConfigError && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowConfigError(false)}
+              className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-zinc-100"
+            >
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <AlertCircle size={32} className="text-amber-500" />
+                </div>
+                <h3 className="text-2xl font-display font-bold text-zinc-900 mb-3">Configuration Required</h3>
+                <p className="text-zinc-500 mb-8 leading-relaxed">
+                  The authentication service is currently being configured. Please ensure your Firebase environment variables are set in the deployment dashboard to enable this feature.
+                </p>
+                
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => setShowConfigError(false)}
+                    className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Settings2 size={18} />
+                    Open Dashboard
+                  </button>
+                  <button 
+                    onClick={() => setShowConfigError(false)}
+                    className="w-full py-4 bg-zinc-100 text-zinc-900 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                
+                <div className="mt-8 pt-8 border-t border-zinc-100 flex items-center justify-center gap-4 text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                  <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-zinc-900 transition-colors">
+                    Firebase Console <ExternalLink size={12} />
+                  </a>
+                </div>
               </div>
             </motion.div>
           </div>

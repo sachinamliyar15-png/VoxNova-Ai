@@ -3,35 +3,42 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getAnalytics, logEvent } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
+// Import the Firebase configuration from the applet config file
+// We use a dynamic import to handle cases where the file might be missing
+let firebaseConfig: any = {
+  apiKey: "placeholder",
+  authDomain: "placeholder",
+  projectId: "placeholder",
+  appId: "placeholder",
+  firestoreDatabaseId: "(default)"
 };
 
-// Only initialize if we have at least an API Key
-let app;
-let auth: any;
-let googleProvider: any;
-let analytics: any;
-let db: any;
+// This is a bit tricky in Vite, but we can try to use import.meta.glob or similar
+// For now, we'll just use a try-catch with a dynamic import if possible
+// Or better yet, just use environment variables if they exist
+if (import.meta.env.VITE_FIREBASE_API_KEY) {
+  firebaseConfig = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || "(default)"
+  };
+}
 
-if (firebaseConfig.apiKey) {
+// Initialize Firebase SDK
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)");
+const googleProvider = new GoogleAuthProvider();
+
+// Analytics is only supported in browser environments
+let analytics: any;
+if (typeof window !== 'undefined') {
   try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    googleProvider = new GoogleAuthProvider();
-    // Analytics is only supported in browser environments
-    if (typeof window !== 'undefined') {
-      analytics = getAnalytics(app);
-    }
+    analytics = getAnalytics(app);
   } catch (error) {
-    console.error("Firebase initialization failed:", error);
+    console.warn("Analytics initialization failed:", error);
   }
 }
 

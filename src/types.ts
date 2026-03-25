@@ -33,15 +33,23 @@ export const VOICES: Voice[] = [
   { id: 'atlas-do', name: 'Atlas (Do)', gender: 'male', color: 'from-blue-900 to-slate-900', description: 'Ultra-high quality cinematic documentary voice. Deeply resonant and intelligent.' },
   { id: 'priyanka', name: 'Priyanka', gender: 'female', color: 'from-fuchsia-600 to-purple-800', description: 'Powerful, deep, and authoritative female voice - perfect for professional documentaries and high-end narration.' },
   { id: 'virat-male', name: 'Virat', gender: 'male', color: 'from-orange-500 to-red-600', description: 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.' },
+  { id: 'leo', name: 'Leo', gender: 'male', color: 'from-amber-600 to-yellow-700', description: 'Warm, friendly, and highly expressive. Great for children\'s stories and character-driven content.' },
+  { id: 'sophia', name: 'Sophia', gender: 'female', color: 'from-rose-400 to-pink-600', description: 'Soft, intimate, and deeply emotional. Ideal for romantic narratives and heartfelt messages.' },
+  { id: 'hugo', name: 'Hugo', gender: 'male', color: 'from-indigo-700 to-blue-900', description: 'Gravelly, intense, and full of character. Perfect for villains or gritty protagonists.' },
+  { id: 'elara', name: 'Elara', gender: 'female', color: 'from-emerald-400 to-teal-500', description: 'Bright, energetic, and enthusiastic. Excellent for tutorials and high-energy marketing.' },
 ];
 
 export interface Generation {
-  id: number;
-  text: string;
-  voice_name: string;
-  style: string;
-  speed: number;
-  pitch: number;
-  audio_data: string;
-  created_at: string;
+  id: string | number;
+  type?: 'voice' | 'caption';
+  text?: string;
+  voice_name?: string;
+  style?: string;
+  speed?: number;
+  pitch?: number;
+  audio_data?: string;
+  words?: any[];
+  language?: string;
+  timestamp?: any;
+  created_at?: string;
 }

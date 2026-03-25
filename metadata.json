@@ -1,6 +1,6 @@
 {
   "name": "VoxNova Text to Speech",
-  "description": "Professional AI voice generator with AI Dubbing, AI Video Captions, and Voice Changer. Optimized for long-form narration, documentaries, and storytelling.",
+  "description": "Professional AI Voice Generator for high-quality, studio-grade narrations in Hindi and English. Create viral content with advanced speech synthesis.",
   "requestFramePermissions": [
     "microphone"
   ]

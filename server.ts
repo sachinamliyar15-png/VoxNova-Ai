@@ -103,7 +103,24 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
 // Initialize Firestore only if admin was initialized
 try {
   if (admin.apps.length > 0) {
+    // Try to load firestoreDatabaseId from config if available
+    let databaseId: string | undefined;
+    try {
+      const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        databaseId = config.firestoreDatabaseId;
+      }
+    } catch (e) {
+      console.warn("Could not load firestoreDatabaseId from config:", e);
+    }
+    
     firestore = admin.firestore();
+    if (databaseId) {
+      console.log(`Firestore initialized. Note: Using default database for admin SDK (databaseId ${databaseId} was provided but admin.firestore() currently uses default).`);
+    } else {
+      console.log("Firestore initialized with default database.");
+    }
   } else {
     console.warn("Firebase Admin not initialized. Firestore features will be disabled.");
   }
@@ -160,8 +177,10 @@ const authenticate = async (req: any, res: any, next: any) => {
 
   if (admin.apps.length === 0) {
     console.error("Firebase Admin not initialized. Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY in environment variables.");
-    return res.status(500).json({ 
-      error: 'Authentication service unavailable. Please ensure server-side Firebase environment variables are configured correctly in your deployment dashboard (e.g., Render/Vercel).' 
+    return res.status(503).json({ 
+      error: 'Service Configuration Required',
+      message: 'The authentication service is currently being configured. Please ensure your Firebase environment variables are set in the dashboard.',
+      code: 'AUTH_CONFIG_MISSING'
     });
   }
 
@@ -296,6 +315,7 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
   // Razorpay: Create Order
   app.post("/api/payments/create-order", authenticate, async (req: any, res) => {
     const { plan } = req.body;
+    console.log(`[Payment] Creating order for plan: ${plan}, user: ${req.user.uid}`);
     
     const planPrices: Record<string, number> = {
       'basic': 100,
@@ -305,7 +325,10 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
     };
 
     const amount = planPrices[plan];
-    if (!amount) return res.status(400).json({ error: "Invalid plan" });
+    if (!amount) {
+      console.error(`[Payment] Invalid plan: ${plan}`);
+      return res.status(400).json({ error: "Invalid plan" });
+    }
 
     try {
       const options = {
@@ -315,9 +338,10 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
       };
 
       const order = await razorpay.orders.create(options);
+      console.log(`[Payment] Order created successfully: ${order.id}`);
       res.json(order);
     } catch (error: any) {
-      console.error("Razorpay order error:", error);
+      console.error("[Payment] Razorpay order error:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -326,6 +350,7 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
   app.post("/api/payments/verify", authenticate, async (req: any, res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
     const userId = req.user.uid;
+    console.log(`[Payment] Verifying payment for user: ${userId}, order: ${razorpay_order_id}`);
 
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto
@@ -334,6 +359,7 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
       .digest("hex");
 
     if (expectedSignature === razorpay_signature) {
+      console.log(`[Payment] Signature verified for order: ${razorpay_order_id}`);
       // Payment is valid
       const planCredits: Record<string, number> = {
         'basic': 6000,
@@ -351,12 +377,25 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
           plan: plan,
           credits: admin.firestore.FieldValue.increment(planCredits[plan])
         });
+        
+        // Save payment history
+        await firestore.collection('payments').add({
+          userId,
+          orderId: razorpay_order_id,
+          paymentId: razorpay_payment_id,
+          plan,
+          credits: planCredits[plan],
+          timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log(`[Payment] Credits added successfully for user: ${userId}`);
         res.json({ success: true });
       } catch (error: any) {
-        console.error("Firestore payment update error:", error);
+        console.error("[Payment] Firestore payment update error:", error);
         res.status(500).json({ error: "Database update failed" });
       }
     } else {
+      console.error(`[Payment] Invalid signature for order: ${razorpay_order_id}`);
       res.status(400).json({ error: "Invalid signature" });
     }
   });
@@ -576,7 +615,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
   res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
 });
 
-// Generate Speech via Gemini API
+// Generate Speech via Gemini API (Authenticated)
 app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
   const { text, voice_name, style, speed, pitch, language, studioClarity, pause } = req.body;
   
@@ -740,6 +779,24 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
 
       const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (audioData) {
+        // Save to Firestore history if user is authenticated
+        if (req.user && firestore) {
+          try {
+            await firestore.collection('voice_history').add({
+              userId: req.user.uid,
+              text,
+              voice_name,
+              style,
+              speed,
+              pitch,
+              language,
+              timestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`[History] Voice history saved for user: ${req.user.uid}`);
+          } catch (historyError) {
+            console.error("[History] Failed to save voice history to Firestore:", historyError);
+          }
+        }
         return res.json({ audioData });
       } else {
         throw new Error("No audio data generated");
@@ -911,22 +968,416 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
   }
 });
 
-app.get(["/api/history", "/api/history/"], authenticate, (req: any, res) => {
+// Generate Captions via Gemini API
+app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
+  const { videoData, language } = req.body;
+  const userId = req.user?.uid || 'guest';
+
+  if (!videoData) {
+    return res.status(400).json({ error: "Video data is required" });
+  }
+
+  const maxRetries = 5;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    const apiKey = getAvailableApiKey();
+    if (!apiKey) {
+      return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = `Transcribe the following video/audio at a word-level with precise timestamps. 
+      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
+      Example: [{"word": "hello", "start": 0.5, "end": 0.9}, ...]
+      Ensure the timestamps are perfectly synced with the speech. 
+      Correct any grammatical errors or misspellings in the transcription.
+      Support both Hindi and English (Hinglish if mixed).
+      Only return the JSON array, no other text.`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: "video/mp4",
+                  data: videoData.split(',')[1] || videoData
+                }
+              }
+            ]
+          }
+        ]
+      });
+
+      const responseText = result.text;
+      const jsonMatch = responseText.match(/\[.*\]/s);
+      if (!jsonMatch) {
+        throw new Error("Failed to parse word-level timestamps from AI response");
+      }
+
+      const words = JSON.parse(jsonMatch[0]);
+
+      // Save to Firestore history
+      if (firestore) {
+        await firestore.collection('caption_history').add({
+          userId,
+          words,
+          language,
+          timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      return res.json({ words });
+    } catch (error: any) {
+      console.error(`[Captions] Attempt ${attempt + 1} failed:`, error.message);
+      if (error.message.includes("429") || error.message.includes("quota")) {
+        markKeyAsExhausted(apiKey);
+        attempt++;
+        continue;
+      }
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  res.status(503).json({ error: "Failed to generate captions after multiple attempts." });
+});
+
+// Helper to add WAV header to raw PCM data
+function addWavHeader(pcmBuffer: Buffer, sampleRate: number): Buffer {
+  const header = Buffer.alloc(44);
+  const length = pcmBuffer.length;
+
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // Mono
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28); // Byte rate
+  header.writeUInt16LE(2, 32); // Block align
+  header.writeUInt16LE(16, 34); // Bits per sample
+  header.write('data', 36);
+  header.writeUInt32LE(length, 40);
+
+  return Buffer.concat([header, pcmBuffer]);
+}
+
+app.post("/api/generate-dubbing", maybeAuthenticate, async (req: any, res) => {
+  const { videoData, sourceLanguage, targetLanguage, voiceName, mode } = req.body;
+  const userId = req.user?.uid || 'guest';
+
+  if (!videoData) {
+    return res.status(400).json({ error: "Video data is required" });
+  }
+
+  const maxRetries = 5;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    const apiKey = getAvailableApiKey();
+    if (!apiKey) {
+      return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      
+      let translatedText = "";
+      
+      if (mode === 'convert') {
+        // Step 1: Just Transcribe (Voice Changer Mode)
+        const transcriptionPrompt = `Transcribe the following video/audio accurately. 
+        Only return the transcribed text, no other commentary.`;
+
+        const transcriptionResult = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: transcriptionPrompt },
+                {
+                  inlineData: {
+                    mimeType: "video/mp4",
+                    data: videoData.split(',')[1] || videoData
+                  }
+                }
+              ]
+            }
+          ]
+        });
+        translatedText = transcriptionResult.text;
+      } else {
+        // Step 1: Segmented Transcribe and Translate (Dubbing Mode)
+        const translationPrompt = `You are a world-class AI dubbing engineer. Your task is to transcribe the following video/audio and translate it into ${targetLanguage} with 100% perfect emotional accuracy.
+        
+        CRITICAL INSTRUCTIONS:
+        1. Break the content into logical segments (sentences or natural phrases) with precise start and end timestamps in seconds.
+        2. Maintain the exact emotional weight, tone, and intensity for each segment.
+        3. Identify the specific emotion for each segment (e.g., "Excited", "Sad", "Angry", "Calm", "Urgent", "Whispering").
+        4. Ensure the translation is natural and fits the timing of the original speech.
+        
+        Return the result as a JSON array of objects: [{"start": number, "end": number, "text": string, "emotion": string}].
+        Only return the JSON, no other commentary.`;
+
+        const translationResult = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: translationPrompt },
+                {
+                  inlineData: {
+                    mimeType: "video/mp4",
+                    data: videoData.split(',')[1] || videoData
+                  }
+                }
+              ]
+            }
+          ],
+          config: {
+            responseMimeType: "application/json"
+          }
+        });
+
+        try {
+          const segments = JSON.parse(translationResult.text);
+          
+          // Step 2: Generate Dubbed Audio for each segment (TTS)
+          const voiceMapping: Record<string, string> = {
+            'Hindi': 'Zephyr', 'English': 'Puck', 'Spanish': 'Kore',
+            'French': 'Zephyr', 'German': 'Charon', 'Japanese': 'Kore'
+          };
+
+          const internalVoiceMapping: Record<string, string> = {
+            'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+            'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+            'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+            'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+            'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
+            'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr'
+          };
+
+          const targetVoice = voiceName ? (internalVoiceMapping[voiceName] || 'Puck') : (voiceMapping[targetLanguage] || 'Zephyr');
+
+          // Process segments in parallel with a limit
+          const CONCURRENCY_LIMIT = 3;
+          const audioSegments: { start: number, end: number, data: Uint8Array }[] = [];
+          
+          for (let i = 0; i < segments.length; i += CONCURRENCY_LIMIT) {
+            const batch = segments.slice(i, i + CONCURRENCY_LIMIT);
+            const batchPromises = batch.map(async (segment: any) => {
+              const ttsResponse = await ai.models.generateContent({
+                model: "gemini-2.5-flash-preview-tts",
+                contents: [{ parts: [{ text: `You are performing a dubbed role. Deliver this line with ${segment.emotion || 'natural'} emotion. 
+                
+                CONTEXT: This is a professional dubbing project.
+                EMOTION: ${segment.emotion}
+                LANGUAGE: ${targetLanguage}
+                SCRIPT: ${segment.text}
+                
+                PERFORMANCE: Sound 100% human, use natural prosody, and match the intensity of the scene.` }] }],
+                config: {
+                  responseModalities: [Modality.AUDIO],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName: targetVoice as any },
+                    },
+                  },
+                },
+              });
+
+              const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+              if (base64Audio) {
+                const pcmData = Buffer.from(base64Audio, 'base64');
+                return { start: segment.start, end: segment.end, data: new Uint8Array(pcmData) };
+              }
+              return null;
+            });
+
+            const results = await Promise.all(batchPromises);
+            results.forEach(r => { if (r) audioSegments.push(r); });
+          }
+
+          // Step 3: Merge segments with silence padding
+          const SAMPLE_RATE = 24000;
+          const BYTES_PER_SECOND = SAMPLE_RATE * 2; // 16-bit = 2 bytes
+          
+          const maxEnd = Math.max(...audioSegments.map(s => s.end), 0);
+          const totalBufferLength = Math.ceil(maxEnd * BYTES_PER_SECOND);
+          const mergedPcm = Buffer.alloc(totalBufferLength);
+
+          audioSegments.forEach(seg => {
+            const offset = Math.floor(seg.start * BYTES_PER_SECOND);
+            const length = Math.min(seg.data.length, mergedPcm.length - offset);
+            if (length > 0) {
+              mergedPcm.set(seg.data.slice(0, length), offset);
+            }
+          });
+
+          // Add WAV header so it plays correctly in browser
+          const wavBuffer = addWavHeader(mergedPcm, SAMPLE_RATE);
+          const finalAudioBase64 = wavBuffer.toString('base64');
+          
+          translatedText = segments.map((s: any) => s.text).join(" ");
+
+          // Save to Firestore history
+          if (firestore) {
+            await firestore.collection('dubbing_history').add({
+              userId,
+              sourceLanguage,
+              targetLanguage,
+              voiceName,
+              mode,
+              translatedText,
+              timestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+
+          return res.json({ audioData: finalAudioBase64, translatedText, segments });
+        } catch (parseError) {
+          console.error("Failed to parse or process segmented dubbing:", parseError);
+          // Fallback to non-segmented if parsing fails
+          translatedText = translationResult.text;
+        }
+      }
+
+      if (!translatedText) throw new Error("Failed to process content");
+
+      // Fallback Step 2: Generate Dubbed Audio (TTS) for non-segmented or voice changer
+      const voiceMapping: Record<string, string> = {
+        'Hindi': 'Zephyr',
+        'English': 'Puck',
+        'Spanish': 'Kore',
+        'French': 'Zephyr',
+        'German': 'Charon',
+        'Japanese': 'Kore'
+      };
+
+      const internalVoiceMapping: Record<string, string> = {
+        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
+        'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr'
+      };
+
+      const targetVoice = voiceName ? (internalVoiceMapping[voiceName] || 'Puck') : (voiceMapping[targetLanguage] || 'Zephyr');
+
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: `Perform this script with high emotional realism, matching the original tone and context. Use professional studio quality. Language: ${targetLanguage || 'the original language'}. Script: ${translatedText}` }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+            },
+          },
+        },
+      });
+
+      const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!audioData) throw new Error("Failed to generate audio");
+
+      // Save to Firestore history
+      if (firestore) {
+        await firestore.collection('dubbing_history').add({
+          userId,
+          sourceLanguage,
+          targetLanguage,
+          voiceName,
+          mode,
+          translatedText,
+          timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      return res.json({ audioData, translatedText });
+    } catch (error: any) {
+      console.error(`[Dubbing/VC] Attempt ${attempt + 1} failed:`, error.message);
+      if (error.message.includes("429") || error.message.includes("quota")) {
+        markKeyAsExhausted(apiKey);
+        attempt++;
+        continue;
+      }
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  res.status(503).json({ error: "Failed to process after multiple attempts." });
+});
+
+app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) => {
   const userId = req.user.uid;
   try {
-    const rows = db.prepare("SELECT * FROM generations WHERE user_id = ? ORDER BY created_at DESC LIMIT 50").all(userId);
-    res.json(rows);
+    if (!firestore) {
+      // Fallback to SQLite if Firestore is not available
+      const rows = db.prepare("SELECT * FROM generations WHERE user_id = ? ORDER BY created_at DESC LIMIT 50").all(userId);
+      return res.json(rows);
+    }
+
+    const voiceHistory = await firestore.collection('voice_history')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .limit(50)
+      .get();
+
+    const captionHistory = await firestore.collection('caption_history')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .limit(50)
+      .get();
+
+    const history = [
+      ...voiceHistory.docs.map(doc => ({ id: doc.id, type: 'voice', ...doc.data() })),
+      ...captionHistory.docs.map(doc => ({ id: doc.id, type: 'caption', ...doc.data() }))
+    ].sort((a: any, b: any) => {
+      const timeA = a.timestamp?.toMillis() || 0;
+      const timeB = b.timestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
+
+    res.json(history);
   } catch (error: any) {
+    console.error("[History] Fetch error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete("/api/history/:id", authenticate, (req: any, res) => {
+app.delete("/api/history/:id", authenticate, async (req: any, res) => {
   const userId = req.user.uid;
+  const { id } = req.params;
+  const { type } = req.query; // 'voice' or 'caption'
+
   try {
-    db.prepare("DELETE FROM generations WHERE id = ? AND user_id = ?").run(req.params.id, userId);
+    if (firestore && type) {
+      const collectionName = type === 'voice' ? 'voice_history' : 'caption_history';
+      const docRef = firestore.collection(collectionName).doc(id);
+      const doc = await docRef.get();
+      
+      if (doc.exists && doc.data()?.userId === userId) {
+        await docRef.delete();
+        return res.json({ success: true });
+      }
+    }
+
+    // Fallback or SQLite
+    db.prepare("DELETE FROM generations WHERE id = ? AND user_id = ?").run(id, userId);
     res.json({ success: true });
   } catch (error: any) {
+    console.error("[History] Delete error:", error);
     res.status(500).json({ error: error.message });
   }
 });

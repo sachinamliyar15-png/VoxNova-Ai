@@ -17,6 +17,26 @@ service cloud.firestore {
     //   - lastResetDate: string (required)
     //   - createdAt: string
     //
+    // Collection: voice_history
+    // Document ID: {historyId}
+    // Fields:
+    //   - userId: string (required)
+    //   - text: string (required)
+    //   - voice_name: string
+    //   - style: string
+    //   - speed: number
+    //   - pitch: number
+    //   - language: string
+    //   - timestamp: timestamp (required)
+    //
+    // Collection: caption_history
+    // Document ID: {historyId}
+    // Fields:
+    //   - userId: string (required)
+    //   - words: list (required)
+    //   - language: string
+    //   - timestamp: timestamp (required)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -40,34 +60,45 @@ service cloud.firestore {
              data.lastResetDate is string;
     }
 
+    function isValidVoiceHistory(data) {
+      return data.keys().hasAll(['userId', 'text', 'timestamp']) &&
+             data.userId is string &&
+             data.text is string &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidCaptionHistory(data) {
+      return data.keys().hasAll(['userId', 'words', 'timestamp']) &&
+             data.userId is string &&
+             data.words is list &&
+             data.timestamp is timestamp;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId);
-      
-      // Only allow creation if the user is authenticated and setting their own UID
-      // and starting with the default free plan credits
       allow create: if isOwner(userId) && 
                       isValidUser(request.resource.data) && 
                       request.resource.data.credits == 20000 &&
                       request.resource.data.plan == 'free';
-      
-      // Allow updates to credits if the user is authenticated
-      // In a production app, credit updates should ideally be handled by Cloud Functions
-      // but for this implementation we'll allow the owner to update their own credits
-      // while ensuring they don't change their plan or UID
       allow update: if isOwner(userId) && 
                       isValidUser(request.resource.data) &&
                       request.resource.data.plan == resource.data.plan &&
                       request.resource.data.uid == resource.data.uid;
     }
 
-    match /scripts/{scriptId} {
+    match /voice_history/{historyId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidVoiceHistory(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /caption_history/{historyId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidCaptionHistory(request.resource.data);
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
   }
