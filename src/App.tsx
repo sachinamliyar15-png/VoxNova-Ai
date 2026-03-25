@@ -777,10 +777,6 @@ export default function App() {
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
 
-  const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
-  const [isSending, setIsSending] = useState(false);
-  const [sendSuccess, setSendSuccess] = useState(false);
-
   const resetSettings = () => {
     setSpeed(1.0);
     setPitch(1.0);
@@ -945,44 +941,6 @@ export default function App() {
       setError(`Dubbing failed: ${err.message}`);
     } finally {
       setIsDubbing(false);
-    }
-  };
-
-  const handleContactSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSending(true);
-    setSendSuccess(false);
-
-    try {
-      // Use the environment variables for EmailJS
-      const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_52isgcx';
-      const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '__ejs-test-mail-service__';
-      const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'IDmeLxswf1eiQFsde';
-
-      const result = await emailjs.send(
-        serviceId,
-        templateId,
-        {
-          from_name: contactForm.name,
-          from_email: contactForm.email,
-          message: contactForm.message,
-          to_name: 'VoxNova Text to Speech Support',
-        },
-        publicKey
-      );
-
-      if (result.status === 200) {
-        setSendSuccess(true);
-        setContactForm({ name: '', email: '', message: '' });
-        setTimeout(() => setSendSuccess(false), 5000);
-      } else {
-        throw new Error('Failed to send');
-      }
-    } catch (err) {
-      console.error('EmailJS Error:', err);
-      setError("Failed to send message. Please use the Google Form link in the contact section below.");
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -1430,15 +1388,9 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     onClick={() => { setShowSettings(false); setShowAbout(true); }}
-                    className="p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 text-xs font-medium transition-all"
+                    className="w-full p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 text-xs font-medium transition-all"
                   >
                     About Us
-                  </button>
-                  <button 
-                    onClick={() => { setShowSettings(false); setShowContact(true); }}
-                    className="p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 text-xs font-medium transition-all"
-                  >
-                    Contact
                   </button>
                 </div>
               </div>
@@ -3088,66 +3040,6 @@ export default function App() {
         <div className="mt-12 pt-12 border-t border-white/5 max-w-4xl mx-auto pb-12">
         </div>
 
-        {/* Contact Section - Above Why Choose VoxNova Text to Speech */}
-        <section className="max-w-4xl mx-auto py-16 px-6">
-          <div className="glass-panel p-10 rounded-[3rem] border-zinc-100 bg-zinc-50/50 space-y-8">
-            <div className="text-center space-y-4">
-              <h2 className="text-3xl font-display font-bold text-zinc-900">Get in Touch</h2>
-              <p className="text-zinc-500">Have questions or need support? We're here to help you create amazing content.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center text-emerald-600">
-                    <Mail size={24} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-zinc-900">Email Support</p>
-                    <p className="text-xs text-zinc-500">Response within 24 hours</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 flex items-center justify-center text-blue-600">
-                    <Globe size={24} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-zinc-900">Community</p>
-                    <p className="text-xs text-zinc-500">Join our creator network</p>
-                  </div>
-                </div>
-                <div className="pt-6">
-                  <a 
-                    href="https://docs.google.com/forms/d/e/1FAIpQLSeTJ4HGSwYNxAYwHwa_OTayYQfY3marHFgLHwHPe_M1yT5bEQ/viewform?embedded=true"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-4 bg-zinc-900 text-white font-bold rounded-2xl hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
-                  >
-                    <ExternalLink size={18} />
-                    Open Google Form
-                  </a>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="rounded-2xl overflow-hidden border border-zinc-200 bg-white h-[300px]">
-                  <iframe 
-                    src="https://docs.google.com/forms/d/e/1FAIpQLSeTJ4HGSwYNxAYwHwa_OTayYQfY3marHFgLHwHPe_M1yT5bEQ/viewform?embedded=true" 
-                    width="100%" 
-                    height="100%" 
-                    frameBorder="0" 
-                    marginHeight={0} 
-                    marginWidth={0}
-                  >
-                    Loading…
-                  </iframe>
-                </div>
-                <p className="text-[10px] text-zinc-400 text-center uppercase tracking-widest">Official Support Form</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* SEO Content Section (The "Boxes") - Moved to Bottom */}
         <section className="max-w-4xl mx-auto py-16 px-6 space-y-12">
           {/* Ad Section - Top of SEO */}
@@ -3297,60 +3189,18 @@ export default function App() {
                   <p className="text-zinc-500">Have questions or feedback? We'd love to hear from you.</p>
                 </div>
 
-                <form onSubmit={handleContactSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs text-zinc-500 uppercase tracking-widest">Name</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={contactForm.name}
-                        onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 transition-all text-zinc-900"
-                        placeholder="Your Name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs text-zinc-500 uppercase tracking-widest">Email</label>
-                      <input 
-                        required
-                        type="email" 
-                        value={contactForm.email}
-                        onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 transition-all text-zinc-900"
-                        placeholder="your@email.com"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs text-zinc-500 uppercase tracking-widest">Message</label>
-                    <textarea 
-                      required
-                      rows={4}
-                      value={contactForm.message}
-                      onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 transition-all resize-none text-zinc-900"
-                      placeholder="How can we help you?"
-                    />
-                  </div>
-                  <button 
-                    disabled={isSending}
-                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-                  >
-                    {isSending ? <Loader2 className="animate-spin" /> : 'Send Message'}
-                  </button>
-                  {sendSuccess && (
-                    <p className="text-center text-emerald-600 text-sm font-bold animate-bounce">Message sent successfully!</p>
-                  )}
-                </form>
-
-                <div className="pt-8 border-t border-zinc-100 space-y-4">
-                  <p className="text-sm text-zinc-500 text-center">Alternatively, you can reach us via:</p>
-                  <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-                    <a href="https://docs.google.com/forms/d/e/1FAIpQLSeTJ4HGSwYNxAYwHwa_OTayYQfY3marHFgLHwHPe_M1yT5bEQ/viewform?embedded=true" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-zinc-50 rounded-full hover:bg-zinc-100 transition-all text-sm text-zinc-600">
-                      <ExternalLink size={16} /> Google Form
+                <div className="space-y-6 text-center py-8">
+                  <p className="text-zinc-500">Click the button below to send us an email directly from your email client.</p>
+                  <div className="flex items-center justify-center">
+                    <a 
+                      href="mailto:robotlinkan@gmail.com" 
+                      className="flex items-center gap-3 px-8 py-4 bg-zinc-900 rounded-2xl hover:bg-zinc-800 transition-all text-lg font-bold text-white shadow-xl shadow-zinc-900/20"
+                    >
+                      <Mail size={24} />
+                      Send Email to Support
                     </a>
                   </div>
+                  <p className="text-xs text-zinc-400">Your default email app will open with our support address.</p>
                 </div>
               </div>
             </motion.div>
