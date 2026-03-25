@@ -399,7 +399,7 @@ const CaptionEditor = ({
 
 export default function App() {
   const [text, setText] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState<Voice>(VOICES[0]);
+  const [selectedVoice, setSelectedVoice] = useState<Voice>(VOICES[1]);
   const [style, setStyle] = useState('normal');
   const [speed, setSpeed] = useState(1);
   const [pitch, setPitch] = useState(1);
@@ -447,6 +447,13 @@ export default function App() {
     setTimeout(() => setShowShareToast(false), 3000);
   };
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Reset selected voice if it's 'original' and user switches away from dubbing
+  useEffect(() => {
+    if (selectedVoice.id === 'original' && activeTab !== 'dubbing') {
+      setSelectedVoice(VOICES[1]);
+    }
+  }, [activeTab, selectedVoice.id]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -807,10 +814,15 @@ export default function App() {
       if (audioData) {
         const audio = new Audio(`data:audio/wav;base64,${audioData}`);
         audio.onended = () => setPreviewingVoiceId(null);
+        audio.onerror = () => {
+          setError("Failed to play audio. Please try again.");
+          setPreviewingVoiceId(null);
+        };
         audio.play();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Preview failed:", err);
+      setError(err.message || "Failed to preview voice. Please try again.");
       setPreviewingVoiceId(null);
     }
   };
@@ -1067,8 +1079,8 @@ export default function App() {
       // Increased chunk size to 2500 for faster processing of long scripts
       const chunks = splitTextIntoChunks(sanitizedText, 2500); 
       
-      // Increased concurrency to 2 for faster generation while staying within safe limits
-      const CONCURRENCY_LIMIT = 2;
+      // Increased concurrency to 5 for faster generation while staying within safe limits
+      const CONCURRENCY_LIMIT = 5;
       const allPcmBuffers: ArrayBuffer[] = new Array(chunks.length);
       
       // Process chunks in batches
@@ -3468,7 +3480,13 @@ export default function App() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {VOICES.filter(v => v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase())).map((voice) => (
+                {VOICES.filter(v => {
+                  const matchesSearch = v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
+                  if (v.id === 'original') {
+                    return matchesSearch && activeTab === 'dubbing';
+                  }
+                  return matchesSearch;
+                }).map((voice) => (
                   <div 
                     key={voice.id}
                     className={`p-6 rounded-2xl border transition-all group relative ${selectedVoice.id === voice.id ? 'bg-zinc-50 border-zinc-900' : 'bg-white border-zinc-100 hover:border-zinc-300'}`}

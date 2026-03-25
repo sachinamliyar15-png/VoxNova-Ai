@@ -661,16 +661,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      const voiceMapping: Record<string, string> = {
-        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
-        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
-        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
-        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon'
-      };
-
-      const targetVoice = voiceMapping[voice_name] || 'Puck';
+      const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
@@ -776,25 +767,66 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       if (pause > 0.1) {
         promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
       }
-      
-      const currentPrompt = attempt === 0 
-        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
-        : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: currentPrompt }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: targetVoice as any },
+      // Split text into chunks for parallel processing if it's long
+      const CHUNK_SIZE = 800; // characters
+      const chunks: string[] = [];
+      if (text.length > CHUNK_SIZE) {
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+        let currentChunk = "";
+        for (const sentence of sentences) {
+          if ((currentChunk + sentence).length > CHUNK_SIZE && currentChunk.length > 0) {
+            chunks.push(currentChunk.trim());
+            currentChunk = sentence;
+          } else {
+            currentChunk += sentence;
+          }
+        }
+        if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
+      } else {
+        chunks.push(text);
+      }
+
+      const audioChunks: Buffer[] = [];
+      const CONCURRENCY = 5;
+
+      for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+        const batch = chunks.slice(i, i + CONCURRENCY);
+        const batchPromises = batch.map(async (chunk, idx) => {
+          const currentPrompt = attempt === 0 
+            ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}`
+            : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunk}`;
+
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: currentPrompt }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: targetVoice as any },
+                },
+              },
             },
-          },
-        },
-      });
+          });
 
-      const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64) return Buffer.from(base64, 'base64');
+          return null;
+        });
+
+        const results = await Promise.all(batchPromises);
+        results.forEach(r => { if (r) audioChunks.push(r); });
+      }
+
+      if (audioChunks.length === 0) throw new Error("Failed to generate audio chunks");
+
+      // Merge PCM chunks
+      const mergedPcm = Buffer.concat(audioChunks);
+      const SAMPLE_RATE = 24000;
+      const wavBuffer = addWavHeader(mergedPcm, SAMPLE_RATE);
+      const audioData = wavBuffer.toString('base64');
+
       if (audioData) {
         // Save to Firestore history if user is authenticated
         if (req.user && firestore) {
@@ -1183,7 +1215,7 @@ app.post("/api/generate-dubbing", maybeAuthenticate, async (req: any, res) => {
           const targetVoice = voiceName ? (INTERNAL_VOICE_MAPPING[voiceName] || 'Puck') : (voiceMapping[targetLanguage] || 'Zephyr');
 
           // Process segments in parallel with a limit
-          const CONCURRENCY_LIMIT = 3;
+          const CONCURRENCY_LIMIT = 10;
           const audioSegments: { start: number, end: number, data: Uint8Array }[] = [];
           
           for (let i = 0; i < segments.length; i += CONCURRENCY_LIMIT) {
