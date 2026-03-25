@@ -786,6 +786,10 @@ export default function App() {
 
   const handlePreviewVoice = async (voice: Voice) => {
     if (previewingVoiceId) return;
+    if (voice.id === 'original') {
+      setError("Original Voice preview is not available as it clones the speaker's voice from your uploaded video.");
+      return;
+    }
     setPreviewingVoiceId(voice.id);
     try {
       const response = await fetch('/api/preview-voice', {

@@ -9,6 +9,7 @@ export interface Voice {
 }
 
 export const VOICES: Voice[] = [
+  { id: 'original', name: 'Original Voice', gender: 'male', color: 'from-zinc-800 to-black', description: 'AI will analyze and clone the original speaker\'s voice from the video for a perfectly natural dub.', isPremium: true },
   { id: 'adam', name: 'Adam', gender: 'male', color: 'from-blue-500 to-indigo-600', description: 'Deep, resonant, professional cinematic voice. Perfect for high-end commercials and movie trailers.' },
   { id: 'brian', name: 'Brian', gender: 'male', color: 'from-emerald-500 to-teal-600', description: 'Calm, steady, high-fidelity studio quality. Ideal for educational content and corporate presentations.' },
   { id: 'daniel', name: 'Daniel', gender: 'male', color: 'from-amber-500 to-orange-600', description: 'Authoritative, clear, broadcast standard. Excellent for news, announcements, and formal narration.' },

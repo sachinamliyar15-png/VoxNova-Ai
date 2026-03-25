@@ -58,6 +58,23 @@ const razorpay = new Razorpay({
 // Initialize Firebase Admin
 let firestore: admin.firestore.Firestore;
 
+const INTERNAL_VOICE_MAPPING: Record<string, string> = {
+  'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+  'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+  'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+  'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+  'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+  'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
+  'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr',
+  'adam': 'Puck', 'brian': 'Charon', 'daniel': 'Fenrir', 'josh': 'Puck',
+  'liam': 'Charon', 'michael': 'Fenrir', 'ryan': 'Puck', 'matthew': 'Charon',
+  'bill': 'Fenrir', 'callum': 'Puck', 'frank': 'Zephyr', 'marcus': 'Charon',
+  'jessica': 'Kore', 'sarah': 'Zephyr', 'matilda': 'Kore', 'emily': 'Zephyr',
+  'bella': 'Kore', 'rachel': 'Zephyr', 'nicole': 'Kore', 'clara': 'Zephyr',
+  'doc-pro': 'Charon', 'atlas-do': 'Fenrir', 'priyanka': 'Zephyr', 'virat-male': 'Charon',
+  'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr'
+};
+
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
   try {
     if (admin.apps.length === 0) {
@@ -886,13 +903,16 @@ app.post("/api/generate-image", authenticate, async (req: any, res) => {
 app.post("/api/preview-voice", async (req: any, res) => {
   const { voice_id, voice_name } = req.body;
   if (!voice_id) return res.status(400).json({ error: "Voice ID is required" });
+  if (voice_id === 'original') return res.status(400).json({ error: "Original Voice preview is not available." });
+
+  const targetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_name] || voice_id;
 
   const maxRetries = 15;
   let attempt = 0;
 
   while (attempt < maxRetries) {
     const apiKey = getAvailableApiKey();
-    if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+    if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again later or provide more API keys in settings." });
 
     try {
       const ai = new GoogleGenAI({ apiKey });
@@ -903,7 +923,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice_id }
+              prebuiltVoiceConfig: { voiceName: targetVoice as any }
             }
           }
         }
@@ -927,7 +947,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
     }
   }
 
-  res.status(503).json({ error: "Failed to preview voice after multiple attempts with different API keys." });
+  res.status(503).json({ error: "Failed to generate preview after multiple attempts. This is likely due to API quota limits. Please try again later or provide more API keys in settings." });
 });
 // Save generation to history & Deduct Credits
 app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
@@ -1122,9 +1142,10 @@ app.post("/api/generate-dubbing", maybeAuthenticate, async (req: any, res) => {
         1. Break the content into logical segments (sentences or natural phrases) with precise start and end timestamps in seconds.
         2. Maintain the exact emotional weight, tone, and intensity for each segment.
         3. Identify the specific emotion for each segment (e.g., "Excited", "Sad", "Angry", "Calm", "Urgent", "Whispering").
-        4. Ensure the translation is natural and fits the timing of the original speech.
+        4. Identify the gender of the primary speaker ("male" or "female").
+        5. Ensure the translation is natural and fits the timing of the original speech.
         
-        Return the result as a JSON array of objects: [{"start": number, "end": number, "text": string, "emotion": string}].
+        Return the result as a JSON object: {"speakerGender": "male" | "female", "segments": [{"start": number, "end": number, "text": string, "emotion": string}]}.
         Only return the JSON, no other commentary.`;
 
         const translationResult = await ai.models.generateContent({
@@ -1149,7 +1170,9 @@ app.post("/api/generate-dubbing", maybeAuthenticate, async (req: any, res) => {
         });
 
         try {
-          const segments = JSON.parse(translationResult.text);
+          const resultData = JSON.parse(translationResult.text);
+          const segments = resultData.segments || resultData;
+          const speakerGender = resultData.speakerGender || 'male';
           
           // Step 2: Generate Dubbed Audio for each segment (TTS)
           const voiceMapping: Record<string, string> = {
@@ -1157,17 +1180,7 @@ app.post("/api/generate-dubbing", maybeAuthenticate, async (req: any, res) => {
             'French': 'Zephyr', 'German': 'Charon', 'Japanese': 'Kore'
           };
 
-          const internalVoiceMapping: Record<string, string> = {
-            'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
-            'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-            'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
-            'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
-            'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-            'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
-            'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr'
-          };
-
-          const targetVoice = voiceName ? (internalVoiceMapping[voiceName] || 'Puck') : (voiceMapping[targetLanguage] || 'Zephyr');
+          const targetVoice = voiceName ? (INTERNAL_VOICE_MAPPING[voiceName] || 'Puck') : (voiceMapping[targetLanguage] || 'Zephyr');
 
           // Process segments in parallel with a limit
           const CONCURRENCY_LIMIT = 3;
@@ -1263,17 +1276,7 @@ app.post("/api/generate-dubbing", maybeAuthenticate, async (req: any, res) => {
         'Japanese': 'Kore'
       };
 
-      const internalVoiceMapping: Record<string, string> = {
-        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
-        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
-        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
-        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
-        'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr'
-      };
-
-      const targetVoice = voiceName ? (internalVoiceMapping[voiceName] || 'Puck') : (voiceMapping[targetLanguage] || 'Zephyr');
+      const targetVoice = voiceName ? (INTERNAL_VOICE_MAPPING[voiceName] || 'Puck') : (voiceMapping[targetLanguage] || 'Zephyr');
 
       const ttsResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
@@ -1316,7 +1319,7 @@ app.post("/api/generate-dubbing", maybeAuthenticate, async (req: any, res) => {
     }
   }
 
-  res.status(503).json({ error: "Failed to process after multiple attempts." });
+  res.status(503).json({ error: "Failed to process after multiple attempts. This is likely due to API quota limits (10 requests per day on free tier). Please try again later or provide more API keys in settings." });
 });
 
 app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) => {
