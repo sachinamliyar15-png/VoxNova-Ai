@@ -4754,7 +4754,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         </div>
       </footer>
 
-      {/* Mobile Overlay */}
+            {/* Mobile Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div 
@@ -4766,6 +4766,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           />
         )}
       </AnimatePresence>
+      </main> {/* YAHAN MAIN TAG CLOSE KIYA HAI */}
     </div>
   )}
 </AnimatePresence>
