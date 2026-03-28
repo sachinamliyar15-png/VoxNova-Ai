@@ -4765,8 +4765,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-40 md:hidden"
           />
         )}
-      </AnimatePresence>
-      </main> {/* YAHAN MAIN TAG CLOSE KIYA HAI */}
+            </AnimatePresence>
+      </main>
     </div>
   )}
 </AnimatePresence>
@@ -4774,4 +4774,3 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 );
 };
 
-export default App;
