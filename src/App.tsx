@@ -2376,7 +2376,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           </span>
                         </div>
                         <button 
-                          onClick={() => setShowPricing(true)}
+                          onClick={() => setIsPricingModalOpen(true)}
                           className="p-3 bg-zinc-900 text-white rounded-2xl hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-900/10"
                         >
                           <Plus size={20} />
@@ -2561,7 +2561,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           <div className="space-y-6">
                             <div className="space-y-4">
                               <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                                <Settings2 size={14} /> Voice Settings
+                                <Settings2 size={14} /> Fine-Tuning
                               </label>
                               
                               <div className="space-y-6">
@@ -2594,7 +2594,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             </div>
 
                             <div className="pt-4 border-t border-zinc-50 space-y-4">
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
                                 <div className="flex items-center gap-2">
                                   <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
                                     <Sparkles size={14} />
@@ -2606,21 +2606,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                   className={`w-10 h-5 rounded-full transition-all relative ${studioClarity ? 'bg-emerald-500' : 'bg-zinc-200'}`}
                                 >
                                   <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${studioClarity ? 'left-6' : 'left-1'}`} />
-                                </button>
-                              </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                                    <Languages size={14} />
-                                  </div>
-                                  <span className="text-xs font-bold text-zinc-700">Hindi Mode</span>
-                                </div>
-                                <button 
-                                  onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
-                                  className={`w-10 h-5 rounded-full transition-all relative ${language === 'hi' ? 'bg-blue-500' : 'bg-zinc-200'}`}
-                                >
-                                  <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${language === 'hi' ? 'left-6' : 'left-1'}`} />
                                 </button>
                               </div>
                             </div>
@@ -2642,6 +2627,92 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   />
                 )}
                 
+                {activeTab === 'generate' && (
+                  <motion.div 
+                    key="generate"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
+                  >
+                    <div className="mb-12">
+                      <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <Sparkles size={12} />
+                          AI Image Studio
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
+                          Visualize Your <span className="text-blue-500">Ideas</span>
+                        </h2>
+                        <p className="text-zinc-500 text-lg max-w-2xl">
+                          Generate stunning AI images from your text descriptions. Perfect for thumbnails, social media, and creative projects.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Image Generation UI placeholder */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="space-y-6">
+                        <div className="p-8 bg-white rounded-[2.5rem] border border-zinc-100 shadow-xl shadow-zinc-200/20 space-y-6">
+                          <div className="space-y-4">
+                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                              <Sparkles size={14} /> Prompt
+                            </label>
+                            <textarea 
+                              placeholder="A futuristic city with neon lights and flying cars..."
+                              className="w-full h-40 p-6 bg-zinc-50 rounded-3xl border border-zinc-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none text-zinc-900 placeholder:text-zinc-400 font-medium"
+                            />
+                          </div>
+                          
+                          <button className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-3 group shadow-xl shadow-zinc-900/10">
+                            Generate Image
+                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="aspect-square bg-zinc-50 rounded-[2.5rem] border border-zinc-100 flex items-center justify-center text-zinc-400 font-medium italic">
+                        Generated image will appear here
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === 'voice-changer' && (
+                  <motion.div 
+                    key="voice-changer"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
+                  >
+                    <div className="mb-12">
+                      <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <Mic2 size={12} />
+                          Voice Changer
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
+                          Transform Your <span className="text-purple-500">Voice</span>
+                        </h2>
+                        <p className="text-zinc-500 text-lg max-w-2xl">
+                          Upload your audio and change the voice to any of our high-quality AI models.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="p-12 bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center space-y-4">
+                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-400">
+                        <Upload size={32} />
+                      </div>
+                      <div>
+                        <p className="text-zinc-900 font-bold">Upload Audio File</p>
+                        <p className="text-zinc-500 text-sm">Drag and drop or click to browse (MP3, WAV, M4A)</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
                 {activeTab === 'history' && (
                   <HistoryView 
                     history={history} 
@@ -2659,6 +2730,65 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
                 {activeTab === 'dubbing' && (
                   <DubbingStudio />
+                )}
+                
+                {activeTab === 'library' && (
+                  <motion.div 
+                    key="library"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
+                  >
+                    <div className="mb-12">
+                      <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <Sparkles size={12} />
+                          Voice Library
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
+                          Explore <span className="text-emerald-500">Premium</span> Voices
+                        </h2>
+                        <p className="text-zinc-500 text-lg max-w-2xl">
+                          Discover over 100+ high-quality AI voices for every project and language.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {VOICES.map((voice) => (
+                        <div key={voice.id} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all group">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
+                                <User size={24} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-zinc-900">{voice.name}</h4>
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{voice.gender}</span>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                setSelectedVoice(voice);
+                                setActiveTab('tts');
+                              }}
+                              className="p-2 bg-zinc-50 text-zinc-400 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
+                            >
+                              <Play size={16} />
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {voice.tags.map((tag) => (
+                              <span key={tag} className="px-2 py-1 bg-zinc-50 text-zinc-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </main>
@@ -4624,154 +4754,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         </div>
       </footer>
 
-      {/* Pricing Modal */}
-      <AnimatePresence>
-        {isPricingModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/80 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-4xl bg-white border border-zinc-200 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
-            >
-              <div className="flex justify-between items-center">
-                <div className="space-y-1">
-                  <h3 className="text-3xl font-display font-bold text-zinc-900">Premium Plans</h3>
-                  <p className="text-zinc-500">Choose the plan that fits your creative needs.</p>
-                </div>
-                <button onClick={() => setIsPricingModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900">
-                  <X size={24} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Free Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Free</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹0<span className="text-sm text-zinc-500">/mo</span></div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 20,000 Credits/mo</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Standard Voices</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Monthly Reset</li>
-                  </ul>
-                  <button disabled className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-400 font-bold text-sm">Current Plan</button>
-                </div>
-
-                {/* Basic Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Basic</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹100</div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 6,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> No Expiry</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('basic', 6000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
-                </div>
-
-                {/* Pro Plan */}
-                <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-6 flex flex-col relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest">Best Value</div>
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-emerald-700">Pro</h4>
-                    <div className="text-3xl font-display font-bold text-emerald-700">₹200</div>
-                  </div>
-                  <ul className="text-xs text-emerald-600 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 15,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('pro', 15000)} className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-all">Buy Now</button>
-                </div>
-
-                {/* Advanced Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Advanced</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹400</div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 30,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('advanced', 30000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
-                </div>
-
-                {/* Ultra Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Ultra</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹500</div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 40,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Custom Voice Profiles</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('ultra', 40000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
-                </div>
-              </div>
-
-              <div className="p-6 bg-zinc-50 rounded-3xl text-center space-y-4">
-                <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest">Secure Payments via Razorpay</p>
-                <div className="flex flex-wrap justify-center items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b2/Google_Pay_Logo.svg" alt="Google Pay" className="h-6" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_standalone.svg" alt="Paytm" className="h-4" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon Pay" className="h-5" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-6" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo.png" alt="UPI" className="h-6" referrerPolicy="no-referrer" />
-                  </div>
-                </div>
-                <p className="text-[10px] text-zinc-400">
-                  * 1 Credit = ~10 characters of text. Credits are deducted only on successful generation.
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Global Toasts */}
-      <AnimatePresence>
-        {showShareToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-zinc-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10"
-          >
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-sm font-medium">{toastMessage}</span>
-          </motion.div>
-        )}
-
-        {showLimitToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-amber-500 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3"
-          >
-            <AlertCircle size={18} />
-            <span className="text-sm font-medium">Character limit reached for your current plan</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Mobile Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
@@ -4784,3 +4766,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           />
         )}
       </AnimatePresence>
+    </div>
+  )}
+</AnimatePresence>
+</ErrorBoundary>
+);
+};
+
+export default App;

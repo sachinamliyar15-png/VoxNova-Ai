@@ -81,36 +81,45 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
       // Robust private key parsing
       let privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
       
-      // Trim whitespace and handle potential wrapping quotes
-      privateKey = privateKey.trim();
-      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-        privateKey = privateKey.substring(1, privateKey.length - 1);
-      }
-      
-      // Replace escaped newlines with actual newlines
-      // This handles the common case where the key is provided as a single line with \n strings
-      // We use a global regex to replace all occurrences of \n (escaped) with actual newlines
-      privateKey = privateKey.replace(/\\n/g, '\n');
-      
-      // If the key still doesn't have actual newlines, it might be double-escaped or just a single line
-      if (!privateKey.includes('\n') && privateKey.includes(' ')) {
-        // Some systems might replace newlines with spaces, though rare for PEM
-        // But more likely it's just one long string that needs the headers/footers fixed
-      }
+      if (!privateKey) {
+        console.warn("FIREBASE_PRIVATE_KEY is missing. Firestore features will be disabled.");
+      } else {
+        // Trim whitespace and handle potential wrapping quotes
+        privateKey = privateKey.trim();
+        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+          privateKey = privateKey.substring(1, privateKey.length - 1);
+        }
+        
+        // Replace escaped newlines with actual newlines
+        privateKey = privateKey.replace(/\\n/g, '\n');
+        
+        // Ensure the key has the correct PEM headers and footers
+        if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+          privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
+        }
+        
+        if (!privateKey.includes('-----END PRIVATE KEY-----')) {
+          privateKey = `${privateKey}\n-----END PRIVATE KEY-----`;
+        }
 
-      // Ensure the key has the correct PEM headers and footers
-      if (privateKey && !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
-        privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
+        // Final cleanup: ensure no double headers/footers and correct newline placement
+        privateKey = privateKey.replace(/(-----BEGIN PRIVATE KEY-----)+/g, '-----BEGIN PRIVATE KEY-----');
+        privateKey = privateKey.replace(/(-----END PRIVATE KEY-----)+/g, '-----END PRIVATE KEY-----');
+        
+        try {
+          admin.initializeApp({
+            credential: admin.credential.cert({
+              projectId: process.env.FIREBASE_PROJECT_ID,
+              clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+              privateKey: privateKey,
+            }),
+          });
+          console.log("Firebase Admin initialized successfully");
+        } catch (initError) {
+          console.error("Failed to initialize Firebase Admin with provided credentials:", initError);
+          // Fallback or handle gracefully
+        }
       }
-      
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: privateKey,
-        }),
-      });
-      console.log("Firebase Admin initialized successfully");
     }
   } catch (error) {
     console.error("Firebase Admin init error:", error);
