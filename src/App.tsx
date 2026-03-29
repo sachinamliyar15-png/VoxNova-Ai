@@ -4754,7 +4754,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         </div>
       </footer>
 
-            {/* Mobile Overlay */}
+      {/* Mobile Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div 
@@ -4765,8 +4765,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-40 md:hidden"
           />
         )}
-            </AnimatePresence>
-      </main>
+      </AnimatePresence>
     </div>
   )}
 </AnimatePresence>
@@ -4774,3 +4773,4 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 );
 };
 
+export default App;

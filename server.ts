@@ -1428,12 +1428,18 @@ app.delete("/api/history/:id", authenticate, async (req: any, res) => {
 
 // Vite Middleware
 async function startServer() {
-  
-  // Yahan se if/else hata diya hai. Ab ye hamesha dist folder hi serve karega
-  app.use(express.static(path.join(process.cwd(), "dist")));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(process.cwd(), "dist", "index.html"));
-  });
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.join(process.cwd(), "dist")));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(process.cwd(), "dist", "index.html"));
+    });
+  }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
