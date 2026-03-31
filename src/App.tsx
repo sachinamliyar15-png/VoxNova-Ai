@@ -1067,7 +1067,7 @@ function Sidebar({
 }: any) {
   return (
     <aside className={`
-      fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-zinc-200 p-6 flex flex-col gap-8 transition-transform duration-300 ease-in-out
+      fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-zinc-200 p-6 flex flex-col gap-8 transition-transform duration-300 ease-in-out
       md:relative md:translate-x-0
       ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
     `}>
