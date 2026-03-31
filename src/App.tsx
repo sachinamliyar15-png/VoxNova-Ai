@@ -731,6 +731,290 @@ const CaptionOverlay = ({
   );
 };
 
+const VoiceLibrary = ({ onSelect, selectedVoiceId }: { onSelect: (voice: Voice) => void, selectedVoiceId: string }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const filteredVoices = VOICES.filter(v => 
+    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    v.tags?.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto space-y-8"
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold uppercase tracking-wider">
+            <Sparkles size={12} />
+            Voice Library
+          </div>
+          <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
+            Explore <span className="text-emerald-500">Premium</span> Voices
+          </h2>
+          <p className="text-zinc-500 text-lg max-w-2xl">
+            Discover over 100+ high-quality AI voices for every project and language.
+          </p>
+        </div>
+        
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+          <input 
+            type="text"
+            placeholder="Search voices..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-white border border-zinc-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-emerald-500 transition-all shadow-sm"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {filteredVoices.map((voice) => (
+          <div 
+            key={voice.id} 
+            onClick={() => onSelect(voice)}
+            className={`p-6 bg-white rounded-3xl border transition-all group cursor-pointer relative overflow-hidden ${selectedVoiceId === voice.id ? 'border-emerald-500 ring-4 ring-emerald-500/10' : 'border-zinc-100 hover:border-zinc-300 shadow-sm hover:shadow-md'}`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${voice.color} flex items-center justify-center font-display font-bold text-xl text-white group-hover:scale-110 transition-transform shadow-lg`}>
+                  {voice.name[0]}
+                </div>
+                <div>
+                  <h4 className="font-bold text-zinc-900">{voice.name}</h4>
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{voice.gender}</span>
+                </div>
+              </div>
+              {voice.isPremium && (
+                <div className="p-1.5 bg-amber-50 text-amber-500 rounded-lg">
+                  <Crown size={14} />
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-zinc-500 line-clamp-2 mb-4">{voice.description}</p>
+            <div className="flex flex-wrap gap-2">
+              {voice.tags?.map((tag) => (
+                <span key={tag} className="px-2 py-1 bg-zinc-50 text-zinc-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+
+const HistoryView = ({ history, onPlay, onDelete }: { history: Generation[], onPlay: (gen: Generation) => void, onDelete: (id: string | number) => void }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const filteredHistory = history.filter(h => 
+    h.text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    h.voice_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto space-y-8"
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider">
+            <History size={12} />
+            History
+          </div>
+          <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
+            Generation <span className="text-blue-500">History</span>
+          </h2>
+          <p className="text-zinc-500 text-lg max-w-2xl">
+            Access and manage your previous voice generations and captions.
+          </p>
+        </div>
+        
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+          <input 
+            type="text"
+            placeholder="Search history..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-white border border-zinc-200 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-all shadow-sm"
+          />
+        </div>
+      </div>
+
+      {filteredHistory.length === 0 ? (
+        <div className="text-center py-20 bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200">
+          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-300 mx-auto mb-4">
+            <History size={32} />
+          </div>
+          <p className="text-zinc-500 font-medium">No history found</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {filteredHistory.map((gen) => (
+            <div key={gen.id} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${gen.type === 'caption' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                    {gen.type || 'Voice'}
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-mono">{new Date(gen.created_at || Date.now()).toLocaleString()}</span>
+                </div>
+                <p className="text-sm text-zinc-900 font-medium line-clamp-2">{gen.text || "No text content"}</p>
+                <div className="flex items-center gap-4 text-[10px] text-zinc-500 uppercase font-bold tracking-widest">
+                  <span className="flex items-center gap-1"><User size={10} /> {gen.voice_name}</span>
+                  {gen.language && <span className="flex items-center gap-1"><Globe size={10} /> {gen.language}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => onPlay(gen)}
+                  className="p-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all"
+                >
+                  <Play size={18} />
+                </button>
+                <button 
+                  onClick={() => onDelete(gen.id)}
+                  className="p-3 bg-zinc-50 text-zinc-400 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const PricingModal = ({ onClose, onSelect }: { onClose: () => void, onSelect: (plan: string, credits: number) => void }) => {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/80 backdrop-blur-md">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className="w-full max-w-4xl bg-white border border-zinc-200 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+      >
+        <div className="flex justify-between items-center">
+          <div className="space-y-1">
+            <h3 className="text-3xl font-display font-bold text-zinc-900">Premium Plans</h3>
+            <p className="text-zinc-500">Choose the plan that fits your creative needs.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* Free Plan */}
+          <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
+            <div className="space-y-2">
+              <h4 className="text-lg font-bold text-zinc-900">Free</h4>
+              <div className="text-3xl font-display font-bold text-zinc-900">₹0<span className="text-sm text-zinc-500">/mo</span></div>
+            </div>
+            <ul className="text-xs text-zinc-500 space-y-3 flex-1">
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 20,000 Credits/mo</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Standard Voices</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Monthly Reset</li>
+            </ul>
+            <button disabled className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-400 font-bold text-sm">Current Plan</button>
+          </div>
+
+          {/* Basic Plan */}
+          <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
+            <div className="space-y-2">
+              <h4 className="text-lg font-bold text-zinc-900">Basic</h4>
+              <div className="text-3xl font-display font-bold text-zinc-900">₹100</div>
+            </div>
+            <ul className="text-xs text-zinc-500 space-y-3 flex-1">
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 6,000 Credits</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> No Expiry</li>
+            </ul>
+            <button onClick={() => onSelect('basic', 6000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
+          </div>
+
+          {/* Pro Plan */}
+          <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-6 flex flex-col relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest">Best Value</div>
+            <div className="space-y-2">
+              <h4 className="text-lg font-bold text-emerald-700">Pro</h4>
+              <div className="text-3xl font-display font-bold text-emerald-700">₹200</div>
+            </div>
+            <ul className="text-xs text-emerald-600 space-y-3 flex-1">
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 15,000 Credits</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
+            </ul>
+            <button onClick={() => onSelect('pro', 15000)} className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-all">Buy Now</button>
+          </div>
+
+          {/* Advanced Plan */}
+          <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
+            <div className="space-y-2">
+              <h4 className="text-lg font-bold text-zinc-900">Advanced</h4>
+              <div className="text-3xl font-display font-bold text-zinc-900">₹400</div>
+            </div>
+            <ul className="text-xs text-zinc-500 space-y-3 flex-1">
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 30,000 Credits</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
+            </ul>
+            <button onClick={() => onSelect('advanced', 30000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
+          </div>
+
+          {/* Ultra Plan */}
+          <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
+            <div className="space-y-2">
+              <h4 className="text-lg font-bold text-zinc-900">Ultra</h4>
+              <div className="text-3xl font-display font-bold text-zinc-900">₹500</div>
+            </div>
+            <ul className="text-xs text-zinc-500 space-y-3 flex-1">
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 40,000 Credits</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Custom Voice Profiles</li>
+            </ul>
+            <button onClick={() => onSelect('ultra', 40000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
+          </div>
+        </div>
+
+        <div className="p-6 bg-zinc-50 rounded-3xl text-center space-y-4">
+          <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest">Secure Payments via Razorpay</p>
+          <div className="flex flex-wrap justify-center items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+            <div className="flex flex-col items-center gap-1">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/b/b2/Google_Pay_Logo.svg" alt="Google Pay" className="h-6" referrerPolicy="no-referrer" />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_standalone.svg" alt="Paytm" className="h-4" referrerPolicy="no-referrer" />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon Pay" className="h-5" referrerPolicy="no-referrer" />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-6" referrerPolicy="no-referrer" />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo.png" alt="UPI" className="h-6" referrerPolicy="no-referrer" />
+            </div>
+          </div>
+          <p className="text-[10px] text-zinc-400">
+            * 1 Credit = ~10 characters of text. Credits are deducted only on successful generation.
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const CaptionEditor = ({ 
   words, 
   onUpdate 
@@ -775,13 +1059,11 @@ function Sidebar({
   userProfile, 
   onLogin, 
   onLogout, 
-  setShowPricing,
   handleShare,
   setIsPricingModalOpen,
   setShowVoiceLibrary,
   setShowSettings,
-  selectedVoice,
-  isWhitelisted
+  selectedVoice
 }: any) {
   return (
     <aside className={`
@@ -800,18 +1082,11 @@ function Sidebar({
 
       <nav className="flex flex-col gap-2">
         <button 
-          onClick={() => { setActiveTab('generate'); setIsMobileMenuOpen(false); }}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'generate' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+          onClick={() => { setActiveTab('tts'); setIsMobileMenuOpen(false); }}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'tts' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
         >
           <Mic size={20} />
           Text to Speech Voice
-        </button>
-        <button 
-          onClick={() => { setActiveTab('dubbing'); setIsMobileMenuOpen(false); }}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
-        >
-          <Languages size={20} />
-          AI Dubbing
         </button>
         <button 
           onClick={() => { setActiveTab('voice-changer'); setIsMobileMenuOpen(false); }}
@@ -923,7 +1198,7 @@ function Sidebar({
   );
 }
 
-export default function App() {
+function App() {
   const [text, setText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<Voice>(VOICES[1]);
   const [style, setStyle] = useState('normal');
@@ -961,8 +1236,15 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'dubbing' | 'library'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts'>('generate');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [dubbingFile, setDubbingFile] = useState<File | null>(null);
+  const [dubbingResult, setDubbingResult] = useState<any>(null);
+  const [dubbingMode, setDubbingMode] = useState<'convert' | 'dub'>('convert');
+  const [isDubbing, setIsDubbing] = useState(false);
+  const [dubbingStep, setDubbingStep] = useState('');
+  const [dubbingProgress, setDubbingProgress] = useState(0);
 
   const [showShareToast, setShowShareToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -973,13 +1255,6 @@ export default function App() {
     setTimeout(() => setShowShareToast(false), 3000);
   };
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-
-  // Reset selected voice if it's 'original' and user switches away from dubbing
-  useEffect(() => {
-    if (selectedVoice.id === 'original' && activeTab !== 'dubbing') {
-      setSelectedVoice(VOICES[1]);
-    }
-  }, [activeTab, selectedVoice.id]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1026,22 +1301,10 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [captionOffset, setCaptionOffset] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const dubbingVideoRef = useRef<HTMLVideoElement>(null);
-  const dubbingAudioRef = useRef<HTMLAudioElement>(null);
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionStep, setCaptionStep] = useState('');
   const [captionProgress, setCaptionProgress] = useState(0);
-  const [dubbingFile, setDubbingFile] = useState<File | null>(null);
-  const [dubbingResult, setDubbingResult] = useState<any>(null);
-  const [dubbingMode, setDubbingMode] = useState('auto');
-  const [isDubbing, setIsDubbing] = useState(false);
-  const [dubbingProgress, setDubbingProgress] = useState(0);
-  const [dubbingStep, setDubbingStep] = useState('');
-  const [dubbingLanguage, setDubbingLanguage] = useState('Hindi');
-  const [sourceLanguage, setSourceLanguage] = useState('English');
   const [showConfigError, setShowConfigError] = useState(false);
-  const [dubbingCurrentTime, setDubbingCurrentTime] = useState(0);
-  const [isSyncPlaying, setIsSyncPlaying] = useState(false);
 
   // Auto-save feature
   useEffect(() => {
@@ -1301,7 +1564,6 @@ export default function App() {
   const [showContact, setShowContact] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
@@ -1476,6 +1738,65 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return new Blob([data], { type: 'video/mp4' });
   };
 
+  const handleDubbing = async () => {
+    if (!dubbingFile) return;
+    setIsDubbing(true);
+    setDubbingProgress(0);
+    setDubbingStep('Preparing file...');
+
+    try {
+      const fileData = await fileToBase64(dubbingFile);
+      setDubbingProgress(20);
+      setDubbingStep('Uploading to AI engine...');
+
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch('/api/voice-changer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          fileData,
+          voice_id: selectedVoice.id,
+          mode: dubbingMode
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to change voice');
+      }
+
+      setDubbingProgress(60);
+      setDubbingStep('Processing audio...');
+
+      const { audioData } = await response.json();
+      
+      if (dubbingFile.type.startsWith('video/')) {
+        setDubbingStep('Merging with video...');
+        const videoBlob = await mergeDubbing(dubbingFile, audioData);
+        setDubbingResult({
+          url: URL.createObjectURL(videoBlob),
+          type: 'video'
+        });
+      } else {
+        setDubbingResult({
+          url: `data:audio/wav;base64,${audioData}`,
+          type: 'audio'
+        });
+      }
+
+      setDubbingProgress(100);
+      setDubbingStep('Complete!');
+      showToast("Voice changed successfully!");
+    } catch (err: any) {
+      setError(`Voice changer failed: ${err.message}`);
+    } finally {
+      setIsDubbing(false);
+    }
+  };
+
   const handleCaptioning = async () => {
     if (!captionFile) return;
     setIsCaptioning(true);
@@ -1545,7 +1866,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if (!captionFile || captionWords.length === 0) return;
     setIsCaptioning(true);
     setCaptionProgress(0);
-    setDubbingStep('Burning captions into video...'); // Reuse dubbingStep or add new state
+    setCaptionStep('Burning captions into video...'); 
     
     try {
       const videoBlob = await burnCaptions(captionFile, captionWords, captionStyle);
@@ -1560,85 +1881,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       setError(`Export failed: ${err.message}`);
     } finally {
       setIsCaptioning(false);
-    }
-  };
-
-  const handleDubbing = async () => {
-    if (!dubbingFile) return;
-    setIsDubbing(true);
-    setDubbingProgress(0);
-    setDubbingStep('Preparing video data...');
-    
-    try {
-      const videoData = await fileToBase64(dubbingFile);
-      setDubbingProgress(20);
-      setDubbingStep('Uploading to AI engine...');
-
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch('/api/generate-dubbing', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          videoData,
-          sourceLanguage,
-          targetLanguage: dubbingLanguage,
-          voiceName: selectedVoice.name,
-          mode: dubbingMode
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.code === 'AUTH_CONFIG_MISSING') {
-          setShowConfigError(true);
-          return;
-        }
-        throw new Error(errorData.error || 'Failed to generate dubbing');
-      }
-
-      setDubbingProgress(70);
-      setDubbingStep('Synthesizing AI voice...');
-
-      const data = await response.json();
-      
-      setDubbingResult({
-        videoUrl: URL.createObjectURL(dubbingFile),
-        audioUrl: `data:audio/wav;base64,${data.audioData}`,
-        text: data.translatedText,
-        segments: data.segments
-      });
-      
-      setDubbingProgress(100);
-      setDubbingStep('Dubbing Complete!');
-    } catch (err: any) {
-      setError(`Dubbing failed: ${err.message}`);
-    } finally {
-      setIsDubbing(false);
-    }
-  };
-
-  const handleExportDubbing = async () => {
-    if (!dubbingFile || !dubbingResult?.audioUrl) return;
-    setIsDubbing(true);
-    setDubbingProgress(0);
-    setDubbingStep('Merging audio and video...');
-    
-    try {
-      const videoBlob = await mergeDubbing(dubbingFile, dubbingResult.audioUrl);
-      const url = URL.createObjectURL(videoBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `dubbed-${dubbingFile.name}`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("Video exported successfully!");
-    } catch (err: any) {
-      setError(`Export failed: ${err.message}`);
-    } finally {
-      setIsDubbing(false);
     }
   };
 
@@ -2333,13 +2575,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             userProfile={userProfile}
             onLogin={handleLogin}
             onLogout={handleLogout}
-            setShowPricing={setShowPricing}
             handleShare={handleShare}
             setIsPricingModalOpen={setIsPricingModalOpen}
             setShowVoiceLibrary={setShowVoiceLibrary}
             setShowSettings={setShowSettings}
             selectedVoice={selectedVoice}
-            isWhitelisted={isWhitelisted}
           />
 
           {/* Main Content Area */}
@@ -2627,56 +2867,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   />
                 )}
                 
-                {activeTab === 'generate' && (
-                  <motion.div 
-                    key="generate"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
-                  >
-                    <div className="mb-12">
-                      <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <Sparkles size={12} />
-                          AI Image Studio
-                        </div>
-                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
-                          Visualize Your <span className="text-blue-500">Ideas</span>
-                        </h2>
-                        <p className="text-zinc-500 text-lg max-w-2xl">
-                          Generate stunning AI images from your text descriptions. Perfect for thumbnails, social media, and creative projects.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Image Generation UI placeholder */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="space-y-6">
-                        <div className="p-8 bg-white rounded-[2.5rem] border border-zinc-100 shadow-xl shadow-zinc-200/20 space-y-6">
-                          <div className="space-y-4">
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                              <Sparkles size={14} /> Prompt
-                            </label>
-                            <textarea 
-                              placeholder="A futuristic city with neon lights and flying cars..."
-                              className="w-full h-40 p-6 bg-zinc-50 rounded-3xl border border-zinc-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none text-zinc-900 placeholder:text-zinc-400 font-medium"
-                            />
-                          </div>
-                          
-                          <button className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-3 group shadow-xl shadow-zinc-900/10">
-                            Generate Image
-                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="aspect-square bg-zinc-50 rounded-[2.5rem] border border-zinc-100 flex items-center justify-center text-zinc-400 font-medium italic">
-                        Generated image will appear here
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
+
 
                 {activeTab === 'voice-changer' && (
                   <motion.div 
@@ -2689,7 +2880,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <div className="mb-12">
                       <div className="space-y-2">
                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <Mic2 size={12} />
+                          <Mic size={12} />
                           Voice Changer
                         </div>
                         <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
@@ -2723,79 +2914,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     onDelete={handleDeleteHistory}
                   />
                 )}
-
-                {activeTab === 'captions' && (
-                  <CaptionStudio />
-                )}
-
-                {activeTab === 'dubbing' && (
-                  <DubbingStudio />
-                )}
-                
-                {activeTab === 'library' && (
-                  <motion.div 
-                    key="library"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
-                  >
-                    <div className="mb-12">
-                      <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <Sparkles size={12} />
-                          Voice Library
-                        </div>
-                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
-                          Explore <span className="text-emerald-500">Premium</span> Voices
-                        </h2>
-                        <p className="text-zinc-500 text-lg max-w-2xl">
-                          Discover over 100+ high-quality AI voices for every project and language.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {VOICES.map((voice) => (
-                        <div key={voice.id} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all group">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
-                                <User size={24} />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-zinc-900">{voice.name}</h4>
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{voice.gender}</span>
-                              </div>
-                            </div>
-                            <button 
-                              onClick={() => {
-                                setSelectedVoice(voice);
-                                setActiveTab('tts');
-                              }}
-                              className="p-2 bg-zinc-50 text-zinc-400 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
-                            >
-                              <Play size={16} />
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {voice.tags.map((tag) => (
-                              <span key={tag} className="px-2 py-1 bg-zinc-50 text-zinc-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
               </AnimatePresence>
             </main>
 
             {/* Global Modals & Toasts */}
             <AnimatePresence>
-              {showPricing && <PricingModal onClose={() => setShowPricing(false)} onSelect={purchaseCredits} />}
+              {isPricingModalOpen && <PricingModal onClose={() => setIsPricingModalOpen(false)} onSelect={purchaseCredits} />}
               {showLimitToast && (
                 <motion.div 
                   initial={{ opacity: 0, y: 50 }}
@@ -2831,6 +2955,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </div>
                 </motion.div>
               )}
+              <SettingsModal />
             </AnimatePresence>
 
             {/* Configuration Error Modal */}
@@ -2931,126 +3056,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         )}
       </AnimatePresence>
 
-      {/* Pricing Modal */}
-      <AnimatePresence>
-        {isPricingModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/80 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="w-full max-w-4xl bg-white border border-zinc-200 rounded-[2.5rem] p-10 space-y-8 shadow-2xl overflow-y-auto max-h-[90vh]"
-            >
-              <div className="flex justify-between items-center">
-                <div className="space-y-1">
-                  <h3 className="text-3xl font-display font-bold text-zinc-900">Premium Plans</h3>
-                  <p className="text-zinc-500">Choose the plan that fits your creative needs.</p>
-                </div>
-                <button onClick={() => setIsPricingModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900">
-                  <X size={24} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Free Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Free</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹0<span className="text-sm text-zinc-500">/mo</span></div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 20,000 Credits/mo</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Standard Voices</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Monthly Reset</li>
-                  </ul>
-                  <button disabled className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-400 font-bold text-sm">Current Plan</button>
-                </div>
-
-                {/* Basic Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Basic</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹100</div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 6,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> No Expiry</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('basic', 6000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
-                </div>
-
-                {/* Pro Plan */}
-                <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-6 flex flex-col relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest">Best Value</div>
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-emerald-700">Pro</h4>
-                    <div className="text-3xl font-display font-bold text-emerald-700">₹200</div>
-                  </div>
-                  <ul className="text-xs text-emerald-600 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 15,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> High Quality Voices</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('pro', 15000)} className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-all">Buy Now</button>
-                </div>
-
-                {/* Advanced Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Advanced</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹400</div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 30,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Priority Support</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('advanced', 30000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
-                </div>
-
-                {/* Ultra Plan */}
-                <div className="p-6 bg-zinc-50 rounded-3xl border border-zinc-100 space-y-6 flex flex-col">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-zinc-900">Ultra</h4>
-                    <div className="text-3xl font-display font-bold text-zinc-900">₹500</div>
-                  </div>
-                  <ul className="text-xs text-zinc-500 space-y-3 flex-1">
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> 40,000 Credits</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> All Premium Features</li>
-                    <li className="flex items-center gap-2"><Check size={14} className="text-emerald-500" /> Custom Voice Profiles</li>
-                  </ul>
-                  <button onClick={() => purchaseCredits('ultra', 40000)} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold text-sm hover:bg-zinc-800 transition-all">Buy Now</button>
-                </div>
-              </div>
-
-              <div className="p-6 bg-zinc-50 rounded-3xl text-center space-y-4">
-                <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest">Secure Payments via Razorpay</p>
-                <div className="flex flex-wrap justify-center items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b2/Google_Pay_Logo.svg" alt="Google Pay" className="h-6" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/24/Paytm_Logo_standalone.svg" alt="Paytm" className="h-4" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon Pay" className="h-5" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-6" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo.png" alt="UPI" className="h-6" referrerPolicy="no-referrer" />
-                  </div>
-                </div>
-                <p className="text-[10px] text-zinc-400">
-                  * 1 Credit = ~10 characters of text. Credits are deducted only on successful generation.
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* Pricing Modal removed - consolidated above */}
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-6 md:p-12">
@@ -3539,13 +3545,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           <Upload size={48} />
                         </div>
                         <p className="font-bold">Click to upload video</p>
-                        <p className="text-xs opacity-50">MP4, MOV or WEBM (Max 50MB)</p>
+                        <p className="text-xs opacity-50">MP4, MOV or WEBM (Max 500MB)</p>
                       </div>
                     )}
                     <input 
                       type="file" id="video-upload-captions" hidden accept="video/*" 
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
+                        if (file && file.size > 500 * 1024 * 1024) {
+                          showToast("File too large (max 500MB)");
+                          return;
+                        }
                         setCaptionFile(file);
                         setCaptionResult(null);
                         setCaptionWords([]);
@@ -4036,225 +4046,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </motion.div>
               )}
             </motion.div>
-          ) : activeTab === 'dubbing' ? (
-            <motion.div 
-              key="dubbing"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto space-y-8"
-            >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold text-zinc-900">AI Video Dubbing</h2>
-                <p className="text-zinc-500">Translate and dub your videos into multiple languages while preserving the original speaker's voice characteristics.</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
-                  <div className="space-y-4">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload Video</label>
-                    <div 
-                      onClick={() => document.getElementById('video-upload-dubbing')?.click()}
-                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
-                    >
-                      <input 
-                        type="file" id="video-upload-dubbing" hidden accept="video/*" 
-                        onChange={(e) => {
-                          setDubbingFile(e.target.files?.[0] || null);
-                          setDubbingResult(null);
-                          setDubbingMode('dub');
-                        }}
-                      />
-                      {dubbingFile ? (
-                        <>
-                          <div className="p-4 bg-emerald-100 rounded-2xl text-emerald-600">
-                            <Video size={32} />
-                          </div>
-                          <div className="text-center">
-                            <p className="text-sm font-bold text-emerald-600">{dubbingFile.name}</p>
-                            <p className="text-xs text-zinc-500">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="p-4 bg-zinc-100 rounded-2xl text-zinc-400">
-                            <Upload size={32} />
-                          </div>
-                          <p className="text-sm text-zinc-500">Click to upload video</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">2. Source Language</label>
-                      <select 
-                        value={sourceLanguage}
-                        onChange={(e) => setSourceLanguage(e.target.value)}
-                        className="w-full p-3 bg-white border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition-all"
-                      >
-                        {['English', 'Hindi', 'Spanish', 'French', 'German', 'Japanese'].map((lang) => (
-                          <option key={lang} value={lang}>{lang}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-4">
-                      <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">3. Target Language</label>
-                      <select 
-                        value={dubbingLanguage}
-                        onChange={(e) => setDubbingLanguage(e.target.value)}
-                        className="w-full p-3 bg-white border border-zinc-100 rounded-xl text-xs font-bold text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition-all"
-                      >
-                        {['Hindi', 'English', 'Spanish', 'French', 'German', 'Japanese'].map((lang) => (
-                          <option key={lang} value={lang}>{lang}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">4. Voice Character</label>
-                    <button 
-                      onClick={() => setShowVoiceLibrary(true)}
-                      className="w-full p-4 bg-white border border-zinc-100 rounded-2xl flex items-center justify-between group hover:border-emerald-500/30 transition-all"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-white font-bold`}>
-                          {selectedVoice.name[0]}
-                        </div>
-                        <div className="text-left">
-                          <p className="text-sm font-bold text-zinc-900">{selectedVoice.name}</p>
-                          <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest">{selectedVoice.gender} • {selectedVoice.isPremium ? 'Pro' : 'Standard'}</p>
-                        </div>
-                      </div>
-                      <ChevronDown size={18} className="text-zinc-400 group-hover:text-emerald-500 transition-colors" />
-                    </button>
-                  </div>
-
-                  <button 
-                    onClick={handleDubbing}
-                    disabled={isDubbing || !dubbingFile}
-                    className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isDubbing ? (
-                      <>
-                        <Loader2 className="animate-spin" size={20} />
-                        {dubbingStep} ({dubbingProgress}%)
-                      </>
-                    ) : (
-                      <>
-                        <Languages size={20} />
-                        Start Dubbing
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="glass-panel p-8 rounded-[2.5rem] space-y-6 border-zinc-100">
-                  <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">Preview & Export</label>
-                  
-                  {dubbingResult ? (
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest">Original Video</label>
-                        <div className="aspect-video bg-zinc-900 rounded-3xl overflow-hidden relative group">
-                          <video 
-                            ref={dubbingVideoRef} 
-                            src={dubbingResult.videoUrl} 
-                            onTimeUpdate={() => setDubbingCurrentTime(dubbingVideoRef.current?.currentTime || 0)}
-                            className="w-full h-full object-contain" 
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-xs font-bold text-emerald-600 uppercase tracking-widest">Dubbed Audio ({dubbingLanguage})</label>
-                          <button 
-                            onClick={() => {
-                              const a = document.createElement('a');
-                              a.href = dubbingResult.audioUrl;
-                              a.download = `dubbed-audio-${dubbingLanguage}-${Date.now()}.wav`;
-                              a.click();
-                            }}
-                            className="text-emerald-600 hover:text-emerald-700 transition-all"
-                            title="Download Dubbed Audio"
-                          >
-                            <Download size={18} />
-                          </button>
-                        </div>
-                        <audio ref={dubbingAudioRef} src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
-                        
-                        <div className="pt-2 space-y-4">
-                          <button 
-                            onClick={() => {
-                              const v = dubbingVideoRef.current;
-                              const a = dubbingAudioRef.current;
-                              if (v && a) {
-                                if (isSyncPlaying) {
-                                  v.pause();
-                                  a.pause();
-                                  setIsSyncPlaying(false);
-                                } else {
-                                  v.currentTime = 0;
-                                  a.currentTime = 0;
-                                  v.muted = true;
-                                  v.play();
-                                  a.play();
-                                  setIsSyncPlaying(true);
-                                  a.onended = () => {
-                                    v.pause();
-                                    setIsSyncPlaying(false);
-                                  };
-                                  v.onended = () => {
-                                    a.pause();
-                                    setIsSyncPlaying(false);
-                                  };
-                                }
-                              }
-                            }}
-                            className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg ${isSyncPlaying ? 'bg-zinc-900 text-white' : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20'}`}
-                          >
-                            {isSyncPlaying ? <Pause size={20} /> : <Play size={20} />}
-                            {isSyncPlaying ? 'Stop Preview' : 'Play Dubbed Video'}
-                          </button>
-
-                          <button 
-                            onClick={handleExportDubbing}
-                            disabled={isDubbing}
-                            className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
-                          >
-                            {isDubbing ? <Loader2 size={18} className="animate-spin" /> : <Video size={18} />}
-                            Export Dubbed Video
-                          </button>
-                        </div>
-
-                        {dubbingResult.text && (
-                          <div className="space-y-2">
-                            <label className="block text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Translated Script</label>
-                            <p className="text-sm text-emerald-900 leading-relaxed italic">
-                              "{dubbingResult.text}"
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-4">
-                      <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center text-zinc-300">
-                        <Languages size={32} />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-zinc-400">No Video Dubbed</p>
-                        <p className="text-xs text-zinc-400">Upload a video and select target language to start.</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
           ) : (
             <motion.div 
               key="history"
@@ -4632,11 +4423,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
               <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {VOICES.filter(v => {
-                  const matchesSearch = v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
-                  if (v.id === 'original') {
-                    return matchesSearch && activeTab === 'dubbing';
-                  }
-                  return matchesSearch;
+                  return v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
                 }).map((voice) => (
                   <div 
                     key={voice.id}
@@ -4744,6 +4531,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           </div>
         )}
       </AnimatePresence>
+      </main>
 
       {/* Footer / Status */}
       <footer className="fixed bottom-0 left-0 right-0 md:left-64 p-4 border-t border-zinc-100 bg-white/80 backdrop-blur-md flex items-center justify-between text-[10px] text-zinc-400 uppercase tracking-[0.2em] z-40">
