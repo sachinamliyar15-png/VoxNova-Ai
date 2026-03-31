@@ -106,11 +106,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
           >
             Refresh Page
           </button>
-          {process.env.NODE_ENV === 'development' && (
-            <pre className="mt-8 p-4 bg-zinc-50 rounded-lg text-left text-xs text-red-600 overflow-auto max-w-full">
-              {this.state.error?.toString()}
-            </pre>
-          )}
+          <div className="mt-8 p-4 bg-zinc-50 rounded-lg text-left text-xs text-red-600 overflow-auto max-w-full">
+            <p className="font-bold mb-2">Error Details:</p>
+            <pre>{this.state.error?.toString()}</pre>
+            <pre className="mt-2 opacity-50">{this.state.error?.stack}</pre>
+          </div>
         </div>
       );
     }
@@ -1199,6 +1199,7 @@ function Sidebar({
 }
 
 function App() {
+  console.log("VoxNova: App component initializing...");
   const [text, setText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<Voice>(VOICES[1]);
   const [style, setStyle] = useState('normal');
