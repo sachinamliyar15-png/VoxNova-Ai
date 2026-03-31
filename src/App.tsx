@@ -812,10 +812,10 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId }: { onSelect: (voice: Voice) 
 const HistoryView = ({ history, onPlay, onDelete }: { history: Generation[], onPlay: (gen: Generation) => void, onDelete: (id: string | number) => void }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
-  const filteredHistory = history.filter(h => 
+  const filteredHistory = Array.isArray(history) ? history.filter(h => 
     h.text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     h.voice_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   return (
     <motion.div 
@@ -1552,9 +1552,15 @@ function App() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      setHistory(data);
+      if (Array.isArray(data)) {
+        setHistory(data);
+      } else {
+        console.error('History data is not an array:', data);
+        setHistory([]);
+      }
     } catch (err) {
       console.error('Failed to fetch history', err);
+      setHistory([]);
     }
   };
 
@@ -2230,10 +2236,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     setShowHistoryModal(false);
   };
 
-  const filteredHistory = history.filter(item => 
-    item.text.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
-    item.voice_name.toLowerCase().includes(historySearchTerm.toLowerCase())
-  );
+  const filteredHistory = Array.isArray(history) ? history.filter(item => 
+    item.text?.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+    item.voice_name?.toLowerCase().includes(historySearchTerm.toLowerCase())
+  ) : [];
 
   const SettingsModal = () => (
     <AnimatePresence>
