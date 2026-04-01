@@ -1332,6 +1332,39 @@ function App() {
 
 
 
+  const [isClassifying, setIsClassifying] = useState(false);
+
+  const handleClassifyScript = async () => {
+    if (!text || text.length < 10) {
+      showToast("Please enter a longer script for analysis.");
+      return;
+    }
+    setIsClassifying(true);
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch('/api/classify-script', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ text })
+      });
+      if (!response.ok) throw new Error("Classification failed");
+      const { suggestedVoiceId, category } = await response.json();
+      const voice = VOICES.find(v => v.id === suggestedVoiceId);
+      if (voice) {
+        setSelectedVoice(voice);
+        showToast(`Magic Suggest: Selected ${voice.name} for your ${category} script!`);
+      }
+    } catch (err) {
+      console.error("Classification error:", err);
+      showToast("Failed to analyze script. Please select a voice manually.");
+    } finally {
+      setIsClassifying(false);
+    }
+  };
+
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     const limit = currentUser ? 5000 : 200;
@@ -2748,12 +2781,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                                 <Mic size={14} className="text-emerald-500" /> Select Voice
                               </label>
-                              <button 
-                                onClick={() => setActiveTab('library')}
-                                className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider"
-                              >
-                                View All
-                              </button>
+                              <div className="flex items-center gap-4">
+                                <button
+                                  onClick={handleClassifyScript}
+                                  disabled={isClassifying || !text}
+                                  className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                                >
+                                  {isClassifying ? (
+                                    <RefreshCw size={12} className="animate-spin" />
+                                  ) : (
+                                    <Sparkles size={12} />
+                                  )}
+                                  Magic Suggest
+                                </button>
+                                <button 
+                                  onClick={() => setActiveTab('library')}
+                                  className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider"
+                                >
+                                  View All
+                                </button>
+                              </div>
                             </div>
                             
                             <div className="relative group">

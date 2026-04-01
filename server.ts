@@ -72,7 +72,8 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'jessica': 'Kore', 'sarah': 'Zephyr', 'matilda': 'Kore', 'emily': 'Zephyr',
   'bella': 'Kore', 'rachel': 'Zephyr', 'nicole': 'Kore', 'clara': 'Zephyr',
   'doc-pro': 'Charon', 'atlas-do': 'Fenrir', 'priyanka': 'Zephyr', 'virat-male': 'Charon',
-  'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr', 'pankaj': 'Fenrir', 'original': 'Zephyr'
+  'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr', 'pankaj': 'Fenrir', 'original': 'Zephyr',
+  'sultan': 'Fenrir', 'vikram': 'Charon', 'bharat': 'Fenrir', 'titan': 'Puck'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -848,6 +849,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
               speed,
               pitch,
               language,
+              audio_data: audioData, // Save audio data for history playback
               timestamp: admin.firestore.FieldValue.serverTimestamp()
             });
             console.log(`[History] Voice history saved for user: ${req.user.uid}`);
@@ -957,7 +959,29 @@ app.post("/api/voice-changer", authenticate, async (req: any, res) => {
       const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!audioData) throw new Error("Failed to generate speech in target voice");
 
-      return res.json({ audioData, text: translatedText });
+      // Convert PCM to WAV
+      const pcmBuffer = Buffer.from(audioData, 'base64');
+      const wavBuffer = addWavHeader(pcmBuffer, 24000);
+      const finalAudioData = wavBuffer.toString('base64');
+
+      // Save to history if firestore is available
+      if (firestore && userId) {
+        try {
+          await firestore.collection('voice_history').add({
+            userId,
+            text: translatedText,
+            voice_name: voice_id,
+            mode,
+            targetLanguage,
+            audio_data: finalAudioData,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+        } catch (saveErr) {
+          console.error("Failed to save voice changer history:", saveErr);
+        }
+      }
+
+      return res.json({ audioData: finalAudioData, text: translatedText });
     } catch (error: any) {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Voice Changer Attempt ${attempt + 1} failed:`, errorMessage);
@@ -1055,6 +1079,25 @@ app.post("/api/generate-image", authenticate, async (req: any, res) => {
   res.status(503).json({ error: "Failed to generate image after multiple attempts with different API keys." });
 });
 
+// Helper to add WAV header to PCM data
+function addWavHeader(pcmData: Buffer, sampleRate: number): Buffer {
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcmData.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // Mono
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28); // Byte rate
+  header.writeUInt16LE(2, 32); // Block align
+  header.writeUInt16LE(16, 34); // Bits per sample
+  header.write('data', 36);
+  header.writeUInt32LE(pcmData.length, 40);
+  return Buffer.concat([header, pcmData]);
+}
+
 // Preview Voice via Gemini API
 app.post("/api/preview-voice", async (req: any, res) => {
   const { voice_id, voice_name } = req.body;
@@ -1085,7 +1128,12 @@ app.post("/api/preview-voice", async (req: any, res) => {
         }
       });
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      return res.json({ audioData: base64Audio });
+      if (!base64Audio) throw new Error("No audio data returned from Gemini");
+      
+      // Convert PCM to WAV
+      const pcmBuffer = Buffer.from(base64Audio, 'base64');
+      const wavBuffer = addWavHeader(pcmBuffer, 24000);
+      return res.json({ audioData: wavBuffer.toString('base64') });
     } catch (error: any) {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Preview voice attempt ${attempt + 1} failed:`, errorMessage);
@@ -1105,6 +1153,41 @@ app.post("/api/preview-voice", async (req: any, res) => {
 
   res.status(503).json({ error: "Failed to generate preview after multiple attempts. This is likely due to API quota limits. Please try again later or provide more API keys in settings." });
 });
+// Classify Script to suggest a voice
+app.post("/api/classify-script", authenticate, async (req: any, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: "Text is required" });
+
+  const apiKey = getAvailableApiKey();
+  if (!apiKey) return res.status(503).json({ error: "API keys exhausted" });
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `Analyze the following script and suggest the best voice category from this list: "Motivational", "Mysterious", "Legendary", "Professional", "Energetic".
+    Script: "${text}"
+    Return ONLY the category name.`;
+
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    });
+
+    const category = result.text.trim();
+    
+    // Map category to voice ID
+    let suggestedVoiceId = 'leo';
+    if (category.includes("Motivational")) suggestedVoiceId = 'sultan';
+    else if (category.includes("Mysterious")) suggestedVoiceId = 'vikram';
+    else if (category.includes("Legendary")) suggestedVoiceId = 'bharat';
+    else if (category.includes("Professional")) suggestedVoiceId = 'pankaj';
+    else if (category.includes("Energetic")) suggestedVoiceId = 'titan';
+
+    res.json({ category, suggestedVoiceId });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Save generation to history & Deduct Credits
 app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
   const { text, voice, style, speed, pitch, audioData, creditCost } = req.body;
@@ -1125,17 +1208,22 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
       return res.status(403).json({ error: "Insufficient credits" });
     }
 
-    // Deduct credits in Firestore
+    // Deduct credits
     await userRef.update({
       credits: admin.firestore.FieldValue.increment(-creditCost)
     });
     
-    // Save generation in SQLite (History)
-    const stmt = db.prepare(`
-      INSERT INTO generations (user_id, text, voice_name, style, speed, pitch, audio_data)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(userId, text, voice, style, speed, pitch, audioData);
+      // Save to Firestore (History)
+      await firestore.collection('voice_history').add({
+        userId,
+        text,
+        voice_name: voice,
+        style,
+        speed,
+        pitch,
+        audio_data: audioData,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
 
     res.json({ success: true });
   } catch (error: any) {
@@ -1181,10 +1269,10 @@ app.post("/api/generate-captions", authenticate, async (req: any, res) => {
 
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Transcribe the following video/audio at a word-level with precise timestamps. 
+      const prompt = `Transcribe the following video/audio at a word-level with extremely precise timestamps. 
       Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
-      Example: [{"word": "hello", "start": 0.5, "end": 0.9}, ...]
-      Ensure the timestamps are perfectly synced with the speech. 
+      Example: [{"word": "hello", "start": 0.52, "end": 0.88}, ...]
+      CRITICAL: The timestamps MUST be perfectly aligned with the audio. Use at least 2 decimal places for precision.
       Correct any grammatical errors or misspellings in the transcription.
       Support both Hindi and English (Hinglish if mixed).
       Only return the JSON array, no other text.`;
@@ -1239,28 +1327,6 @@ app.post("/api/generate-captions", authenticate, async (req: any, res) => {
 
   res.status(503).json({ error: "Failed to generate captions after multiple attempts." });
 });
-
-// Helper to add WAV header to raw PCM data
-function addWavHeader(pcmBuffer: Buffer, sampleRate: number): Buffer {
-  const header = Buffer.alloc(44);
-  const length = pcmBuffer.length;
-
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + length, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20); // PCM
-  header.writeUInt16LE(1, 22); // Mono
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(sampleRate * 2, 28); // Byte rate
-  header.writeUInt16LE(2, 32); // Block align
-  header.writeUInt16LE(16, 34); // Bits per sample
-  header.write('data', 36);
-  header.writeUInt32LE(length, 40);
-
-  return Buffer.concat([header, pcmBuffer]);
-}
 
 app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) => {
   const userId = req.user.uid;
