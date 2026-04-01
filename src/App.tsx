@@ -387,6 +387,45 @@ const CAPTION_PRESETS: CaptionPreset[] = [
     animation: 'glow'
   },
   {
+    id: 'karaoke-blue',
+    name: 'Karaoke Blue',
+    style: {
+      fontSize: 40,
+      color: '#ffffff',
+      glow: false,
+      border: 'thick' as const,
+      font: 'Inter',
+      position: 'bottom' as const,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      outlineColor: '#3b82f6',
+      case: 'original' as const,
+      wordsPerLine: 5,
+      shadow: true,
+      shadowColor: 'rgba(0,0,0,0.5)',
+      strokeWidth: 2
+    },
+    animation: 'karaoke'
+  },
+  {
+    id: 'typewriter-white',
+    name: 'Typewriter White',
+    style: {
+      fontSize: 36,
+      color: '#ffffff',
+      glow: false,
+      border: 'none' as const,
+      font: 'Courier New',
+      position: 'bottom' as const,
+      backgroundColor: 'transparent',
+      case: 'original' as const,
+      wordsPerLine: 8,
+      shadow: true,
+      shadowColor: 'rgba(0,0,0,0.8)',
+      strokeWidth: 0
+    },
+    animation: 'typewriter'
+  },
+  {
     id: 'hindi-shadow-white',
     name: 'Hindi Shadow White',
     style: {
@@ -688,6 +727,18 @@ const CaptionOverlay = ({
           animate: { opacity: 1, filter: 'blur(0px)' },
           transition: { duration: 0.3 }
         };
+      case 'karaoke':
+        return {
+          initial: { opacity: 1 },
+          animate: { opacity: 1 },
+          transition: { duration: 0.1 }
+        };
+      case 'typewriter':
+        return {
+          initial: { width: 0, opacity: 0 },
+          animate: { width: 'auto', opacity: 1 },
+          transition: { duration: 0.3 }
+        };
       default:
         return {
           initial: { opacity: 0 },
@@ -711,9 +762,69 @@ const CaptionOverlay = ({
     backgroundColor: style.backgroundColor,
     padding: style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
     borderRadius: '8px',
+    display: 'inline-block',
+    whiteSpace: 'pre-wrap'
   };
 
   const positionClass = style.position === 'top' ? 'top-10' : style.position === 'middle' ? 'top-1/2 -translate-y-1/2' : 'bottom-10';
+
+  // For typewriter, we show words one by one as they are spoken
+  if (animation === 'typewriter') {
+    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+    if (!currentLine) return null;
+
+    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
+    const visibleWords = lineWords.filter(w => currentTime >= w.start);
+
+    return (
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+        <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
+          {visibleWords.map((w, i) => (
+            <motion.span 
+              key={i} 
+              initial={{ opacity: 0, x: -5 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="mx-1"
+            >
+              {w.word}
+            </motion.span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // For karaoke, we need to render all words in the current line and highlight the active one
+  if (animation === 'karaoke') {
+    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+    if (!currentLine) return null;
+
+    // Find the original words that belong to this line
+    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
+    
+    return (
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+        <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
+          {lineWords.map((w, i) => {
+            const isActive = currentTime >= w.start && currentTime <= w.end;
+            return (
+              <span 
+                key={i} 
+                className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
+                style={{
+                  color: isActive ? style.color : 'rgba(255,255,255,0.5)',
+                  textShadow: isActive ? (style.shadow ? `${style.shadowColor} 2px 2px 4px` : 'none') : 'none',
+                  WebkitTextStroke: isActive ? (style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor}` : 'none') : 'none',
+                }}
+              >
+                {w.word}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
@@ -1254,6 +1365,11 @@ function App() {
   const [isDubbing, setIsDubbing] = useState(false);
   const [dubbingStep, setDubbingStep] = useState('');
   const [dubbingProgress, setDubbingProgress] = useState(0);
+  const [isVoiceChanging, setIsVoiceChanging] = useState(false);
+  const [voiceChangingStep, setVoiceChangingStep] = useState('');
+  const [voiceChangingProgress, setVoiceChangingProgress] = useState(0);
+  const [voiceChangingResult, setVoiceChangingResult] = useState<any>(null);
+  const [voiceChangingFile, setVoiceChangingFile] = useState<File | null>(null);
 
   const [showShareToast, setShowShareToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -1788,6 +1904,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleDubbing = async () => {
     if (!dubbingFile) return;
+    if (!currentUser) {
+      setError("Please login to use AI Dubbing.");
+      return;
+    }
+    if (dubbingFile.size > 20 * 1024 * 1024) {
+      setError("File is too large (>20MB). Please upload a smaller file for better results.");
+      return;
+    }
     setIsDubbing(true);
     setDubbingProgress(0);
     setDubbingStep('Preparing file...');
@@ -1807,14 +1931,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         body: JSON.stringify({
           fileData,
           voice_id: selectedVoice.id,
-          mode: dubbingMode,
+          mode: 'dub',
           targetLanguage
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to change voice');
+        throw new Error(errorData.error || 'Failed to dub video');
       }
 
       setDubbingProgress(60);
@@ -1838,17 +1962,93 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
       setDubbingProgress(100);
       setDubbingStep('Complete!');
-      showToast("Voice changed successfully!");
+      showToast("Video dubbed successfully!");
       if (auth.currentUser) fetchUserProfile(auth.currentUser);
     } catch (err: any) {
-      setError(`Voice changer failed: ${err.message}`);
+      setError(`Dubbing failed: ${err.message}`);
     } finally {
       setIsDubbing(false);
     }
   };
 
+  const handleVoiceChanger = async () => {
+    if (!voiceChangingFile) return;
+    if (!currentUser) {
+      setError("Please login to use Voice Changer.");
+      return;
+    }
+    if (voiceChangingFile.size > 20 * 1024 * 1024) {
+      setError("File is too large (>20MB). Please upload a smaller file for better results.");
+      return;
+    }
+    setIsVoiceChanging(true);
+    setVoiceChangingProgress(0);
+    setVoiceChangingStep('Preparing file...');
+
+    try {
+      const fileData = await fileToBase64(voiceChangingFile);
+      setVoiceChangingProgress(20);
+      setVoiceChangingStep('Uploading to AI engine...');
+
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch('/api/voice-changer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          fileData,
+          voice_id: selectedVoice.id,
+          mode: 'convert'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to change voice');
+      }
+
+      setVoiceChangingProgress(60);
+      setVoiceChangingStep('Processing audio...');
+
+      const { audioData } = await response.json();
+      
+      if (voiceChangingFile.type.startsWith('video/')) {
+        setVoiceChangingStep('Merging with video...');
+        const videoBlob = await mergeDubbing(voiceChangingFile, audioData);
+        setVoiceChangingResult({
+          url: URL.createObjectURL(videoBlob),
+          type: 'video'
+        });
+      } else {
+        setVoiceChangingResult({
+          url: `data:audio/wav;base64,${audioData}`,
+          type: 'audio'
+        });
+      }
+
+      setVoiceChangingProgress(100);
+      setVoiceChangingStep('Complete!');
+      showToast("Voice changed successfully!");
+      if (auth.currentUser) fetchUserProfile(auth.currentUser);
+    } catch (err: any) {
+      setError(`Voice changer failed: ${err.message}`);
+    } finally {
+      setIsVoiceChanging(false);
+    }
+  };
+
   const handleCaptioning = async () => {
     if (!captionFile) return;
+    if (!currentUser) {
+      setError("Please login to generate captions.");
+      return;
+    }
+    if (captionFile.size > 20 * 1024 * 1024) {
+      setError("Video file is too large (>20MB). Please upload a smaller video for captioning.");
+      return;
+    }
     setIsCaptioning(true);
     setCaptionProgress(0);
     setCaptionStep('Preparing video data...');
@@ -3014,7 +3214,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             onChange={(e) => {
                               setDubbingFile(e.target.files?.[0] || null);
                               setDubbingResult(null);
-                              setDubbingMode('dub');
                             }}
                           />
                           {dubbingFile ? (
@@ -4176,24 +4375,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload File</label>
                     <div 
                       onClick={() => document.getElementById('audio-upload-vc')?.click()}
-                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${dubbingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
+                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${voiceChangingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
                     >
                       <input 
                         type="file" id="audio-upload-vc" hidden accept="audio/*,video/*" 
                         onChange={(e) => {
-                          setDubbingFile(e.target.files?.[0] || null);
-                          setDubbingResult(null);
-                          setDubbingMode('convert');
+                          setVoiceChangingFile(e.target.files?.[0] || null);
+                          setVoiceChangingResult(null);
                         }}
                       />
-                      {dubbingFile ? (
+                      {voiceChangingFile ? (
                         <>
                           <div className="p-4 bg-emerald-100 rounded-2xl text-emerald-600">
                             <Music size={32} />
                           </div>
                           <div className="text-center">
-                            <p className="text-sm font-bold text-emerald-600">{dubbingFile.name}</p>
-                            <p className="text-xs text-zinc-500">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                            <p className="text-sm font-bold text-emerald-600">{voiceChangingFile.name}</p>
+                            <p className="text-xs text-zinc-500">{(voiceChangingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
                           </div>
                         </>
                       ) : (
@@ -4227,22 +4425,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
                   <button 
                     onClick={() => {
-                      if (!dubbingFile) {
+                      if (!voiceChangingFile) {
                         setError("Please upload an audio or video file first to change voice.");
                         return;
                       }
-                      handleDubbing();
+                      handleVoiceChanger();
                     }}
-                    disabled={isDubbing}
-                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20'}`}
+                    disabled={isVoiceChanging}
+                    className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isVoiceChanging ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !voiceChangingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20'}`}
                   >
-                    {isDubbing ? (
+                    {isVoiceChanging ? (
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center gap-2">
                           <Loader2 className="animate-spin" size={24} />
                           <span className="font-bold">Processing...</span>
                         </div>
-                        <span className="text-[10px] opacity-70 animate-pulse">{dubbingStep}</span>
+                        <span className="text-[10px] opacity-70 animate-pulse">{voiceChangingStep}</span>
                       </div>
                     ) : (
                       <>
@@ -4252,16 +4450,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     )}
                   </button>
 
-                  {isDubbing && (
+                  {isVoiceChanging && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-[10px] text-zinc-500">
-                        <span>{dubbingStep}</span>
-                        <span>{dubbingProgress}%</span>
+                        <span>{voiceChangingStep}</span>
+                        <span>{voiceChangingProgress}%</span>
                       </div>
                       <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ width: 0 }}
-                          animate={{ width: `${dubbingProgress}%` }}
+                          animate={{ width: `${voiceChangingProgress}%` }}
                           className="h-full bg-emerald-500"
                         />
                       </div>
@@ -4270,7 +4468,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </div>
               </div>
 
-              {dubbingResult && (
+              {voiceChangingResult && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -4284,8 +4482,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       <button 
                         onClick={() => {
                           const a = document.createElement('a');
-                          a.href = dubbingResult.audioUrl;
-                          a.download = `voice-change-${Date.now()}.wav`;
+                          a.href = voiceChangingResult.url;
+                          a.download = `voice-change-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
                           a.click();
                         }}
                         className="p-3 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-all text-zinc-600"
@@ -4295,17 +4493,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     </div>
                   </div>
 
-                  {dubbingResult.text && (
-                    <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-                      <p className="text-sm text-zinc-600 leading-relaxed italic">
-                        "{dubbingResult.text}"
-                      </p>
+                  {voiceChangingResult.type === 'video' ? (
+                    <video 
+                      src={voiceChangingResult.url} 
+                      controls 
+                      className="w-full rounded-2xl shadow-lg aspect-video bg-black"
+                    />
+                  ) : (
+                    <div className="p-4 bg-zinc-100 rounded-2xl">
+                      <audio src={voiceChangingResult.url} controls className="w-full h-10 accent-emerald-500" />
                     </div>
                   )}
-                  
-                  <div className="p-4 bg-zinc-100 rounded-2xl">
-                    <audio src={dubbingResult.audioUrl} controls className="w-full h-10 accent-emerald-500" />
-                  </div>
                 </motion.div>
               )}
             </motion.div>

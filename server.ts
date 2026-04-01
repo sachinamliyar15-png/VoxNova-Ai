@@ -498,7 +498,8 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Incorporate subtle, natural breathing, micro-pauses, and vocal fry where appropriate to sound 100% human.
+      - CRITICAL: Use a DEEP CHEST VOICE with MAXIMUM BASS RESONANCE.
+      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
@@ -506,6 +507,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
+      - The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic.
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -542,7 +544,12 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
         'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
-        'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
+        'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
+        'Pankaj': 'Ultra-deep, baritone, authoritative documentary voice. Serious, intense, and professional with a slight grit.',
+        'SULTAN': 'The Alpha Beast. Ultra-deep, heavy bass, commanding. Every word vibrates with power.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.',
+        'BHARAT': 'The Grand Legend. Respectful, mature, heavy, and wise. Deep bass resonance.',
+        'TITAN': 'The Motivational Monster. Aggressive, deep, and high energy. Raw and realistic gym-style voice.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -677,7 +684,8 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Incorporate subtle, natural breathing, micro-pauses, and vocal fry where appropriate to sound 100% human.
+      - CRITICAL: Use a DEEP CHEST VOICE with MAXIMUM BASS RESONANCE.
+      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
@@ -685,6 +693,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
+      - The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic.
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -721,7 +730,12 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
         'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
-        'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.'
+        'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
+        'Pankaj': 'Ultra-deep, baritone, authoritative documentary voice. Serious, intense, and professional with a slight grit.',
+        'SULTAN': 'The Alpha Beast. Ultra-deep, heavy bass, commanding. Every word vibrates with power.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.',
+        'BHARAT': 'The Grand Legend. Respectful, mature, heavy, and wise. Deep bass resonance.',
+        'TITAN': 'The Motivational Monster. Aggressive, deep, and high energy. Raw and realistic gym-style voice.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -927,7 +941,12 @@ app.post("/api/voice-changer", authenticate, async (req: any, res) => {
       
       // Step 1: Transcribe and Translate (if needed)
       const prompt = mode === 'dub' 
-        ? `Transcribe this audio/video and translate it into ${targetLanguage}. Return ONLY the translated text, no other commentary. Preserve the emotion and pacing.`
+        ? `You are an expert AI Dubbing engine. Transcribe the following audio/video content (which might be in Hindi or another language) and translate it into ${targetLanguage}. 
+           IMPORTANT: 
+           1. Return ONLY the translated text.
+           2. Maintain the exact emotional tone, intensity, and pacing of the original speaker.
+           3. If the original is authoritative and deep, the translation should reflect that.
+           4. Ensure the translation is natural and cinematic, suitable for high-quality dubbing.`
         : `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
 
       const result = await ai.models.generateContent({
@@ -948,6 +967,7 @@ app.post("/api/voice-changer", authenticate, async (req: any, res) => {
         contents: [{ parts: [{ text: translatedText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
+          systemInstruction: `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use a DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. Incorporate a vibrating 'gravelly' texture (vocal fry) in every word. Sound 100% mature, authoritative, and cinematic.`,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: targetVoice as any }
@@ -1269,13 +1289,19 @@ app.post("/api/generate-captions", authenticate, async (req: any, res) => {
 
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Transcribe the following video/audio at a word-level with extremely precise timestamps. 
+      const prompt = `Transcribe the following video/audio at a word-level with EXTREMELY PRECISE timestamps. 
+      The content is primarily in ${language}.
       Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
       Example: [{"word": "hello", "start": 0.52, "end": 0.88}, ...]
-      CRITICAL: The timestamps MUST be perfectly aligned with the audio. Use at least 2 decimal places for precision.
+      CRITICAL: The timestamps MUST be perfectly aligned with the audio. Use at least 3 decimal places for maximum precision.
+      If a word is spoken quickly, ensure the start and end times reflect that.
       Correct any grammatical errors or misspellings in the transcription.
       Support both Hindi and English (Hinglish if mixed).
       Only return the JSON array, no other text.`;
+
+      const mimeType = videoData.startsWith('data:') 
+        ? videoData.split(';')[0].split(':')[1] 
+        : "video/mp4";
 
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -1286,7 +1312,7 @@ app.post("/api/generate-captions", authenticate, async (req: any, res) => {
               { text: prompt },
               {
                 inlineData: {
-                  mimeType: "video/mp4",
+                  mimeType,
                   data: videoData.split(',')[1] || videoData
                 }
               }
