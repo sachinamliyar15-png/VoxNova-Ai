@@ -73,7 +73,9 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'bella': 'Kore', 'rachel': 'Zephyr', 'nicole': 'Kore', 'clara': 'Zephyr',
   'doc-pro': 'Charon', 'atlas-do': 'Fenrir', 'priyanka': 'Zephyr', 'virat-male': 'Charon',
   'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr', 'pankaj': 'Fenrir', 'original': 'Zephyr',
-  'sultan': 'Fenrir', 'vikram': 'Charon', 'bharat': 'Fenrir', 'titan': 'Puck'
+  'sultan': 'Fenrir', 'vikram': 'Charon', 'bharat': 'Fenrir', 'titan': 'Puck',
+  'shera': 'Fenrir', 'kaal': 'Charon', 'bheem': 'Fenrir', 'sikandar': 'Charon',
+  'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon', 'VIKRAM': 'Charon'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -489,16 +491,19 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
         'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
         'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon'
+        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
+        'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon'
       };
 
       const targetVoice = voiceMapping[voice_name] || 'Puck';
+      
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      - CRITICAL: Use a DEEP CHEST VOICE with MAXIMUM BASS RESONANCE.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
@@ -507,7 +512,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
-      - The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic.
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -546,10 +551,12 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
         'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
         'Pankaj': 'Ultra-deep, baritone, authoritative documentary voice. Serious, intense, and professional with a slight grit.',
-        'SULTAN': 'The Alpha Beast. Ultra-deep, heavy bass, commanding. Every word vibrates with power.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.',
-        'BHARAT': 'The Grand Legend. Respectful, mature, heavy, and wise. Deep bass resonance.',
-        'TITAN': 'The Motivational Monster. Aggressive, deep, and high energy. Raw and realistic gym-style voice.'
+        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry.',
+        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful.',
+        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains.',
+        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency.',
+        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -680,11 +687,13 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
       
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat'].includes(voice_name);
+      
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      - CRITICAL: Use a DEEP CHEST VOICE with MAXIMUM BASS RESONANCE.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
@@ -693,7 +702,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
-      - The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic.
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -732,10 +741,12 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
         'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
         'Pankaj': 'Ultra-deep, baritone, authoritative documentary voice. Serious, intense, and professional with a slight grit.',
-        'SULTAN': 'The Alpha Beast. Ultra-deep, heavy bass, commanding. Every word vibrates with power.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.',
-        'BHARAT': 'The Grand Legend. Respectful, mature, heavy, and wise. Deep bass resonance.',
-        'TITAN': 'The Motivational Monster. Aggressive, deep, and high energy. Raw and realistic gym-style voice.'
+        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry.',
+        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful.',
+        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains.',
+        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency.',
+        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;

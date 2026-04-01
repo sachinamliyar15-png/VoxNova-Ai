@@ -883,9 +883,9 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId }: { onSelect: (voice: Voice) 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredVoices.map((voice) => (
+        {filteredVoices.map((voice, idx) => (
           <div 
-            key={voice.id} 
+            key={`${voice.id}-${idx}`} 
             onClick={() => onSelect(voice)}
             className={`p-6 bg-white rounded-3xl border transition-all group cursor-pointer relative overflow-hidden ${selectedVoiceId === voice.id ? 'border-emerald-500 ring-4 ring-emerald-500/10' : 'border-zinc-100 hover:border-zinc-300 shadow-sm hover:shadow-md'}`}
           >
@@ -969,8 +969,8 @@ const HistoryView = ({ history, onPlay, onDelete }: { history: Generation[], onP
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {filteredHistory.map((gen) => (
-            <div key={gen.id} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
+          {filteredHistory.map((gen, idx) => (
+            <div key={`${gen.id}-${idx}`} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3">
                   <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${gen.type === 'caption' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -1714,7 +1714,16 @@ function App() {
       });
       const data = await res.json();
       if (Array.isArray(data)) {
-        setHistory(data);
+        // Filter out duplicates by ID
+        const uniqueHistory = data.reduce((acc: Generation[], current: Generation) => {
+          const x = acc.find(item => item.id === current.id);
+          if (!x) {
+            return acc.concat([current]);
+          } else {
+            return acc;
+          }
+        }, []);
+        setHistory(uniqueHistory);
       } else {
         console.error('History data is not an array:', data);
         setHistory([]);
@@ -3024,9 +3033,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                     className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl border border-zinc-100 shadow-2xl z-50 overflow-hidden p-2"
                                   >
                                     <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                                      {VOICES.slice(0, 8).map(voice => (
+                                      {VOICES.slice(0, 8).map((voice, idx) => (
                                         <button
-                                          key={voice.id}
+                                          key={`${voice.id}-${idx}`}
                                           onClick={() => {
                                             setSelectedVoice(voice);
                                             setIsFeatureMenuOpen(false);
@@ -4523,8 +4532,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <p className="text-zinc-500">No generations yet. Start by creating some audio!</p>
                   </div>
                 ) : (
-                  history.map((item) => (
-                    <div key={item.id} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
+                  history.map((item, idx) => (
+                    <div key={`${item.id}-${idx}`} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           {item.type === 'caption' ? (
