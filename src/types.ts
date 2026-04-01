@@ -49,6 +49,21 @@ export const VOICES: Voice[] = [
   { id: 'vikram', name: 'VIKRAM', gender: 'male', color: 'from-slate-800 to-zinc-900', description: 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Ideal for crime thrillers and horror stories.', isPremium: true },
   { id: 'doc-pro', name: 'Documentary Pro', gender: 'male', color: 'from-emerald-700 to-teal-900', description: 'Deep, cinematic, elite documentary narration. National Geographic style quality.', isPremium: true },
   { id: 'adam', name: 'Adam', gender: 'male', color: 'from-blue-500 to-indigo-600', description: 'Deep, resonant, professional cinematic voice. Perfect for high-end commercials and movie trailers.' },
+  {
+  id: 'munna-bhai',
+  name: 'Munna Bhai',
+  gender: 'male',
+  color: 'from-black via-red-700 to-orange-600',
+  description: 'Ultra-heavy, powerful, deep baritone desi voice with explosive energy and commanding presence. Loud, aggressive, and highly impactful delivery that feels like a fearless leader speaking directly to you. Perfect for extreme motivation, warrior mindset, and high-intensity storytelling.'
+  { id: 'sachinboy', 
+  name: 'Sachinboy', 
+  gender: 'male', 
+  color: 'from-black via-red-900 to-red-600', 
+  description: 'The undisputed heavyweight champion of AI voices. A monstrous, chest-rattling deep baritone with explosive, fearless energy. It delivers words like a thunderclap—loud, aggressive, and incredibly professional. Perfect for hardcore motivation, dark documentaries, and raw warrior mindset content.', 
+  isPremium: true 
+}
+
+  
 ];
 
 export interface Generation {
