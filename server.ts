@@ -65,14 +65,14 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
   'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
   'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
-  'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr',
+  'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr', 'Pankaj': 'Fenrir', 'Original Voice': 'Zephyr',
   'adam': 'Puck', 'brian': 'Charon', 'daniel': 'Fenrir', 'josh': 'Puck',
   'liam': 'Charon', 'michael': 'Fenrir', 'ryan': 'Puck', 'matthew': 'Charon',
   'bill': 'Fenrir', 'callum': 'Puck', 'frank': 'Zephyr', 'marcus': 'Charon',
   'jessica': 'Kore', 'sarah': 'Zephyr', 'matilda': 'Kore', 'emily': 'Zephyr',
   'bella': 'Kore', 'rachel': 'Zephyr', 'nicole': 'Kore', 'clara': 'Zephyr',
   'doc-pro': 'Charon', 'atlas-do': 'Fenrir', 'priyanka': 'Zephyr', 'virat-male': 'Charon',
-  'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr'
+  'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr', 'pankaj': 'Fenrir', 'original': 'Zephyr'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -880,11 +880,126 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
 });
 
 // Generate Image via Gemini API
+app.post("/api/voice-changer", authenticate, async (req: any, res) => {
+  const { fileData, voice_id, mode, targetLanguage = 'English' } = req.body;
+  const userId = req.user?.uid;
+  const creditCost = 10; // Fixed cost for voice changing/dubbing
+
+  if (!fileData) return res.status(400).json({ error: "File data is required" });
+  if (!voice_id) return res.status(400).json({ error: "Voice ID is required" });
+
+  try {
+    if (userId && firestore) {
+      const userRef = firestore.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists || (userDoc.data()?.credits || 0) < creditCost) {
+        return res.status(403).json({ error: "Insufficient credits" });
+      }
+      await userRef.update({
+        credits: admin.firestore.FieldValue.increment(-creditCost)
+      });
+    }
+  } catch (err: any) {
+    console.error("Credit deduction failed:", err);
+    return res.status(500).json({ error: "Failed to process credits" });
+  }
+
+  const targetVoice = INTERNAL_VOICE_MAPPING[voice_id] || voice_id;
+  
+  // Extract base64 data and mime type
+  const matches = fileData.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: "Invalid file data format" });
+  
+  const mimeType = matches[1];
+  const base64Data = matches[2];
+
+  const maxRetries = 15;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    const apiKey = getAvailableApiKey();
+    if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      
+      // Step 1: Transcribe and Translate (if needed)
+      const prompt = mode === 'dub' 
+        ? `Transcribe this audio/video and translate it into ${targetLanguage}. Return ONLY the translated text, no other commentary. Preserve the emotion and pacing.`
+        : `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
+        ]
+      });
+
+      const translatedText = result.text?.trim();
+      if (!translatedText) throw new Error("Failed to transcribe/translate audio");
+
+      console.log(`[Voice Changer] Transcribed/Translated text: ${translatedText.substring(0, 50)}...`);
+
+      // Step 2: Generate Speech in Target Voice
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: translatedText }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: targetVoice as any }
+            }
+          }
+        }
+      });
+
+      const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!audioData) throw new Error("Failed to generate speech in target voice");
+
+      return res.json({ audioData, text: translatedText });
+    } catch (error: any) {
+      const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+      console.error(`Voice Changer Attempt ${attempt + 1} failed:`, errorMessage);
+      
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+          markKeyAsExhausted(apiKey);
+        }
+        attempt++;
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  }
+
+  res.status(503).json({ error: "Failed to process voice change after multiple attempts." });
+});
+
 app.post("/api/generate-image", authenticate, async (req: any, res) => {
   const { prompt, aspectRatio } = req.body;
-  
+  const userId = req.user.uid;
+  const creditCost = 20;
+
   if (!prompt) {
     return res.status(400).json({ error: "Prompt is required" });
+  }
+
+  try {
+    if (firestore) {
+      const userRef = firestore.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists || (userDoc.data()?.credits || 0) < creditCost) {
+        return res.status(403).json({ error: "Insufficient credits" });
+      }
+      await userRef.update({
+        credits: admin.firestore.FieldValue.increment(-creditCost)
+      });
+    }
+  } catch (err: any) {
+    console.error("Credit deduction failed:", err);
+    return res.status(500).json({ error: "Failed to process credits" });
   }
 
   const maxRetries = 15;
@@ -1030,12 +1145,29 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
 });
 
 // Generate Captions via Gemini API
-app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
+app.post("/api/generate-captions", authenticate, async (req: any, res) => {
   const { videoData, language } = req.body;
-  const userId = req.user?.uid || 'guest';
+  const userId = req.user.uid;
+  const creditCost = 5;
 
   if (!videoData) {
     return res.status(400).json({ error: "Video data is required" });
+  }
+
+  try {
+    if (firestore) {
+      const userRef = firestore.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists || (userDoc.data()?.credits || 0) < creditCost) {
+        return res.status(403).json({ error: "Insufficient credits" });
+      }
+      await userRef.update({
+        credits: admin.firestore.FieldValue.increment(-creditCost)
+      });
+    }
+  } catch (err: any) {
+    console.error("Credit deduction failed:", err);
+    return res.status(500).json({ error: "Failed to process credits" });
   }
 
   const maxRetries = 5;

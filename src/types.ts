@@ -38,6 +38,8 @@ export const VOICES: Voice[] = [
   { id: 'sophia', name: 'Sophia', gender: 'female', color: 'from-rose-400 to-pink-600', description: 'Soft, intimate, and deeply emotional. Ideal for romantic narratives and heartfelt messages.' },
   { id: 'hugo', name: 'Hugo', gender: 'male', color: 'from-indigo-700 to-blue-900', description: 'Gravelly, intense, and full of character. Perfect for villains or gritty protagonists.' },
   { id: 'elara', name: 'Elara', gender: 'female', color: 'from-emerald-400 to-teal-500', description: 'Bright, energetic, and enthusiastic. Excellent for tutorials and high-energy marketing.' },
+  { id: 'pankaj', name: 'Pankaj', gender: 'male', color: 'from-zinc-800 to-black', description: 'Ultra-deep, baritone, authoritative documentary voice. Serious, intense, and professional with a slight grit.', isPremium: true },
+  { id: 'original', name: 'Original Voice', gender: 'male', color: 'from-zinc-400 to-zinc-600', description: 'Preserve the original character and tone of your voice while translating.' },
 ];
 
 export interface Generation {

@@ -1096,6 +1096,13 @@ function Sidebar({
           Voice Changer
         </button>
         <button 
+          onClick={() => { setActiveTab('dubbing'); setIsMobileMenuOpen(false); }}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+        >
+          <Video size={20} />
+          AI Dubbing
+        </button>
+        <button 
           onClick={() => { setActiveTab('captions'); setIsMobileMenuOpen(false); }}
           className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'captions' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
         >
@@ -1237,10 +1244,11 @@ function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts' | 'dubbing'>('generate');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [dubbingFile, setDubbingFile] = useState<File | null>(null);
+  const [targetLanguage, setTargetLanguage] = useState('English');
   const [dubbingResult, setDubbingResult] = useState<any>(null);
   const [dubbingMode, setDubbingMode] = useState<'convert' | 'dub'>('convert');
   const [isDubbing, setIsDubbing] = useState(false);
@@ -1766,7 +1774,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         body: JSON.stringify({
           fileData,
           voice_id: selectedVoice.id,
-          mode: dubbingMode
+          mode: dubbingMode,
+          targetLanguage
         })
       });
 
@@ -1797,6 +1806,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       setDubbingProgress(100);
       setDubbingStep('Complete!');
       showToast("Voice changed successfully!");
+      if (auth.currentUser) fetchUserProfile(auth.currentUser);
     } catch (err: any) {
       setError(`Voice changer failed: ${err.message}`);
     } finally {
@@ -1862,6 +1872,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       
       setCaptionProgress(100);
       setCaptionStep('Captions ready!');
+      if (auth.currentUser) fetchUserProfile(auth.currentUser);
     } catch (err: any) {
       setError(`Captioning failed: ${err.message}`);
     } finally {
@@ -2899,13 +2910,211 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
                     </div>
                     
-                    <div className="p-12 bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center space-y-4">
+                    <div 
+                      onClick={() => document.getElementById('audio-upload-vc')?.click()}
+                      className="p-12 bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center space-y-4 cursor-pointer hover:bg-zinc-100 transition-all"
+                    >
+                      <input 
+                        type="file" id="audio-upload-vc" hidden accept="audio/*" 
+                        onChange={(e) => {
+                          setDubbingFile(e.target.files?.[0] || null);
+                          setDubbingResult(null);
+                          setDubbingMode('convert');
+                        }}
+                      />
                       <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-400">
                         <Upload size={32} />
                       </div>
                       <div>
                         <p className="text-zinc-900 font-bold">Upload Audio File</p>
                         <p className="text-zinc-500 text-sm">Drag and drop or click to browse (MP3, WAV, M4A)</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === 'dubbing' && (
+                  <motion.div 
+                    key="dubbing"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
+                  >
+                    <div className="mb-12">
+                      <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <Video size={12} />
+                          AI Dubbing
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
+                          Dub Your <span className="text-blue-500">Videos</span>
+                        </h2>
+                        <p className="text-zinc-500 text-lg max-w-2xl">
+                          Automatically translate and dub your videos into multiple languages while preserving the original voice and emotion.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                      <div className="space-y-8">
+                        <div 
+                          onClick={() => document.getElementById('video-upload-dub')?.click()}
+                          className={`p-12 rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center text-center space-y-4 cursor-pointer transition-all ${dubbingFile ? 'border-blue-500/50 bg-blue-50' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'}`}
+                        >
+                          <input 
+                            type="file" id="video-upload-dub" hidden accept="video/*,audio/*" 
+                            onChange={(e) => {
+                              setDubbingFile(e.target.files?.[0] || null);
+                              setDubbingResult(null);
+                              setDubbingMode('dub');
+                            }}
+                          />
+                          {dubbingFile ? (
+                            <>
+                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-blue-500">
+                                <Video size={32} />
+                              </div>
+                              <div>
+                                <p className="text-zinc-900 font-bold">{dubbingFile.name}</p>
+                                <p className="text-zinc-500 text-sm">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-400">
+                                <Upload size={32} />
+                              </div>
+                              <div>
+                                <p className="text-zinc-900 font-bold">Upload Video File</p>
+                                <p className="text-zinc-500 text-sm">Drag and drop or click to browse (MP4, WEBM, MOV)</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Target Language</label>
+                            <select 
+                              value={targetLanguage}
+                              onChange={(e) => setTargetLanguage(e.target.value)}
+                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            >
+                              <option value="English">English</option>
+                              <option value="Hindi">Hindi</option>
+                              <option value="Spanish">Spanish</option>
+                              <option value="French">French</option>
+                              <option value="German">German</option>
+                              <option value="Japanese">Japanese</option>
+                              <option value="Portuguese">Portuguese</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-3">
+                            <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Target Voice</label>
+                            <div 
+                              onClick={() => setShowVoiceLibrary(true)}
+                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}>
+                                  {selectedVoice.name[0]}
+                                </div>
+                                <span className="text-sm font-medium text-zinc-900">{selectedVoice.name}</span>
+                              </div>
+                              <ChevronDown size={16} className="text-zinc-400" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={handleDubbing}
+                          disabled={isDubbing || !dubbingFile}
+                          className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-blue-500 text-white hover:bg-blue-600 shadow-blue-500/20'}`}
+                        >
+                          {isDubbing ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="animate-spin" size={24} />
+                                <span className="font-bold">Dubbing...</span>
+                              </div>
+                              <span className="text-[10px] opacity-70 animate-pulse">{dubbingStep}</span>
+                            </div>
+                          ) : (
+                            <>
+                              <Sparkles size={24} />
+                              Start Dubbing (10 Credits)
+                            </>
+                          )}
+                        </button>
+
+                        {isDubbing && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] text-zinc-500">
+                              <span>{dubbingStep}</span>
+                              <span>{dubbingProgress}%</span>
+                            </div>
+                            <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${dubbingProgress}%` }}
+                                className="h-full bg-blue-500"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-6">
+                        {dubbingResult ? (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-zinc-900 rounded-[2.5rem] p-8 space-y-6 shadow-2xl overflow-hidden relative group"
+                          >
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="text-white font-bold flex items-center gap-2">
+                                <Sparkles className="text-blue-400" /> Dubbed Result
+                              </h3>
+                              <button 
+                                onClick={() => {
+                                  const a = document.createElement('a');
+                                  a.href = dubbingResult.url;
+                                  a.download = `dubbed-${Date.now()}.${dubbingResult.type === 'video' ? 'mp4' : 'wav'}`;
+                                  a.click();
+                                }}
+                                className="p-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all"
+                              >
+                                <Download size={20} />
+                              </button>
+                            </div>
+
+                            {dubbingResult.type === 'video' ? (
+                              <video 
+                                src={dubbingResult.url} 
+                                controls 
+                                className="w-full rounded-2xl shadow-lg aspect-video bg-black"
+                              />
+                            ) : (
+                              <audio 
+                                src={dubbingResult.url} 
+                                controls 
+                                className="w-full"
+                              />
+                            )}
+                          </motion.div>
+                        ) : (
+                          <div className="h-full min-h-[400px] bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center p-12 space-y-4">
+                            <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center text-zinc-300">
+                              <Play size={40} />
+                            </div>
+                            <div>
+                              <p className="text-zinc-900 font-bold">Preview Area</p>
+                              <p className="text-zinc-500 text-sm">Your dubbed video will appear here once processed.</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>
