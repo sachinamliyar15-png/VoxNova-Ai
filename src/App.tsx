@@ -1482,15 +1482,19 @@ function App() {
   };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    const limit = currentUser ? 5000 : 200;
+    let val = e.target.value;
+    // If user pastes more than 5000, we allow up to 10000 but truncate to 5000 like ElevenLabs
+    if (val.length > 5000) {
+      val = val.substring(0, 5000);
+      setShowLimitToast(true);
+      setTimeout(() => setShowLimitToast(false), 3000);
+    }
+    
+    const limit = currentUser ? 5000 : 300; // Increased guest limit slightly
     if (val.length <= limit) {
       setText(val);
-      if (val.length === limit) {
-        setShowLimitToast(true);
-        setTimeout(() => setShowLimitToast(false), 3000);
-      }
     } else {
+      setText(val.substring(0, limit));
       setShowLimitToast(true);
       setTimeout(() => setShowLimitToast(false), 3000);
     }
@@ -1904,12 +1908,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleDubbing = async () => {
     if (!dubbingFile) return;
-    if (!currentUser) {
-      setError("Please login to use AI Dubbing.");
-      return;
-    }
-    if (dubbingFile.size > 20 * 1024 * 1024) {
-      setError("File is too large (>20MB). Please upload a smaller file for better results.");
+    const limit = currentUser ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB for logged in, 50MB for guest
+    if (dubbingFile.size > limit) {
+      setError(`File is too large (> ${currentUser ? '1GB' : '50MB'}). Please upload a smaller file.`);
       return;
     }
     setIsDubbing(true);
@@ -1973,12 +1974,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleVoiceChanger = async () => {
     if (!voiceChangingFile) return;
-    if (!currentUser) {
-      setError("Please login to use Voice Changer.");
-      return;
-    }
-    if (voiceChangingFile.size > 20 * 1024 * 1024) {
-      setError("File is too large (>20MB). Please upload a smaller file for better results.");
+    const limit = currentUser ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB for logged in, 50MB for guest
+    if (voiceChangingFile.size > limit) {
+      setError(`File is too large (> ${currentUser ? '1GB' : '50MB'}). Please upload a smaller file.`);
       return;
     }
     setIsVoiceChanging(true);
@@ -2041,12 +2039,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleCaptioning = async () => {
     if (!captionFile) return;
-    if (!currentUser) {
-      setError("Please login to generate captions.");
-      return;
-    }
-    if (captionFile.size > 20 * 1024 * 1024) {
-      setError("Video file is too large (>20MB). Please upload a smaller video for captioning.");
+    const limit = currentUser ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB for logged in, 50MB for guest
+    if (captionFile.size > limit) {
+      setError(`Video file is too large (> ${currentUser ? '1GB' : '50MB'}). Please upload a smaller video for captioning.`);
       return;
     }
     setIsCaptioning(true);
@@ -3576,72 +3571,73 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   <textarea 
                     value={text}
                     onChange={handleTextChange}
-                    placeholder={`Enter your script here... (up to ${currentUser ? '5,000' : '200'} characters)`}
-                    className="w-full h-80 bg-white border-2 border-zinc-100 rounded-3xl p-8 text-xl leading-relaxed resize-none focus:outline-none focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 transition-all placeholder:text-zinc-300 text-zinc-900 shadow-sm"
+                    placeholder={`Enter your script here... (Paste up to 10,000 characters, will auto-truncate to 5,000)`}
+                    className="w-full h-[500px] bg-white border-2 border-zinc-100 rounded-3xl p-8 text-xl md:text-2xl leading-relaxed resize-none focus:outline-none focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 transition-all placeholder:text-zinc-300 text-zinc-900 shadow-sm"
                   />
-                  
-                  <div className="absolute bottom-6 left-8 right-8 flex items-center justify-between pointer-events-none">
-                    <div className="flex items-center gap-3 pointer-events-auto">
-                      <div className="relative w-5 h-5">
-                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                          <circle
-                            cx="18"
-                            cy="18"
-                            r="16"
-                            fill="none"
-                            className="stroke-zinc-100"
-                            strokeWidth="3"
-                          />
-                          <motion.circle
-                            cx="18"
-                            cy="18"
-                            r="16"
-                            fill="none"
-                            className="stroke-emerald-500"
-                            strokeWidth="3"
-                            strokeDasharray="100"
-                            animate={{ strokeDashoffset: 100 - (text.length / (currentUser ? 5000 : 200)) * 100 }}
-                            transition={{ type: "spring", bounce: 0, duration: 0.5 }}
-                          />
-                        </svg>
-                      </div>
-                      <span className="text-sm font-medium text-zinc-500">
-                        {!currentUser ? 'Guest Mode (10 daily)' : (isWhitelisted(currentUser?.email || '') ? 'Unlimited' : `${(userProfile?.credits || 0).toLocaleString()} credits remaining`)}
-                      </span>
-                    </div>
+                </div>
 
-                    <div className="flex items-center gap-4 pointer-events-auto">
-                      <button 
-                        onClick={() => setText('')}
-                        className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-900 transition-colors"
-                      >
-                        Clear
-                      </button>
-                      <div className="h-4 w-px bg-zinc-200" />
-                      <span className={`text-sm font-mono font-bold ${text.length >= 4500 ? 'text-amber-500' : 'text-zinc-400'}`}>
-                        {text.length.toLocaleString()} / 5,000
-                      </span>
+                {/* Character and Credit Counts - Moved outside and below the box */}
+                <div className="flex flex-col md:flex-row items-center justify-between px-8 py-5 bg-zinc-50/50 rounded-3xl border border-zinc-100 gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-10 h-10 flex items-center justify-center">
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="16"
+                          fill="none"
+                          className="stroke-zinc-100"
+                          strokeWidth="3"
+                        />
+                        <motion.circle
+                          cx="18"
+                          cy="18"
+                          r="16"
+                          fill="none"
+                          className="stroke-emerald-500"
+                          strokeWidth="3"
+                          strokeDasharray="100"
+                          animate={{ strokeDashoffset: 100 - (text.length / (currentUser ? 5000 : 300)) * 100 }}
+                          transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+                        />
+                      </svg>
                     </div>
+                    <span className="text-sm font-bold text-zinc-500">
+                      {!currentUser ? 'Guest Mode (Limited)' : (isWhitelisted(currentUser?.email || '') ? 'Unlimited' : `${(userProfile?.credits || 0).toLocaleString()} credits remaining`)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-6">
+                    <button 
+                      onClick={() => setText('')}
+                      className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-900 transition-colors"
+                    >
+                      Clear Script
+                    </button>
+                    <div className="h-4 w-px bg-zinc-200" />
+                    <span className={`text-sm font-mono font-bold ${text.length >= 4500 ? 'text-amber-500' : 'text-zinc-400'}`}>
+                      {text.length.toLocaleString()} / 5,000
+                    </span>
                   </div>
                 </div>
 
-                  <button 
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !text || !selectedVoice}
-                    className="w-full py-4 px-6 bg-emerald-500 text-white rounded-2xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20"
-                  >
-                    {isGenerating ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="animate-spin" size={24} />
-                        <span>Generating {generationProgress}%</span>
-                      </div>
-                    ) : (
-                      <>
-                        <Play size={24} fill="currentColor" />
-                        <span>Generate Speech</span>
-                      </>
-                    )}
-                  </button>
+                <button 
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !text || !selectedVoice}
+                  className="w-full py-5 px-6 bg-emerald-500 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20"
+                >
+                  {isGenerating ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="animate-spin" size={24} />
+                      <span>Generating {generationProgress}%</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Play size={24} fill="currentColor" />
+                      <span>Generate Speech</span>
+                    </>
+                  )}
+                </button>
                 </div>
 
                 {isGenerating && (
