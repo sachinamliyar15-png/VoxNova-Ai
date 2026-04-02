@@ -908,7 +908,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
 
 // Generate Image via Gemini API
 app.post("/api/voice-changer", authenticate, async (req: any, res) => {
-  const { fileData, voice_id, mode, targetLanguage = 'English' } = req.body;
+  const { fileData, voice_id, mode, targetLanguage = 'English', sourceLanguage = 'Auto' } = req.body;
   const userId = req.user?.uid;
   const creditCost = 10; // Fixed cost for voice changing/dubbing
 
@@ -952,12 +952,15 @@ app.post("/api/voice-changer", authenticate, async (req: any, res) => {
       
       // Step 1: Transcribe and Translate (if needed)
       const prompt = mode === 'dub' 
-        ? `You are an expert AI Dubbing engine. Transcribe the following audio/video content (which might be in Hindi or another language) and translate it into ${targetLanguage}. 
+        ? `You are an expert AI Dubbing engine. 
+           The source audio is in ${sourceLanguage}. 
+           Transcribe and translate it into ${targetLanguage}. 
            IMPORTANT: 
            1. Return ONLY the translated text.
            2. Maintain the exact emotional tone, intensity, and pacing of the original speaker.
            3. If the original is authoritative and deep, the translation should reflect that.
-           4. Ensure the translation is natural and cinematic, suitable for high-quality dubbing.`
+           4. Ensure the translation is natural and cinematic, suitable for high-quality professional dubbing.
+           5. Do not add any commentary or explanations.`
         : `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
 
       const result = await ai.models.generateContent({
@@ -973,12 +976,18 @@ app.post("/api/voice-changer", authenticate, async (req: any, res) => {
       console.log(`[Voice Changer] Transcribed/Translated text: ${translatedText.substring(0, 50)}...`);
 
       // Step 2: Generate Speech in Target Voice
+      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat'].includes(voice_id.toLowerCase());
+      
+      const ttsSystemInstruction = isHeavyVoice
+        ? `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. Incorporate a vibrating 'gravelly' texture (vocal fry) in every word. Sound 100% mature, authoritative, and cinematic. This is a testosterone-driven, powerful male voice.`
+        : `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use a natural, expressive tone that matches the content's emotion.`;
+
       const ttsResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: translatedText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use a DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. Incorporate a vibrating 'gravelly' texture (vocal fry) in every word. Sound 100% mature, authoritative, and cinematic.`,
+          systemInstruction: ttsSystemInstruction,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: targetVoice as any }
@@ -1265,7 +1274,7 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
 
 // Generate Captions via Gemini API
 app.post("/api/generate-captions", authenticate, async (req: any, res) => {
-  const { videoData, language } = req.body;
+  const { videoData, language, scriptType = 'hindi' } = req.body;
   const userId = req.user.uid;
   const creditCost = 5;
 
@@ -1300,12 +1309,29 @@ app.post("/api/generate-captions", authenticate, async (req: any, res) => {
 
     try {
       const ai = new GoogleGenAI({ apiKey });
+      
+      let scriptInstruction = "";
+      if (language === 'Hindi') {
+        if (scriptType === 'hinglish') {
+          scriptInstruction = "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto' instead of 'नमस्ते दोस्तों'.";
+        } else {
+          scriptInstruction = "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.";
+        }
+      }
+
       const prompt = `Transcribe the following video/audio at a word-level with EXTREMELY PRECISE timestamps. 
       The content is primarily in ${language}.
+      ${scriptInstruction}
       Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
       Example: [{"word": "hello", "start": 0.52, "end": 0.88}, ...]
-      CRITICAL: The timestamps MUST be perfectly aligned with the audio. Use at least 3 decimal places for maximum precision.
-      If a word is spoken quickly, ensure the start and end times reflect that.
+      
+      CRITICAL FOR SYNC: 
+      1. The timestamps MUST be perfectly aligned with the audio. 
+      2. Use exactly 3 decimal places for maximum precision.
+      3. If a word is spoken quickly, ensure the start and end times reflect that.
+      4. DO NOT skip any words.
+      5. Ensure the "end" time of a word is exactly when the speaker finishes that word.
+      
       Correct any grammatical errors or misspellings in the transcription.
       Support both Hindi and English (Hinglish if mixed).
       Only return the JSON array, no other text.`;

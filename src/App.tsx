@@ -56,7 +56,7 @@ import {
   FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { VOICES, Voice, Generation } from './types';
+import { VOICES, Voice, Generation, LANGUAGES } from './types';
 import emailjs from 'emailjs-com';
 import Markdown from 'react-markdown';
 import { 
@@ -1360,6 +1360,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [dubbingFile, setDubbingFile] = useState<File | null>(null);
   const [targetLanguage, setTargetLanguage] = useState('English');
+  const [sourceLanguage, setSourceLanguage] = useState('Auto');
   const [dubbingResult, setDubbingResult] = useState<any>(null);
   const [dubbingMode, setDubbingMode] = useState<'convert' | 'dub'>('convert');
   const [isDubbing, setIsDubbing] = useState(false);
@@ -1419,6 +1420,7 @@ function App() {
   const [captionFile, setCaptionFile] = useState<File | null>(null);
   const [captionResult, setCaptionResult] = useState<any>(null);
   const [captionWords, setCaptionWords] = useState<CaptionWord[]>([]);
+  const [captionScriptType, setCaptionScriptType] = useState<'hindi' | 'hinglish'>('hindi');
   const [selectedPresetId, setSelectedPresetId] = useState<string>('hindi-viral-yellow');
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(CAPTION_PRESETS[0].style);
   const [captionAnimation, setCaptionAnimation] = useState<string>(CAPTION_PRESETS[0].animation);
@@ -1816,7 +1818,11 @@ function App() {
   }, []);
 
   const generateASS = (words: CaptionWord[], style: CaptionStyle) => {
-    const displayWords = groupWordsIntoLines(words, style.wordsPerLine);
+    const displayWords = groupWordsIntoLines(words.map(w => ({
+      ...w,
+      start: Math.max(0, w.start - (captionOffset / 1000)),
+      end: Math.max(0, w.end - (captionOffset / 1000))
+    })), style.wordsPerLine);
     const formatTime = (seconds: number) => {
       const h = Math.floor(seconds / 3600);
       const m = Math.floor((seconds % 3600) / 60);
@@ -1942,7 +1948,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           fileData,
           voice_id: selectedVoice.id,
           mode: 'dub',
-          targetLanguage
+          targetLanguage,
+          sourceLanguage
         })
       });
 
@@ -2071,7 +2078,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         },
         body: JSON.stringify({
           videoData,
-          language: language === 'hi' ? 'Hindi' : 'English'
+          language: targetLanguage,
+          scriptType: captionScriptType
         })
       });
 
@@ -2652,8 +2660,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   <p>No matching history found.</p>
                 </div>
               ) : (
-                filteredHistory.map((item) => (
-                  <div key={item.id} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
+                filteredHistory.map((item, idx) => (
+                  <div key={`${item.id}-${idx}`} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
@@ -3243,7 +3251,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-3">
+                            <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Source Language</label>
+                            <select 
+                              value={sourceLanguage}
+                              onChange={(e) => setSourceLanguage(e.target.value)}
+                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            >
+                              <option value="Auto">Auto Detect</option>
+                              {LANGUAGES.map(lang => (
+                                <option key={lang.code} value={lang.name}>{lang.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
                           <div className="space-y-3">
                             <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Target Language</label>
                             <select 
@@ -3251,13 +3273,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               onChange={(e) => setTargetLanguage(e.target.value)}
                               className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                             >
-                              <option value="English">English</option>
-                              <option value="Hindi">Hindi</option>
-                              <option value="Spanish">Spanish</option>
-                              <option value="French">French</option>
-                              <option value="German">German</option>
-                              <option value="Japanese">Japanese</option>
-                              <option value="Portuguese">Portuguese</option>
+                              {LANGUAGES.map(lang => (
+                                <option key={lang.code} value={lang.name}>{lang.name}</option>
+                              ))}
                             </select>
                           </div>
 
@@ -4081,6 +4099,40 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 <div className="space-y-6">
                   {/* Style Sidebar */}
                   <div className="glass-panel p-6 rounded-[2.5rem] border-zinc-100 space-y-8">
+                    <div className="space-y-4">
+                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        <Globe size={14} className="text-emerald-500" /> Language & Script
+                      </label>
+                      <div className="grid grid-cols-1 gap-2">
+                        <select 
+                          value={targetLanguage}
+                          onChange={(e) => setTargetLanguage(e.target.value)}
+                          className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-xs font-bold focus:outline-none"
+                        >
+                          {LANGUAGES.map(lang => (
+                            <option key={lang.code} value={lang.name}>{lang.name}</option>
+                          ))}
+                        </select>
+                        
+                        {targetLanguage === 'Hindi' && (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setCaptionScriptType('hindi')}
+                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${captionScriptType === 'hindi' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                            >
+                              Hindi Script
+                            </button>
+                            <button 
+                              onClick={() => setCaptionScriptType('hinglish')}
+                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${captionScriptType === 'hinglish' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+                            >
+                              Hinglish
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="space-y-4">
                       <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                         <Sparkles size={14} className="text-emerald-500" /> Style Presets
