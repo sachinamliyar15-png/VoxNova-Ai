@@ -61,14 +61,14 @@ let firestore: admin.firestore.Firestore;
 const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
   'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-  'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
+  'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Fenrir', 'Marcus': 'Charon',
   'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
   'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
   'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
   'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr', 'Pankaj': 'Fenrir', 'Original Voice': 'Zephyr',
   'adam': 'Puck', 'brian': 'Charon', 'daniel': 'Fenrir', 'josh': 'Puck',
   'liam': 'Charon', 'michael': 'Fenrir', 'ryan': 'Puck', 'matthew': 'Charon',
-  'bill': 'Fenrir', 'callum': 'Puck', 'frank': 'Zephyr', 'marcus': 'Charon',
+  'bill': 'Fenrir', 'callum': 'Puck', 'frank': 'Fenrir', 'marcus': 'Charon',
   'jessica': 'Kore', 'sarah': 'Zephyr', 'matilda': 'Kore', 'emily': 'Zephyr',
   'bella': 'Kore', 'rachel': 'Zephyr', 'nicole': 'Kore', 'clara': 'Zephyr',
   'doc-pro': 'Charon', 'atlas-do': 'Fenrir', 'priyanka': 'Zephyr', 'virat-male': 'Charon',
@@ -498,14 +498,15 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
 
       const targetVoice = voiceMapping[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
+      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
@@ -513,7 +514,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -538,7 +539,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
         'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
         'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
-        'Frank': 'Natural, balanced, and clear. Perfect for long-form narration with consistent energy.',
+        'Frank': 'Ultra-deep, heavy, and masculine. A powerful chest-voice with maximum bass resonance and a professional narrator tone.',
         'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
         'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
         'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
@@ -551,13 +552,13 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
         'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
-        'Pankaj': 'Ultra-deep, baritone, authoritative documentary voice. Serious, intense, and professional with a slight grit.',
-        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry.',
-        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful.',
-        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains.',
-        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency.',
-        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.'
+        'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
+        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. 100% Realistic.',
+        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. 100% Realistic.',
+        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.',
+        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.',
+        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -688,14 +689,15 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
+      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Avoid any robotic, monotone, or repetitive cadence.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
@@ -703,7 +705,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
@@ -728,7 +730,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
         'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
         'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
-        'Frank': 'Natural, balanced, and clear. Perfect for long-form narration with consistent energy.',
+        'Frank': 'Ultra-deep, heavy, and masculine. A powerful chest-voice with maximum bass resonance and a professional narrator tone.',
         'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
         'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
         'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
@@ -741,13 +743,13 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
         'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
-        'Pankaj': 'Ultra-deep, baritone, authoritative documentary voice. Serious, intense, and professional with a slight grit.',
-        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry.',
-        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful.',
-        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains.',
-        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency.',
-        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone.'
+        'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
+        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. 100% Realistic.',
+        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. 100% Realistic.',
+        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.',
+        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.',
+        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -977,11 +979,11 @@ app.post("/api/voice-changer", authenticate, async (req: any, res) => {
       console.log(`[Voice Changer] Transcribed/Translated text: ${translatedText.substring(0, 50)}...`);
 
       // Step 2: Generate Speech in Target Voice
-      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat'].includes(voice_id.toLowerCase());
+      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram'].includes(voice_id.toLowerCase());
       
       const ttsSystemInstruction = isHeavyVoice
-        ? `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. Incorporate a vibrating 'gravelly' texture (vocal fry) in every word. Sound 100% mature, authoritative, and cinematic. This is a testosterone-driven, powerful male voice.`
-        : `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use a natural, expressive tone that matches the content's emotion.`;
+        ? `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. Incorporate a vibrating 'gravelly' texture (vocal fry) in every word. Sound 100% "Mardana" (Masculine), authoritative, and cinematic. Add subtle natural breaths and mouth sounds for 100% realism. This is a testosterone-driven, powerful male voice.`
+        : `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use a natural, expressive tone that matches the content's emotion. Add subtle natural breaths for realism.`;
 
       const ttsResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
