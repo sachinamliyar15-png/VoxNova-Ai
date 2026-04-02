@@ -842,13 +842,16 @@ const CaptionOverlay = ({
   );
 };
 
-const VoiceLibrary = ({ onSelect, selectedVoiceId }: { onSelect: (voice: Voice) => void, selectedVoiceId: string }) => {
+const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab }: { onSelect: (voice: Voice) => void, selectedVoiceId: string, activeTab?: string }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
-  const filteredVoices = VOICES.filter(v => 
-    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.tags?.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredVoices = VOICES.filter(v => {
+    const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.tags?.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    if (v.id === 'original' && activeTab !== 'dubbing') return false;
+    return matchesSearch;
+  });
 
   return (
     <motion.div 
@@ -920,7 +923,7 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId }: { onSelect: (voice: Voice) 
   );
 };
 
-const HistoryView = ({ history, onPlay, onDelete }: { history: Generation[], onPlay: (gen: Generation) => void, onDelete: (id: string | number) => void }) => {
+const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Generation[], onPlay: (gen: Generation) => void, onDelete: (id: string | number) => void, onRestore: (gen: Generation) => void }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
   const filteredHistory = Array.isArray(history) ? history.filter(h => 
@@ -990,6 +993,13 @@ const HistoryView = ({ history, onPlay, onDelete }: { history: Generation[], onP
                   className="p-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-all"
                 >
                   <Play size={18} />
+                </button>
+                <button 
+                  onClick={() => onRestore(gen)}
+                  title="Restore Script & Settings"
+                  className="p-3 bg-zinc-50 text-zinc-600 rounded-xl hover:bg-zinc-100 transition-all"
+                >
+                  <RefreshCw size={18} />
                 </button>
                 <button 
                   onClick={() => onDelete(gen.id)}
@@ -2463,16 +2473,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
       setPlayingId(id);
-
+      setIsPlaying(true);
+      
       audio.onended = () => {
         setPlayingId(null);
+        setIsPlaying(false);
         URL.revokeObjectURL(audioUrl);
       };
 
       audio.play().catch(e => {
         console.error("History playback failed:", e);
-        setError("Playback failed. Please try downloading the file.");
         setPlayingId(null);
+        setIsPlaying(false);
+        setError("Playback failed. Please try downloading the file.");
       });
     } catch (err: any) {
       console.error("Error playing from history:", err);
@@ -3141,6 +3154,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       setActiveTab('tts');
                     }}
                     selectedVoiceId={selectedVoice.id}
+                    activeTab={activeTab}
                   />
                 )}
                 
@@ -3391,11 +3405,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 {activeTab === 'history' && (
                   <HistoryView 
                     history={history} 
-                    onPlay={(gen) => {
-                      setPlayingId(gen.id);
-                      setIsPlaying(true);
-                    }}
+                    onPlay={(gen) => playFromHistory(gen.audio_data!, gen.id)}
                     onDelete={handleDeleteHistory}
+                    onRestore={handleRestoreScript}
                   />
                 )}
               </AnimatePresence>
@@ -4941,7 +4953,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
               <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {VOICES.filter(v => {
-                  return v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
+                  const matchesSearch = v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
+                  if (v.id === 'original' && activeTab !== 'dubbing') return false;
+                  return matchesSearch;
                 }).map((voice) => (
                   <div 
                     key={voice.id}

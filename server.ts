@@ -75,7 +75,8 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr', 'pankaj': 'Fenrir', 'original': 'Zephyr',
   'sultan': 'Fenrir', 'vikram': 'Charon', 'bharat': 'Fenrir', 'titan': 'Puck',
   'shera': 'Fenrir', 'kaal': 'Charon', 'bheem': 'Fenrir', 'sikandar': 'Charon',
-  'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon', 'VIKRAM': 'Charon'
+  'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon', 'VIKRAM': 'Charon',
+  'munna-bhai': 'Fenrir', 'sachinboy': 'Fenrir', 'Munna Bhai': 'Fenrir', 'Sachinboy': 'Fenrir'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -1403,18 +1404,34 @@ app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) =
     const voiceHistory = await firestore.collection('voice_history')
       .where('userId', '==', userId)
       .orderBy('timestamp', 'desc')
-      .limit(50)
+      .limit(500)
       .get();
 
     const captionHistory = await firestore.collection('caption_history')
       .where('userId', '==', userId)
       .orderBy('timestamp', 'desc')
-      .limit(50)
+      .limit(500)
       .get();
 
     const history = [
-      ...voiceHistory.docs.map(doc => ({ id: doc.id, type: 'voice', ...doc.data() })),
-      ...captionHistory.docs.map(doc => ({ id: doc.id, type: 'caption', ...doc.data() }))
+      ...voiceHistory.docs.map(doc => {
+        const data = doc.data();
+        return { 
+          id: doc.id, 
+          type: 'voice', 
+          ...data,
+          created_at: data.timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
+        };
+      }),
+      ...captionHistory.docs.map(doc => {
+        const data = doc.data();
+        return { 
+          id: doc.id, 
+          type: 'caption', 
+          ...data,
+          created_at: data.timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
+        };
+      })
     ].sort((a: any, b: any) => {
       const timeA = a.timestamp?.toMillis() || 0;
       const timeB = b.timestamp?.toMillis() || 0;
