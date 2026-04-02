@@ -1753,6 +1753,9 @@ function App() {
   const [showContact, setShowContact] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showBlog, setShowBlog] = useState(false);
+  const [selectedArticle, setSelectedArticle] = useState<number | null>(null);
+  const [showFAQ, setShowFAQ] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
@@ -4729,6 +4732,110 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             </div>
           </div>
 
+          {/* New Blog/Articles Section for AdSense */}
+          <div className="space-y-12 pt-16 border-t border-zinc-100">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl font-display font-bold text-zinc-900">Latest from our AI Voice Blog</h2>
+              <p className="text-zinc-500 max-w-2xl mx-auto">Explore the latest trends in AI voice technology, text to speech tips, and content creation strategies.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {[
+                {
+                  title: "How AI Voice Generators are Changing Content Creation",
+                  excerpt: "AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable. VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion...",
+                  date: "March 28, 2026"
+                },
+                {
+                  title: "Best Hindi AI Voices for YouTube Shorts and Reels",
+                  excerpt: "Hindi content is booming on social media. To stand out, you need high-quality voiceovers. VoxNova offers voices like 'Pankaj' and 'Sultan' which are perfect for motivational videos, news, and storytelling in Hindi...",
+                  date: "March 25, 2026"
+                },
+                {
+                  title: "The Future of Text to Speech Technology in 2026",
+                  excerpt: "As we move further into 2026, AI voices are becoming indistinguishable from real humans. VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing...",
+                  date: "March 22, 2026"
+                },
+                {
+                  title: "How to Create Professional Voiceovers with VoxNova",
+                  excerpt: "Creating a professional voiceover used to require expensive equipment and a recording studio. Now, with VoxNova Text to Speech, you can generate studio-quality audio in seconds. Learn how to fine-tune your scripts for the best results...",
+                  date: "March 18, 2026"
+                }
+              ].map((article, i) => (
+                <div key={i} className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group cursor-pointer" onClick={() => { setSelectedArticle(i); setShowBlog(true); }}>
+                  <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{article.date}</div>
+                  <h3 className="text-xl font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors">{article.title}</h3>
+                  <p className="text-sm text-zinc-500 leading-relaxed line-clamp-3">{article.excerpt}</p>
+                  <div className="flex items-center gap-2 text-zinc-900 font-bold text-sm">
+                    Read More <ArrowRight size={16} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hindi Content Section for AdSense */}
+          <div className="glass-panel p-10 rounded-[3rem] border-zinc-100 bg-emerald-50/30 space-y-8">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl font-display font-bold text-zinc-900">VoxNova Text to Speech: हिंदी में प्रोफेशनल वॉइसओवर कैसे बनाएं?</h2>
+              <p className="text-zinc-600 max-w-2xl mx-auto">VoxNova एक बेहतरीन AI वॉइस जनरेटर है जो आपको हिंदी में उच्च गुणवत्ता वाले वॉइसओवर बनाने की सुविधा देता है।</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div className="space-y-4">
+                <h4 className="text-xl font-bold text-emerald-700">यूट्यूब और रील्स के लिए बेस्ट आवाज़ें</h4>
+                <p className="text-sm text-zinc-600 leading-relaxed">
+                  चाहे आप यूट्यूब वीडियो बना रहे हों या इंस्टाग्राम रील्स, हमारी आवाज़ें आपके कंटेंट को और भी आकर्षक बनाएंगी। 'Pankaj' और 'Sultan' जैसी आवाज़ें मोटिवेशनल और न्यूज़ वीडियो के लिए एकदम सही हैं।
+                </p>
+              </div>
+              <div className="space-y-4">
+                <h4 className="text-xl font-bold text-emerald-700">आसान और तेज़ वॉइस जनरेशन</h4>
+                <p className="text-sm text-zinc-600 leading-relaxed">
+                  बस अपना टेक्स्ट टाइप करें, अपनी पसंदीदा आवाज़ चुनें, और 'Generate' पर क्लिक करें। कुछ ही सेकंड में आपका प्रोफेशनल वॉइसओवर तैयार हो जाएगा। आप पिच और स्पीड को भी अपनी ज़रूरत के अनुसार बदल सकते हैं।
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* FAQ Section for AdSense */}
+          <div className="space-y-8 pt-16 border-t border-zinc-100">
+            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">Frequently Asked Questions</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[
+                { q: "What is VoxNova Text to Speech?", a: "VoxNova is an advanced AI voice generation platform that converts text into realistic, human-like speech using neural networks." },
+                { q: "Is VoxNova free to use?", a: "We offer both free and premium plans. Free users get a daily credit limit, while premium users enjoy unlimited generations and high-fidelity voices." },
+                { q: "Can I use VoxNova voices for commercial projects?", a: "Yes, all audio generated with VoxNova can be used for commercial projects, including YouTube, social media, and professional presentations." },
+                { q: "How many languages does VoxNova support?", a: "Currently, we specialize in high-quality English and Hindi voices, with more languages being added regularly." },
+                { q: "How do I get the best quality AI voice?", a: "For the best results, use proper punctuation in your scripts and adjust the 'Style' and 'Pitch' settings to match your content's mood." },
+                { q: "Does VoxNova support voice cloning?", a: "Yes, our premium plan includes AI voice cloning technology that allows you to create a digital version of any voice from a short sample." }
+              ].map((faq, i) => (
+                <div key={i} className="p-6 bg-zinc-50 rounded-2xl space-y-2">
+                  <h4 className="font-bold text-zinc-900">{faq.q}</h4>
+                  <p className="text-sm text-zinc-500 leading-relaxed">{faq.a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hindi How it works Section for AdSense */}
+          <div className="space-y-8 pt-16 border-t border-zinc-100">
+            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">VoxNova कैसे काम करता है?</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+              {[
+                { step: '01', title: 'टेक्स्ट दर्ज करें', desc: 'अपना स्क्रिप्ट हमारे एडिटर में पेस्ट करें। हम 10,000 अक्षरों तक के लंबे कंटेंट का समर्थन करते हैं।' },
+                { step: '02', title: 'आवाज़ चुनें', desc: 'हमारी 20+ प्रोफेशनल AI आवाज़ों की लाइब्रेरी से अपनी पसंद की आवाज़ चुनें।' },
+                { step: '03', title: 'सेटिंग्स बदलें', desc: 'अपनी आवाज़ को बेहतर बनाने के लिए पिच, स्पीड और इमोशनल स्टाइल को एडजस्ट करें।' },
+                { step: '04', title: 'वॉइस जनरेट करें', desc: 'हमारा AI इंजन कुछ ही सेकंड में आपके लिए स्टूडियो-क्वालिटी ऑडियो तैयार कर देगा।' }
+              ].map((item, i) => (
+                <div key={i} className="p-6 space-y-3">
+                  <div className="text-4xl font-display font-bold text-emerald-100">{item.step}</div>
+                  <h4 className="font-bold text-zinc-900">{item.title}</h4>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Bottom Ad Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
             {/* Removed AdBox */}
@@ -4752,6 +4859,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             <div className="flex flex-wrap justify-center gap-6 text-sm text-zinc-500">
               <button onClick={() => setShowAbout(true)} className="hover:text-zinc-900 transition-colors">About Us</button>
               <button onClick={() => setShowContact(true)} className="hover:text-zinc-900 transition-colors">Contact Us</button>
+              <button onClick={() => setShowBlog(true)} className="hover:text-zinc-900 transition-colors">Blog</button>
               <button onClick={() => setShowPrivacy(true)} className="hover:text-zinc-900 transition-colors">Privacy Policy</button>
               <button onClick={() => setShowTerms(true)} className="hover:text-zinc-900 transition-colors">Terms of Service</button>
             </div>
@@ -4903,6 +5011,113 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </section>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showBlog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => { setShowBlog(false); setSelectedArticle(null); }}
+              className="absolute inset-0 bg-white/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-4xl bg-white p-8 md:p-12 rounded-[2.5rem] border border-zinc-200 shadow-2xl max-h-[80vh] overflow-y-auto"
+            >
+              <button onClick={() => { setShowBlog(false); setSelectedArticle(null); }} className="absolute top-6 right-6 p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-900"><X size={20} /></button>
+              
+              {selectedArticle === null ? (
+                <div className="space-y-8">
+                  <h2 className="text-4xl font-display font-bold text-zinc-900">VoxNova AI Voice Blog</h2>
+                  <div className="grid grid-cols-1 gap-8">
+                    {[
+                      {
+                        title: "How AI Voice Generators are Changing Content Creation",
+                        excerpt: "AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable. VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion...",
+                        date: "March 28, 2026"
+                      },
+                      {
+                        title: "Best Hindi AI Voices for YouTube Shorts and Reels",
+                        excerpt: "Hindi content is booming on social media. To stand out, you need high-quality voiceovers. VoxNova offers voices like 'Pankaj' and 'Sultan' which are perfect for motivational videos, news, and storytelling in Hindi...",
+                        date: "March 25, 2026"
+                      },
+                      {
+                        title: "The Future of Text to Speech Technology in 2026",
+                        excerpt: "As we move further into 2026, AI voices are becoming indistinguishable from real humans. VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing...",
+                        date: "March 22, 2026"
+                      },
+                      {
+                        title: "How to Create Professional Voiceovers with VoxNova",
+                        excerpt: "Creating a professional voiceover used to require expensive equipment and a recording studio. Now, with VoxNova Text to Speech, you can generate studio-quality audio in seconds. Learn how to fine-tune your scripts for the best results...",
+                        date: "March 18, 2026"
+                      }
+                    ].map((article, i) => (
+                      <div key={i} className="p-6 rounded-3xl border border-zinc-100 hover:border-emerald-500/20 transition-all cursor-pointer" onClick={() => setSelectedArticle(i)}>
+                        <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mb-2">{article.date}</div>
+                        <h3 className="text-2xl font-bold text-zinc-900 mb-3">{article.title}</h3>
+                        <p className="text-zinc-500 leading-relaxed mb-4">{article.excerpt}</p>
+                        <div className="text-emerald-600 font-bold flex items-center gap-2">Read Full Article <ArrowRight size={16} /></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  <button onClick={() => setSelectedArticle(null)} className="text-zinc-500 hover:text-zinc-900 flex items-center gap-2 font-medium">
+                    <ArrowUp className="-rotate-90" size={16} /> Back to Blog
+                  </button>
+                  
+                  {selectedArticle === 0 && (
+                    <article className="space-y-6">
+                      <h2 className="text-4xl font-display font-bold text-zinc-900">How AI Voice Generators are Changing Content Creation</h2>
+                      <div className="text-zinc-500 leading-relaxed space-y-4">
+                        <p className="text-lg font-medium text-zinc-900">AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable.</p>
+                        <p>VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion, making it perfect for YouTube creators, filmmakers, and businesses. The ability to generate high-quality audio without a voice actor has opened up new possibilities for small creators.</p>
+                        <p>With the rise of short-form content like TikTok, Reels, and YouTube Shorts, the demand for quick and effective voiceovers is at an all-time high. AI voices allow creators to iterate faster and produce more content in less time.</p>
+                        <h3 className="text-2xl font-bold text-zinc-900 pt-4">Why Realism Matters</h3>
+                        <p>In the past, AI voices were easy to spot. They lacked the natural rhythm and breathing patterns of human speech. Today, VoxNova's technology incorporates these subtle details, making the voices sound 100% realistic.</p>
+                      </div>
+                    </article>
+                  )}
+                  
+                  {selectedArticle === 1 && (
+                    <article className="space-y-6">
+                      <h2 className="text-4xl font-display font-bold text-zinc-900">Best Hindi AI Voices for YouTube Shorts and Reels</h2>
+                      <div className="text-zinc-500 leading-relaxed space-y-4">
+                        <p className="text-lg font-medium text-zinc-900">Hindi content is booming on social media. To stand out, you need high-quality voiceovers that resonate with the audience.</p>
+                        <p>VoxNova offers a specialized library of Hindi voices that are perfect for various niches. For example, 'Pankaj' is an ultra-deep, authoritative voice ideal for news and documentary-style videos. On the other hand, 'Sultan' provides a powerful, warrior-like tone for motivational content.</p>
+                        <h3 className="text-2xl font-bold text-zinc-900 pt-4">Tips for Hindi Voiceovers</h3>
+                        <p>When generating Hindi audio, it's important to use proper punctuation. This helps the AI understand where to pause and which words to emphasize. Our Hindi models are trained on native speakers to ensure perfect pronunciation and cultural nuance.</p>
+                      </div>
+                    </article>
+                  )}
+
+                  {selectedArticle === 2 && (
+                    <article className="space-y-6">
+                      <h2 className="text-4xl font-display font-bold text-zinc-900">The Future of Text to Speech Technology in 2026</h2>
+                      <div className="text-zinc-500 leading-relaxed space-y-4">
+                        <p className="text-lg font-medium text-zinc-900">As we move further into 2026, AI voices are becoming indistinguishable from real humans.</p>
+                        <p>VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing. The next step in TTS evolution is the integration of real-time emotional intelligence, where the AI can adapt its tone based on the sentiment of the text automatically.</p>
+                        <p>We are also seeing a shift towards personalized AI voices, where users can create a unique digital twin of their own voice for use in various applications.</p>
+                      </div>
+                    </article>
+                  )}
+
+                  {selectedArticle === 3 && (
+                    <article className="space-y-6">
+                      <h2 className="text-4xl font-display font-bold text-zinc-900">How to Create Professional Voiceovers with VoxNova</h2>
+                      <div className="text-zinc-500 leading-relaxed space-y-4">
+                        <p className="text-lg font-medium text-zinc-900">Creating a professional voiceover used to require expensive equipment and a recording studio. Now, you can do it in seconds.</p>
+                        <p>Step 1: Write a clear script. Use punctuation to guide the AI's rhythm.<br/>Step 2: Choose the right voice. Each voice in VoxNova has a specific 'vibe' described in the library.<br/>Step 3: Fine-tune the settings. Adjust the speed for energy and the pitch for authority.<br/>Step 4: Use 'Studio Clarity' to ensure the output is crisp and professional.</p>
+                      </div>
+                    </article>
+                  )}
+                </div>
+              )}
             </motion.div>
           </div>
         )}
