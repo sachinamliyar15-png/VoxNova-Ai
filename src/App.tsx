@@ -53,7 +53,15 @@ import {
   Folder,
   Square,
   LayoutGrid,
-  FileText
+  FileText,
+  Activity,
+  Maximize,
+  Terminal,
+  RotateCcw,
+  Wind,
+  Heart,
+  Cloud,
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VOICES, Voice, Generation, LANGUAGES } from './types';
@@ -320,6 +328,7 @@ interface CaptionWord {
   word: string;
   start: number;
   end: number;
+  isHighlighted?: boolean;
 }
 
 interface CaptionStyle {
@@ -650,24 +659,51 @@ const CAPTION_PRESETS: CaptionPreset[] = [
     animation: 'pop'
   },
   {
-    id: 'cyberpunk',
-    name: 'Cyberpunk',
+    id: 'viral-vibrant',
+    name: 'Viral Vibrant',
     style: {
-      fontSize: 36,
-      color: '#00ffff',
+      fontSize: 48,
+      color: '#ffffff',
       glow: true,
-      border: 'thin' as const,
-      font: 'JetBrains Mono',
-      position: 'top' as const,
+      border: 'thick' as const,
+      font: 'Inter',
+      position: 'middle' as const,
       backgroundColor: 'transparent',
-      outlineColor: '#ff00ff',
+      outlineColor: '#000000',
       case: 'uppercase' as const,
       wordsPerLine: 1,
       shadow: true,
       shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 1
+      strokeWidth: 2,
+      isDynamic: true,
+      padding: '4px 12px',
+      borderRadius: '8px',
+      letterSpacing: '0.05em'
     },
-    animation: 'glow'
+    animation: 'skate'
+  },
+  {
+    id: 'minimal-sticker',
+    name: 'Minimal Sticker',
+    style: {
+      fontSize: 32,
+      color: '#000000',
+      glow: false,
+      border: 'none' as const,
+      font: 'Inter',
+      position: 'bottom' as const,
+      backgroundColor: '#ffffff',
+      outlineColor: 'transparent',
+      case: 'original' as const,
+      wordsPerLine: 3,
+      shadow: false,
+      shadowColor: 'transparent',
+      strokeWidth: 0,
+      padding: '6px 16px',
+      borderRadius: '99px',
+      letterSpacing: 'normal'
+    },
+    animation: 'float'
   },
   {
     id: 'trending-dynamic',
@@ -761,6 +797,77 @@ const CaptionOverlay = ({
           animate: { scale: 1, opacity: 1 },
           transition: { type: 'spring' as const, stiffness: 300, damping: 20 }
         };
+      case 'shake':
+        return {
+          initial: { x: -10, opacity: 0 },
+          animate: { x: [0, -10, 10, -10, 10, 0], opacity: 1 },
+          transition: { duration: 0.4 }
+        };
+      case 'bounce':
+        return {
+          initial: { y: 20, opacity: 0 },
+          animate: { y: [0, -20, 10, -5, 0], opacity: 1 },
+          transition: { duration: 0.5 }
+        };
+      case 'slide':
+        return {
+          initial: { x: -50, opacity: 0 },
+          animate: { x: 0, opacity: 1 },
+          transition: { type: 'spring' as const, stiffness: 200, damping: 25 }
+        };
+      case 'zoom':
+        return {
+          initial: { scale: 0, opacity: 0 },
+          animate: { scale: [0, 1.2, 1], opacity: 1 },
+          transition: { duration: 0.4 }
+        };
+      case 'glitch':
+        return {
+          initial: { opacity: 0, x: 0 },
+          animate: { 
+            opacity: 1,
+            x: [0, -2, 2, -2, 2, 0],
+            filter: [
+              'none',
+              'drop-shadow(2px 0 #ff00ff) drop-shadow(-2px 0 #00ffff)',
+              'none'
+            ]
+          },
+          transition: { duration: 0.3, repeat: Infinity, repeatDelay: 2 }
+        };
+      case 'rotate':
+        return {
+          initial: { rotate: -180, opacity: 0, scale: 0 },
+          animate: { rotate: 0, opacity: 1, scale: 1 },
+          transition: { type: 'spring' as const, stiffness: 260, damping: 20 }
+        };
+      case 'flip':
+        return {
+          initial: { rotateX: 90, opacity: 0 },
+          animate: { rotateX: 0, opacity: 1 },
+          transition: { duration: 0.5 }
+        };
+      case 'skate':
+        return {
+          initial: { x: -100, opacity: 0, skewX: -20 },
+          animate: { x: 0, opacity: 1, skewX: 0 },
+          transition: { type: 'spring' as const, stiffness: 100, damping: 10 }
+        };
+      case 'heartbeat':
+        return {
+          initial: { scale: 0.8, opacity: 0 },
+          animate: { scale: [1, 1.2, 1, 1.1, 1], opacity: 1 },
+          transition: { duration: 0.6 }
+        };
+      case 'float':
+        return {
+          initial: { y: 20, opacity: 0 },
+          animate: { y: [0, -10, 0], opacity: 1 },
+          transition: { 
+            y: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+            opacity: { duration: 0.5 }
+          }
+        };
       case 'fade':
         return {
           initial: { opacity: 0, y: 10 },
@@ -816,8 +923,56 @@ const CaptionOverlay = ({
 
   // Dynamic color cycling for "Trending Dynamic" style
   const getDynamicColor = (index: number) => {
-    const colors = ['#ffffff', '#ffff00', '#00ff00']; // White, Yellow, Green
+    const colors = ['#ffffff', '#ffff00', '#00ff00', '#ff00ff', '#00ffff']; // White, Yellow, Green, Pink, Cyan
     return colors[index % colors.length];
+  };
+
+  const getWordStyle = (word: CaptionWord, index: number): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      fontFamily: style.font,
+      fontSize: `${style.fontSize}px`,
+      color: style.isDynamic ? getDynamicColor(index) : style.color,
+      textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
+      padding: style.padding || '0 4px',
+      borderRadius: style.borderRadius || '4px',
+      letterSpacing: style.letterSpacing || 'normal',
+      display: 'inline-block',
+      margin: '0 4px',
+      transition: 'all 0.2s ease-in-out'
+    };
+
+    if (style.border === 'thin') {
+      (baseStyle as any).WebkitTextStroke = `1px ${style.outlineColor}`;
+    } else if (style.border === 'thick') {
+      (baseStyle as any).WebkitTextStroke = `2px ${style.outlineColor}`;
+    }
+
+    if (style.glow) {
+      baseStyle.textShadow = `0 0 10px ${style.color}, 0 0 20px ${style.color}`;
+    }
+
+    if (style.shadow) {
+      baseStyle.boxShadow = `4px 4px 0px ${style.shadowColor}`;
+    }
+    
+    // Smart Highlights
+    if (word.isHighlighted) {
+      return {
+        ...baseStyle,
+        backgroundColor: '#facc15', // Viral Yellow highlight
+        color: '#000000',
+        transform: 'rotate(-2deg) scale(1.15)',
+        fontWeight: '900',
+        boxShadow: '4px 4px 0px rgba(0,0,0,0.3)',
+        padding: '6px 14px',
+        borderRadius: '8px',
+        WebkitTextStroke: '0',
+        textShadow: 'none',
+        zIndex: 20
+      };
+    }
+
+    return baseStyle;
   };
 
   // For typewriter, we show words one by one as they are spoken
@@ -836,7 +991,7 @@ const CaptionOverlay = ({
               key={`typewriter-${i}-${w.start}`} 
               initial={{ opacity: 0, scale: 0.8, y: 5 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              style={{ color: style.isDynamic ? getDynamicColor(i) : style.color }}
+              style={getWordStyle(w, i)}
               className="mx-1"
             >
               {w.word}
@@ -1562,6 +1717,8 @@ function App() {
   const [captionStep, setCaptionStep] = useState('');
   const [captionProgress, setCaptionProgress] = useState(0);
   const [showConfigError, setShowConfigError] = useState(false);
+  const [smartHighlights, setSmartHighlights] = useState(true);
+  const [translateToEnglish, setTranslateToEnglish] = useState(false);
 
   // Auto-save feature
   useEffect(() => {
@@ -2212,7 +2369,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         body: JSON.stringify({
           videoData,
           language: targetLanguage,
-          scriptType: captionScriptType
+          scriptType: captionScriptType,
+          smartHighlights,
+          translateToEnglish
         })
       });
 
@@ -4210,13 +4369,53 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   )}
 
                   {!captionResult && !isCaptioning && captionFile && (
-                    <button 
-                      onClick={handleCaptioning}
-                      className="w-full py-5 bg-emerald-500 text-white rounded-3xl font-bold text-xl hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3"
-                    >
-                      <Sparkles size={24} />
-                      {currentUser ? 'Generate AI Captions' : 'Try for Free'}
-                    </button>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                              <Sparkles size={20} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-emerald-900">Smart Highlights</p>
+                              <p className="text-[10px] text-emerald-600 font-medium">Auto-highlight viral keywords</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setSmartHighlights(!smartHighlights)}
+                            className={`w-12 h-6 rounded-full transition-all relative ${smartHighlights ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                          >
+                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${smartHighlights ? 'translate-x-6' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                              <Languages size={20} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-blue-900">Translate to English</p>
+                              <p className="text-[10px] text-blue-600 font-medium">Convert Hindi to English</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setTranslateToEnglish(!translateToEnglish)}
+                            className={`w-12 h-6 rounded-full transition-all relative ${translateToEnglish ? 'bg-blue-500' : 'bg-zinc-200'}`}
+                          >
+                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${translateToEnglish ? 'translate-x-6' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={handleCaptioning}
+                        className="w-full py-5 bg-emerald-500 text-white rounded-3xl font-bold text-xl hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3"
+                      >
+                        <Sparkles size={24} />
+                        {currentUser ? 'Generate AI Captions' : 'Try for Free'}
+                      </button>
+                    </div>
                   )}
 
                   {isCaptioning && (
@@ -4330,7 +4529,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           { id: 'none', name: 'Static', icon: <Square size={14} /> },
                           { id: 'pop', name: 'Pop Up', icon: <Zap size={14} /> },
                           { id: 'fade', name: 'Fade', icon: <Monitor size={14} /> },
-                          { id: 'glow', name: 'Glow', icon: <Sparkles size={14} /> }
+                          { id: 'glow', name: 'Glow', icon: <Sparkles size={14} /> },
+                          { id: 'shake', name: 'Shake', icon: <Activity size={14} /> },
+                          { id: 'bounce', name: 'Bounce', icon: <ArrowUp size={14} /> },
+                          { id: 'slide', name: 'Slide', icon: <ArrowRight size={14} /> },
+                          { id: 'zoom', name: 'Zoom', icon: <Maximize size={14} /> },
+                          { id: 'glitch', name: 'Glitch', icon: <Terminal size={14} /> },
+                          { id: 'rotate', name: 'Rotate', icon: <RotateCcw size={14} /> },
+                          { id: 'flip', name: 'Flip', icon: <RefreshCw size={14} /> },
+                          { id: 'skate', name: 'Skate', icon: <Wind size={14} /> },
+                          { id: 'heartbeat', name: 'Heartbeat', icon: <Heart size={14} /> },
+                          { id: 'float', name: 'Float', icon: <Cloud size={14} /> }
                         ].map(anim => (
                           <button
                             key={anim.id}
@@ -4342,6 +4551,40 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                          <Star size={14} /> Smart Highlights
+                        </label>
+                        <button 
+                          onClick={() => setSmartHighlights(!smartHighlights)}
+                          className={`w-10 h-5 rounded-full transition-all relative ${smartHighlights ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                        >
+                          <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${smartHighlights ? 'left-6' : 'left-1'}`} />
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 leading-relaxed">
+                        Automatically detect and highlight important keywords with viral effects.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                          <Globe size={14} /> Translate to English
+                        </label>
+                        <button 
+                          onClick={() => setTranslateToEnglish(!translateToEnglish)}
+                          className={`w-10 h-5 rounded-full transition-all relative ${translateToEnglish ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                        >
+                          <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${translateToEnglish ? 'left-6' : 'left-1'}`} />
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 leading-relaxed">
+                        Convert Hindi audio speech into English captions for global reach.
+                      </p>
                     </div>
 
                     <div className="space-y-4">

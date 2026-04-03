@@ -533,10 +533,12 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - Ensure smooth transitions between sentences and ideas.
       ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
       
-      TECHNICAL STANDARDS:
+      TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       - NO background noise, hums, or digital artifacts.
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-      - Ensure crystal-clear, 48kHz studio-quality audio.
+      - NO background music, bell-like sounds, or hallucinations in the background.
+      - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
+      - If the script is long, maintain consistent tone and quality from start to finish.
       `;
       
       let promptPrefix = "";
@@ -732,10 +734,12 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - Ensure smooth transitions between sentences and ideas.
       ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
       
-      TECHNICAL STANDARDS:
+      TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       - NO background noise, hums, or digital artifacts.
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-      - Ensure crystal-clear, 48kHz studio-quality audio.
+      - NO background music, bell-like sounds, or hallucinations in the background.
+      - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
+      - If the script is long, maintain consistent tone and quality from start to finish.
       `;
       
       let promptPrefix = "";
@@ -1330,7 +1334,7 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
 
 // Generate Captions via Gemini API
 app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
-  const { videoData, language, scriptType = 'hindi' } = req.body;
+  const { videoData, language, scriptType = 'hindi', translateToEnglish = false, smartHighlights = false } = req.body;
   const userId = req.user?.uid;
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const creditCost = 5;
@@ -1396,8 +1400,11 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       const prompt = `Transcribe the following video/audio at a word-level with EXTREMELY PRECISE timestamps. 
       The content is primarily in ${language}.
       ${scriptInstruction}
-      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
-      Example: [{"word": "hello", "start": 0.52, "end": 0.88}, ...]
+      ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions. The output 'word' field must be in English." : ""}
+      ${smartHighlights ? "CRITICAL: Identify the most important, high-impact, or emotional words in the script and mark them with 'isHighlighted': true. These are words that should stand out visually for a viral video effect." : ""}
+      
+      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), "end" (in seconds), and optionally "isHighlighted" (boolean).
+      Example: [{"word": "hello", "start": 0.52, "end": 0.88, "isHighlighted": true}, ...]
       
       CRITICAL FOR SYNC: 
       1. The timestamps MUST be perfectly aligned with the audio. 
