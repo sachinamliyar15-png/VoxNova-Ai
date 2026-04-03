@@ -161,7 +161,7 @@ try {
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '50mb' })); // Increased limit for video files
+app.use(express.json({ limit: '100mb' })); // Increased limit for video files
 app.use(cookieParser());
 
 // Initialize Database
@@ -1014,7 +1014,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         : `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
 
       const result = await ai.models.generateContent({
-        model: "gemini-1.5-flash", // Using 1.5 flash for more stable audio processing
+        model: "gemini-3-flash-preview", // Using gemini-3-flash-preview for more stable audio processing
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
@@ -1268,7 +1268,7 @@ app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
     Return ONLY the category name.`;
 
     const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
@@ -1334,10 +1334,10 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
 
 // Generate Captions via Gemini API
 app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
-  const { videoData, language, scriptType = 'hindi', translateToEnglish = false, smartHighlights = false } = req.body;
+  const { videoData, language, scriptType = 'hindi', translateToEnglish = false, smartHighlights = false, advancedCaptions = false } = req.body;
   const userId = req.user?.uid;
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  const creditCost = 5;
+  const creditCost = advancedCaptions ? 10 : 5;
 
   if (!videoData) {
     return res.status(400).json({ error: "Video data is required" });
@@ -1402,15 +1402,21 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       ${scriptInstruction}
       ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions. The output 'word' field must be in English." : ""}
       ${smartHighlights ? "CRITICAL: Identify the most important, high-impact, or emotional words in the script and mark them with 'isHighlighted': true. These are words that should stand out visually for a viral video effect." : ""}
+      ${advancedCaptions ? `CRITICAL: This is for ADVANCED CAPTIONING. 
+        1. Only generate captions for the most IMPORTANT, high-impact segments of the video. Skip silence or filler segments.
+        2. For each caption segment, assign a dynamic 'position' from: ['top', 'middle', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'].
+        3. Randomize the positions to create a dynamic, professional editing feel.
+        4. If the video is in Hindi, you can mix Hindi and English captions (Hinglish) to make it look modern and attractive.
+        5. Occasionally use different 'fontSize' (e.g., 32, 48, 64) to emphasize words.` : ""}
       
-      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), "end" (in seconds), and optionally "isHighlighted" (boolean).
-      Example: [{"word": "hello", "start": 0.52, "end": 0.88, "isHighlighted": true}, ...]
+      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), "end" (in seconds), and optionally "isHighlighted" (boolean), "position" (string), "fontSize" (number).
+      Example: [{"word": "hello", "start": 0.52, "end": 0.88, "isHighlighted": true, "position": "top-right", "fontSize": 48}, ...]
       
       CRITICAL FOR SYNC: 
       1. The timestamps MUST be perfectly aligned with the audio. 
       2. Use exactly 3 decimal places for maximum precision.
       3. If a word is spoken quickly, ensure the start and end times reflect that.
-      4. DO NOT skip any words.
+      4. DO NOT skip any words ${advancedCaptions ? "within the important segments" : ""}.
       5. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the speaker finishes that word.
       6. COMPENSATE FOR ANY AI LATENCY: The timestamps must be absolute relative to the start of the file.
       
@@ -1423,7 +1429,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         : "video/mp4";
 
       const result = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: [
           {
             role: "user",

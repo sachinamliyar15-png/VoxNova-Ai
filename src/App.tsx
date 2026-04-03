@@ -329,6 +329,9 @@ interface CaptionWord {
   start: number;
   end: number;
   isHighlighted?: boolean;
+  position?: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  color?: string;
+  fontSize?: number;
 }
 
 interface CaptionStyle {
@@ -337,7 +340,7 @@ interface CaptionStyle {
   glow: boolean;
   border: 'none' | 'thin' | 'thick';
   font: string;
-  position: 'top' | 'middle' | 'bottom';
+  position: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   backgroundColor?: string;
   outlineColor?: string;
   case: 'original' | 'uppercase' | 'lowercase';
@@ -777,17 +780,25 @@ const CaptionOverlay = ({
   words, 
   currentTime, 
   style, 
-  animation 
+  animation,
+  shadowColor
 }: { 
   words: CaptionWord[], 
   currentTime: number, 
   style: CaptionStyle, 
-  animation: string 
+  animation: string,
+  shadowColor: string
 }) => {
   const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine), [words, style.wordsPerLine]);
   const currentWord = displayWords.find(w => currentTime >= w.start && currentTime <= w.end);
   
   if (!currentWord) return null;
+
+  // Dynamic color cycling for "Trending Dynamic" style
+  const getDynamicColor = (index: number) => {
+    const colors = ['#ffffff', '#ffff00', '#00ff00', '#ff00ff', '#00ffff']; // White, Yellow, Green, Pink, Cyan
+    return colors[index % colors.length];
+  };
 
   const getAnimationProps = () => {
     switch (animation) {
@@ -919,19 +930,27 @@ const CaptionOverlay = ({
     whiteSpace: 'pre-wrap'
   };
 
-  const positionClass = style.position === 'top' ? 'top-10' : style.position === 'middle' ? 'top-1/2 -translate-y-1/2' : 'bottom-10';
-
-  // Dynamic color cycling for "Trending Dynamic" style
-  const getDynamicColor = (index: number) => {
-    const colors = ['#ffffff', '#ffff00', '#00ff00', '#ff00ff', '#00ffff']; // White, Yellow, Green, Pink, Cyan
-    return colors[index % colors.length];
+  const getPositionClass = (pos?: string) => {
+    const p = pos || style.position;
+    switch (p) {
+      case 'top': return 'top-10';
+      case 'middle': return 'top-1/2 -translate-y-1/2';
+      case 'bottom': return 'bottom-10';
+      case 'left': return 'top-1/2 -translate-y-1/2 left-10 text-left';
+      case 'right': return 'top-1/2 -translate-y-1/2 right-10 text-right';
+      case 'top-left': return 'top-10 left-10 text-left';
+      case 'top-right': return 'top-10 right-10 text-right';
+      case 'bottom-left': return 'bottom-10 left-10 text-left';
+      case 'bottom-right': return 'bottom-10 right-10 text-right';
+      default: return 'bottom-10';
+    }
   };
 
   const getWordStyle = (word: CaptionWord, index: number): React.CSSProperties => {
     const baseStyle: React.CSSProperties = {
       fontFamily: style.font,
-      fontSize: `${style.fontSize}px`,
-      color: style.isDynamic ? getDynamicColor(index) : style.color,
+      fontSize: `${word.fontSize || style.fontSize}px`,
+      color: word.color || (style.isDynamic ? getDynamicColor(index) : style.color),
       textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
       padding: style.padding || '0 4px',
       borderRadius: style.borderRadius || '4px',
@@ -942,9 +961,9 @@ const CaptionOverlay = ({
     };
 
     if (style.border === 'thin') {
-      (baseStyle as any).WebkitTextStroke = `1px ${style.outlineColor}`;
+      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1}px ${style.outlineColor}`;
     } else if (style.border === 'thick') {
-      (baseStyle as any).WebkitTextStroke = `2px ${style.outlineColor}`;
+      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 1) * 2}px ${style.outlineColor}`;
     }
 
     if (style.glow) {
@@ -952,7 +971,7 @@ const CaptionOverlay = ({
     }
 
     if (style.shadow) {
-      baseStyle.boxShadow = `4px 4px 0px ${style.shadowColor}`;
+      baseStyle.textShadow = `${shadowColor} 2px 2px 4px`;
     }
     
     // Smart Highlights
@@ -963,7 +982,7 @@ const CaptionOverlay = ({
         color: '#000000',
         transform: 'rotate(-2deg) scale(1.15)',
         fontWeight: '900',
-        boxShadow: '4px 4px 0px rgba(0,0,0,0.3)',
+        boxShadow: `4px 4px 0px ${shadowColor}4D`, // 30% opacity shadow
         padding: '6px 14px',
         borderRadius: '8px',
         WebkitTextStroke: '0',
@@ -975,6 +994,9 @@ const CaptionOverlay = ({
     return baseStyle;
   };
 
+  const currentWordPosition = currentWord.position || style.position;
+  const positionClass = getPositionClass(currentWordPosition);
+
   // For typewriter, we show words one by one as they are spoken
   if (animation === 'typewriter' || animation === 'typing') {
     const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
@@ -982,9 +1004,10 @@ const CaptionOverlay = ({
 
     const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
     const visibleWords = lineWords.filter(w => currentTime >= w.start);
+    const linePosition = lineWords[0]?.position || style.position;
 
     return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {visibleWords.map((w, i) => (
             <motion.span 
@@ -1009,9 +1032,10 @@ const CaptionOverlay = ({
 
     // Find the original words that belong to this line
     const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
+    const linePosition = lineWords[0]?.position || style.position;
     
     return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {lineWords.map((w, i) => {
             const isActive = currentTime >= w.start && currentTime <= w.end;
@@ -1020,9 +1044,9 @@ const CaptionOverlay = ({
                 key={`karaoke-${i}-${w.start}`} 
                 className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
                 style={{
-                  color: isActive ? (style.isDynamic ? getDynamicColor(i) : style.color) : 'rgba(255,255,255,0.5)',
-                  textShadow: isActive ? (style.shadow ? `${style.shadowColor} 2px 2px 4px` : 'none') : 'none',
-                  WebkitTextStroke: isActive ? (style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor}` : 'none') : 'none',
+                  ...getWordStyle(w, i),
+                  color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i) : style.color)) : 'rgba(255,255,255,0.5)',
+                  textShadow: isActive ? (style.shadow ? `${shadowColor} 2px 2px 4px` : 'none') : 'none',
                 }}
               >
                 {w.word}
@@ -1044,7 +1068,7 @@ const CaptionOverlay = ({
             initial={{ scale: 0.5, opacity: 0, y: 20 }}
             animate={{ scale: 1.2, opacity: 1, y: 0 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            style={{ ...textStyle, color: style.isDynamic ? getDynamicColor(words.indexOf(currentWord)) : style.color }}
+            style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
             className="font-bold text-center px-4"
           >
             {currentWord.word}
@@ -1064,7 +1088,7 @@ const CaptionOverlay = ({
             initial={{ opacity: 0, filter: 'blur(10px)' }}
             animate={{ opacity: 1, filter: 'blur(0px)' }}
             exit={{ opacity: 0, filter: 'blur(10px)' }}
-            style={{ ...textStyle, color: style.isDynamic ? getDynamicColor(words.indexOf(currentWord)) : style.color }}
+            style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
             className="font-bold text-center px-4"
           >
             {currentWord.word}
@@ -1080,7 +1104,7 @@ const CaptionOverlay = ({
         <motion.div
           key={currentWord.word + currentWord.start}
           {...getAnimationProps()}
-          style={textStyle}
+          style={getWordStyle(currentWord, words.indexOf(currentWord))}
           className="font-bold text-center px-4"
         >
           {currentWord.word}
@@ -1719,6 +1743,8 @@ function App() {
   const [showConfigError, setShowConfigError] = useState(false);
   const [smartHighlights, setSmartHighlights] = useState(true);
   const [translateToEnglish, setTranslateToEnglish] = useState(false);
+  const [advancedCaptions, setAdvancedCaptions] = useState(false);
+  const [shadowColor, setShadowColor] = useState('#000000');
 
   // Auto-save feature
   useEffect(() => {
@@ -2371,7 +2397,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           language: targetLanguage,
           scriptType: captionScriptType,
           smartHighlights,
-          translateToEnglish
+          translateToEnglish,
+          advancedCaptions
         })
       });
 
@@ -4320,6 +4347,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             currentTime={currentTime + (captionOffset / 1000)} 
                             style={captionStyle} 
                             animation={captionAnimation} 
+                            shadowColor={shadowColor}
                           />
                         )}
                       </div>
@@ -4386,6 +4414,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             className={`w-12 h-6 rounded-full transition-all relative ${smartHighlights ? 'bg-emerald-500' : 'bg-zinc-200'}`}
                           >
                             <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${smartHighlights ? 'translate-x-6' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                              <Zap size={20} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-blue-900">Advanced Captions</p>
+                              <p className="text-[10px] text-blue-600">Dynamic positions & important highlights</p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => setAdvancedCaptions(!advancedCaptions)}
+                            className={`w-12 h-6 rounded-full transition-all relative ${advancedCaptions ? 'bg-blue-500' : 'bg-zinc-200'}`}
+                          >
+                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${advancedCaptions ? 'translate-x-6' : 'translate-x-0'}`} />
                           </button>
                         </div>
 
@@ -4674,11 +4720,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             <div className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100">
                               <input 
                                 type="color" 
-                                value={captionStyle.shadowColor || '#000000'}
+                                value={captionStyle.shadowColor?.startsWith('#') ? captionStyle.shadowColor : '#000000'}
                                 onChange={(e) => setCaptionStyle({...captionStyle, shadowColor: e.target.value})}
                                 className="w-8 h-8 rounded-lg cursor-pointer border-none bg-transparent"
                               />
-                              <span className="text-[10px] font-mono uppercase text-zinc-500">{captionStyle.shadowColor || '#000000'}</span>
+                              <input 
+                                type="text"
+                                value={captionStyle.shadowColor || ''}
+                                onChange={(e) => setCaptionStyle({...captionStyle, shadowColor: e.target.value})}
+                                className="flex-1 bg-transparent text-[10px] font-mono uppercase text-zinc-500 focus:outline-none"
+                                placeholder="HEX or RGBA"
+                              />
                             </div>
                           </div>
                           <div className="space-y-2">
