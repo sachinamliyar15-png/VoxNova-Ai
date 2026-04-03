@@ -1,4 +1,3 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://voxnova-ai.onrender.com/sitemap.xml
+Sitemap: https://voxnova-ai-1.onrender.app/sitemap.xml

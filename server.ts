@@ -253,6 +253,15 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
+// Serve robots.txt and sitemap.xml
+app.get('/robots.txt', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'robots.txt'));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'sitemap.xml'));
+});
+
 // Blocked temp email domains
 const BLOCKED_DOMAINS = [
   'temp-mail.org', 'guerrillamail.com', '10minutemail.com', 'mailinator.com', 
@@ -910,13 +919,31 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
 });
 
 // Generate Image via Gemini API
-app.post("/api/voice-changer", authenticate, async (req: any, res) => {
+app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
   const { fileData, voice_id, mode, targetLanguage = 'English', sourceLanguage = 'Auto' } = req.body;
   const userId = req.user?.uid;
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const creditCost = 10; // Fixed cost for voice changing/dubbing
 
   if (!fileData) return res.status(400).json({ error: "File data is required" });
   if (!voice_id) return res.status(400).json({ error: "Voice ID is required" });
+
+  // Check file size for guests (100MB limit)
+  if (!userId) {
+    const base64Length = fileData.length - (fileData.indexOf(',') + 1);
+    const sizeInBytes = (base64Length * 3) / 4;
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    
+    if (sizeInBytes > maxSize) {
+      return res.status(400).json({ error: "Guest uploads are limited to 100MB. Please sign up for larger files." });
+    }
+
+    if (!checkGuestLimit(ip)) {
+      return res.status(429).json({ 
+        error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
+      });
+    }
+  }
 
   try {
     if (userId && firestore) {
@@ -1044,17 +1071,27 @@ app.post("/api/voice-changer", authenticate, async (req: any, res) => {
   res.status(503).json({ error: "Failed to process voice change after multiple attempts." });
 });
 
-app.post("/api/generate-image", authenticate, async (req: any, res) => {
+app.post("/api/generate-image", maybeAuthenticate, async (req: any, res) => {
   const { prompt, aspectRatio } = req.body;
-  const userId = req.user.uid;
+  const userId = req.user?.uid;
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const creditCost = 20;
 
   if (!prompt) {
     return res.status(400).json({ error: "Prompt is required" });
   }
 
+  // Check guest limit for images
+  if (!userId) {
+    if (!checkGuestLimit(ip)) {
+      return res.status(429).json({ 
+        error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
+      });
+    }
+  }
+
   try {
-    if (firestore) {
+    if (userId && firestore) {
       const userRef = firestore.collection('users').doc(userId);
       const userDoc = await userRef.get();
       if (!userDoc.exists || (userDoc.data()?.credits || 0) < creditCost) {
@@ -1197,7 +1234,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
   res.status(503).json({ error: "Failed to generate preview after multiple attempts. This is likely due to API quota limits. Please try again later or provide more API keys in settings." });
 });
 // Classify Script to suggest a voice
-app.post("/api/classify-script", authenticate, async (req: any, res) => {
+app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "Text is required" });
 
@@ -1276,17 +1313,35 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
 });
 
 // Generate Captions via Gemini API
-app.post("/api/generate-captions", authenticate, async (req: any, res) => {
+app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
   const { videoData, language, scriptType = 'hindi' } = req.body;
-  const userId = req.user.uid;
+  const userId = req.user?.uid;
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   const creditCost = 5;
 
   if (!videoData) {
     return res.status(400).json({ error: "Video data is required" });
   }
 
+  // Check file size for guests (100MB limit)
+  if (!userId) {
+    const base64Length = videoData.length - (videoData.indexOf(',') + 1);
+    const sizeInBytes = (base64Length * 3) / 4;
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    
+    if (sizeInBytes > maxSize) {
+      return res.status(400).json({ error: "Guest uploads are limited to 100MB. Please sign up for larger files." });
+    }
+
+    if (!checkGuestLimit(ip)) {
+      return res.status(429).json({ 
+        error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
+      });
+    }
+  }
+
   try {
-    if (firestore) {
+    if (userId && firestore) {
       const userRef = firestore.collection('users').doc(userId);
       const userDoc = await userRef.get();
       if (!userDoc.exists || (userDoc.data()?.credits || 0) < creditCost) {

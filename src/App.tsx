@@ -1936,9 +1936,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleDubbing = async () => {
     if (!dubbingFile) return;
-    const limit = currentUser ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB for logged in, 50MB for guest
+    const limit = currentUser ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB for logged in, 100MB for guest
     if (dubbingFile.size > limit) {
-      setError(`File is too large (> ${currentUser ? '1GB' : '50MB'}). Please upload a smaller file.`);
+      setError(`File is too large (> ${currentUser ? '1GB' : '100MB'}). Please upload a smaller file.`);
       return;
     }
     setIsDubbing(true);
@@ -2003,9 +2003,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleVoiceChanger = async () => {
     if (!voiceChangingFile) return;
-    const limit = currentUser ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB for logged in, 50MB for guest
+    const limit = currentUser ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB for logged in, 100MB for guest
     if (voiceChangingFile.size > limit) {
-      setError(`File is too large (> ${currentUser ? '1GB' : '50MB'}). Please upload a smaller file.`);
+      setError(`File is too large (> ${currentUser ? '1GB' : '100MB'}). Please upload a smaller file.`);
       return;
     }
     setIsVoiceChanging(true);
@@ -2068,9 +2068,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleCaptioning = async () => {
     if (!captionFile) return;
-    const limit = currentUser ? 1024 * 1024 * 1024 : 50 * 1024 * 1024; // 1GB for logged in, 50MB for guest
+    const limit = currentUser ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB for logged in, 100MB for guest
     if (captionFile.size > limit) {
-      setError(`Video file is too large (> ${currentUser ? '1GB' : '50MB'}). Please upload a smaller video for captioning.`);
+      setError(`Video file is too large (> ${currentUser ? '1GB' : '100MB'}). Please upload a smaller video for captioning.`);
       return;
     }
     setIsCaptioning(true);
@@ -3329,7 +3329,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           ) : (
                             <>
                               <Sparkles size={24} />
-                              Start Dubbing (10 Credits)
+                              {currentUser ? 'Start Dubbing (10 Credits)' : 'Try Dubbing for Free'}
                             </>
                           )}
                         </button>
@@ -4087,7 +4087,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       className="w-full py-5 bg-emerald-500 text-white rounded-3xl font-bold text-xl hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3"
                     >
                       <Sparkles size={24} />
-                      Generate AI Captions
+                      {currentUser ? 'Generate AI Captions' : 'Try for Free'}
                     </button>
                   )}
 
@@ -4517,7 +4517,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     ) : (
                       <>
                         <RefreshCw size={24} />
-                        Change Voice
+                        {currentUser ? 'Change Voice' : 'Try for Free'}
                       </>
                     )}
                   </button>
