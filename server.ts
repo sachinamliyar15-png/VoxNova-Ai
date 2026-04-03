@@ -511,6 +511,14 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
+      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+      Analyze the script's category and tone to determine the best vocal characteristics:
+      - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
+      - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
+      - ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
+      - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
+      - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
+      
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
@@ -701,6 +709,14 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
+      
+      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+      Analyze the script's category and tone to determine the best vocal characteristics:
+      - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
+      - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
+      - ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
+      - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
+      - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
@@ -994,7 +1010,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         : `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
 
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-1.5-flash", // Using 1.5 flash for more stable audio processing
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
@@ -1248,7 +1264,7 @@ app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
     Return ONLY the category name.`;
 
     const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
@@ -1388,7 +1404,8 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       2. Use exactly 3 decimal places for maximum precision.
       3. If a word is spoken quickly, ensure the start and end times reflect that.
       4. DO NOT skip any words.
-      5. Ensure the "end" time of a word is exactly when the speaker finishes that word.
+      5. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the speaker finishes that word.
+      6. COMPENSATE FOR ANY AI LATENCY: The timestamps must be absolute relative to the start of the file.
       
       Correct any grammatical errors or misspellings in the transcription.
       Support both Hindi and English (Hinglish if mixed).
@@ -1399,7 +1416,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         : "video/mp4";
 
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-1.5-flash",
         contents: [
           {
             role: "user",

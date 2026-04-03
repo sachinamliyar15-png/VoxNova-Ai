@@ -336,6 +336,10 @@ interface CaptionStyle {
   shadow?: boolean;
   shadowColor?: string;
   strokeWidth?: number;
+  isDynamic?: boolean;
+  padding?: string;
+  borderRadius?: string;
+  letterSpacing?: string;
 }
 
 interface CaptionPreset {
@@ -664,6 +668,48 @@ const CAPTION_PRESETS: CaptionPreset[] = [
       strokeWidth: 1
     },
     animation: 'glow'
+  },
+  {
+    id: 'trending-dynamic',
+    name: 'Trending Dynamic',
+    style: {
+      fontSize: 52,
+      color: '#ffffff',
+      glow: true,
+      border: 'thick' as const,
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: 'rgba(0,0,0,0.8)',
+      strokeWidth: 3,
+      isDynamic: true
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'typing-style',
+    name: 'Typing Effect',
+    style: {
+      fontSize: 36,
+      color: '#ffffff',
+      glow: false,
+      border: 'none' as const,
+      font: 'Inter',
+      position: 'bottom' as const,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: '12px 24px',
+      borderRadius: '16px',
+      case: 'original' as const,
+      wordsPerLine: 5,
+      shadow: false,
+      shadowColor: 'transparent',
+      strokeWidth: 0
+    },
+    animation: 'typing'
   }
 ];
 
@@ -768,8 +814,14 @@ const CaptionOverlay = ({
 
   const positionClass = style.position === 'top' ? 'top-10' : style.position === 'middle' ? 'top-1/2 -translate-y-1/2' : 'bottom-10';
 
+  // Dynamic color cycling for "Trending Dynamic" style
+  const getDynamicColor = (index: number) => {
+    const colors = ['#ffffff', '#ffff00', '#00ff00']; // White, Yellow, Green
+    return colors[index % colors.length];
+  };
+
   // For typewriter, we show words one by one as they are spoken
-  if (animation === 'typewriter') {
+  if (animation === 'typewriter' || animation === 'typing') {
     const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
     if (!currentLine) return null;
 
@@ -781,9 +833,10 @@ const CaptionOverlay = ({
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {visibleWords.map((w, i) => (
             <motion.span 
-              key={i} 
-              initial={{ opacity: 0, x: -5 }}
-              animate={{ opacity: 1, x: 0 }}
+              key={`typewriter-${i}-${w.start}`} 
+              initial={{ opacity: 0, scale: 0.8, y: 5 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              style={{ color: style.isDynamic ? getDynamicColor(i) : style.color }}
               className="mx-1"
             >
               {w.word}
@@ -809,10 +862,10 @@ const CaptionOverlay = ({
             const isActive = currentTime >= w.start && currentTime <= w.end;
             return (
               <span 
-                key={i} 
+                key={`karaoke-${i}-${w.start}`} 
                 className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
                 style={{
-                  color: isActive ? style.color : 'rgba(255,255,255,0.5)',
+                  color: isActive ? (style.isDynamic ? getDynamicColor(i) : style.color) : 'rgba(255,255,255,0.5)',
                   textShadow: isActive ? (style.shadow ? `${style.shadowColor} 2px 2px 4px` : 'none') : 'none',
                   WebkitTextStroke: isActive ? (style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor}` : 'none') : 'none',
                 }}
@@ -822,6 +875,46 @@ const CaptionOverlay = ({
             );
           })}
         </div>
+      </div>
+    );
+  }
+
+  // Pop Up animation
+  if (animation === 'pop') {
+    return (
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentWord.word + currentWord.start}
+            initial={{ scale: 0.5, opacity: 0, y: 20 }}
+            animate={{ scale: 1.2, opacity: 1, y: 0 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            style={{ ...textStyle, color: style.isDynamic ? getDynamicColor(words.indexOf(currentWord)) : style.color }}
+            className="font-bold text-center px-4"
+          >
+            {currentWord.word}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // Glow animation
+  if (animation === 'glow') {
+    return (
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentWord.word + currentWord.start}
+            initial={{ opacity: 0, filter: 'blur(10px)' }}
+            animate={{ opacity: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, filter: 'blur(10px)' }}
+            style={{ ...textStyle, color: style.isDynamic ? getDynamicColor(words.indexOf(currentWord)) : style.color }}
+            className="font-bold text-center px-4"
+          >
+            {currentWord.word}
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }
@@ -1143,10 +1236,22 @@ const CaptionEditor = ({
   words: CaptionWord[], 
   onUpdate: (words: CaptionWord[]) => void 
 }) => {
+  const deleteWord = (idx: number) => {
+    const newWords = [...words];
+    newWords.splice(idx, 1);
+    onUpdate(newWords);
+  };
+
+  const adjustTime = (idx: number, field: 'start' | 'end', delta: number) => {
+    const newWords = [...words];
+    newWords[idx][field] = Math.max(0, newWords[idx][field] + delta);
+    onUpdate(newWords);
+  };
+
   return (
     <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
       {words.map((word, idx) => (
-        <div key={idx} className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100">
+        <div key={`caption-word-${idx}`} className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100 group">
           <input 
             type="text" 
             value={word.word} 
@@ -1157,10 +1262,25 @@ const CaptionEditor = ({
             }}
             className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
           />
-          <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
-            <span>{word.start.toFixed(2)}s</span>
-            <span>-</span>
-            <span>{word.end.toFixed(2)}s</span>
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center">
+              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+                <button onClick={() => adjustTime(idx, 'start', -0.1)} className="hover:text-zinc-900">«</button>
+                <span>{word.start.toFixed(2)}s</span>
+                <button onClick={() => adjustTime(idx, 'start', 0.1)} className="hover:text-zinc-900">»</button>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+                <button onClick={() => adjustTime(idx, 'end', -0.1)} className="hover:text-zinc-900">«</button>
+                <span>{word.end.toFixed(2)}s</span>
+                <button onClick={() => adjustTime(idx, 'end', 0.1)} className="hover:text-zinc-900">»</button>
+              </div>
+            </div>
+            <button 
+              onClick={() => deleteWord(idx)}
+              className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
         </div>
       ))}
@@ -2250,11 +2370,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       }
 
       // 1. Split text into chunks for long-form stability
-      // Increased chunk size to 2500 for faster processing of long scripts
-      const chunks = splitTextIntoChunks(sanitizedText, 2500); 
+      // Increased chunk size to 3500 for faster processing of long scripts
+      const chunks = splitTextIntoChunks(sanitizedText, 3500); 
       
-      // Increased concurrency to 5 for faster generation while staying within safe limits
-      const CONCURRENCY_LIMIT = 5;
+      // Increased concurrency to 8 for faster generation while staying within safe limits
+      const CONCURRENCY_LIMIT = 8;
       const allPcmBuffers: ArrayBuffer[] = new Array(chunks.length);
       
       // Process chunks in batches
@@ -2263,8 +2383,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         const batchPromises = batch.map(async (chunkText, batchIndex) => {
           const globalIndex = i + batchIndex;
           
-          // Stagger the starts within the batch
-          await new Promise(resolve => setTimeout(resolve, batchIndex * 1000));
+          // Reduced stagger delay to 100ms for much faster starts
+          await new Promise(resolve => setTimeout(resolve, batchIndex * 100));
           
           const base64Audio = await generateWithRetry(chunkText);
           const pcmBuffer = base64ToArrayBuffer(base64Audio);
@@ -2352,6 +2472,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           reader.readAsDataURL(finalBlob);
         });
 
+        // Firestore has a 1MB limit. If audio is too large, we store a placeholder.
+        // Base64 is ~1.33x the size of binary. 800KB base64 is ~600KB binary.
+        const isTooLarge = finalBase64.length > 800000;
+        const audioToSave = isTooLarge ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : finalBase64;
+
         // Save to history & Deduct Credits
         try {
           const token = await currentUser.getIdToken();
@@ -2367,7 +2492,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               style,
               speed,
               pitch,
-              audioData: finalBase64,
+              audioData: audioToSave,
               creditCost: Math.ceil(text.length / 10)
             })
           });
@@ -3555,6 +3680,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         )}
       </AnimatePresence>
 
+      {/* History Modal */}
+      <HistoryModal />
+
       {/* Pricing Modal removed - consolidated above */}
 
       {/* Main Content */}
@@ -4723,7 +4851,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 { step: '03', title: 'Fine-Tune', desc: 'Adjust pitch, speed, and emotional style to get the perfect performance for your project.' },
                 { step: '04', title: 'Generate', desc: 'Our neural engines process your request in seconds, delivering studio-quality 48kHz audio.' }
               ].map((item, i) => (
-                <div key={i} className="p-6 space-y-3">
+                <div key={`step-en-${i}`} className="p-6 space-y-3">
                   <div className="text-4xl font-display font-bold text-zinc-100">{item.step}</div>
                   <h4 className="font-bold text-zinc-900">{item.title}</h4>
                   <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
@@ -4762,7 +4890,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   date: "March 18, 2026"
                 }
               ].map((article, i) => (
-                <div key={i} className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group cursor-pointer" onClick={() => { setSelectedArticle(i); setShowBlog(true); }}>
+                <div key={`article-${i}`} className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group cursor-pointer" onClick={() => { setSelectedArticle(i); setShowBlog(true); }}>
                   <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{article.date}</div>
                   <h3 className="text-xl font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors">{article.title}</h3>
                   <p className="text-sm text-zinc-500 leading-relaxed line-clamp-3">{article.excerpt}</p>
@@ -4809,7 +4937,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 { q: "How do I get the best quality AI voice?", a: "For the best results, use proper punctuation in your scripts and adjust the 'Style' and 'Pitch' settings to match your content's mood." },
                 { q: "Does VoxNova support voice cloning?", a: "Yes, our premium plan includes AI voice cloning technology that allows you to create a digital version of any voice from a short sample." }
               ].map((faq, i) => (
-                <div key={i} className="p-6 bg-zinc-50 rounded-2xl space-y-2">
+                <div key={`faq-${i}`} className="p-6 bg-zinc-50 rounded-2xl space-y-2">
                   <h4 className="font-bold text-zinc-900">{faq.q}</h4>
                   <p className="text-sm text-zinc-500 leading-relaxed">{faq.a}</p>
                 </div>
@@ -4827,7 +4955,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 { step: '03', title: 'सेटिंग्स बदलें', desc: 'अपनी आवाज़ को बेहतर बनाने के लिए पिच, स्पीड और इमोशनल स्टाइल को एडजस्ट करें।' },
                 { step: '04', title: 'वॉइस जनरेट करें', desc: 'हमारा AI इंजन कुछ ही सेकंड में आपके लिए स्टूडियो-क्वालिटी ऑडियो तैयार कर देगा।' }
               ].map((item, i) => (
-                <div key={i} className="p-6 space-y-3">
+                <div key={`step-hi-${i}`} className="p-6 space-y-3">
                   <div className="text-4xl font-display font-bold text-emerald-100">{item.step}</div>
                   <h4 className="font-bold text-zinc-900">{item.title}</h4>
                   <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
@@ -5056,7 +5184,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         date: "March 18, 2026"
                       }
                     ].map((article, i) => (
-                      <div key={i} className="p-6 rounded-3xl border border-zinc-100 hover:border-emerald-500/20 transition-all cursor-pointer" onClick={() => setSelectedArticle(i)}>
+                      <div key={`blog-list-${i}`} className="p-6 rounded-3xl border border-zinc-100 hover:border-emerald-500/20 transition-all cursor-pointer" onClick={() => setSelectedArticle(i)}>
                         <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mb-2">{article.date}</div>
                         <h3 className="text-2xl font-bold text-zinc-900 mb-3">{article.title}</h3>
                         <p className="text-zinc-500 leading-relaxed mb-4">{article.excerpt}</p>
