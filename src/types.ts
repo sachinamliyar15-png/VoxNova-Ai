@@ -61,6 +61,14 @@ export const VOICES: Voice[] = [
     color: 'from-black via-red-900 to-red-600',
     description: 'The undisputed heavyweight champion of AI voices. A monstrous, chest-rattling deep baritone with explosive, fearless energy. It delivers words like a thunderclap—loud, aggressive, and incredibly professional. Perfect for hardcore motivation, dark documentaries, and raw warrior mindset content.',
     isPremium: true
+  },
+  {
+    id: 'maharaja',
+    name: 'MAHARAJA',
+    gender: 'male',
+    color: 'from-yellow-600 via-amber-700 to-yellow-900',
+    description: 'The King of all voices. The most powerful, authoritative, and legendary deep baritone ever created. It commands absolute respect and attention. Perfect for royal narrations, epic storytelling, and the most impactful videos.',
+    isPremium: true
   }
 ];
 

@@ -352,6 +352,8 @@ interface CaptionStyle {
   padding?: string;
   borderRadius?: string;
   letterSpacing?: string;
+  italic?: boolean;
+  fontWeight?: string;
 }
 
 interface CaptionPreset {
@@ -362,6 +364,49 @@ interface CaptionPreset {
 }
 
 const CAPTION_PRESETS: CaptionPreset[] = [
+  {
+    id: 'zeemo-pro',
+    name: 'Zeemo Pro',
+    style: {
+      fontSize: 64,
+      color: '#ffffff',
+      glow: false,
+      border: 'thick' as const,
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 3,
+      letterSpacing: '0.05em',
+      italic: true,
+      fontWeight: '900'
+    },
+    animation: 'zeemo'
+  },
+  {
+    id: 'kinetic-stacking',
+    name: 'Kinetic Stacking',
+    style: {
+      fontSize: 48,
+      color: '#ffffff',
+      glow: false,
+      border: 'none' as const,
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      case: 'uppercase' as const,
+      wordsPerLine: 4,
+      shadow: true,
+      shadowColor: 'rgba(0,0,0,0.5)',
+      strokeWidth: 0,
+      fontWeight: '900'
+    },
+    animation: 'kinetic'
+  },
   {
     id: 'hindi-viral-yellow',
     name: 'Hindi Viral Yellow',
@@ -927,7 +972,9 @@ const CaptionOverlay = ({
     padding: style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
     borderRadius: '8px',
     display: 'inline-block',
-    whiteSpace: 'pre-wrap'
+    whiteSpace: 'pre-wrap',
+    fontStyle: style.italic ? 'italic' : 'normal',
+    fontWeight: style.fontWeight || 'bold'
   };
 
   const getPositionClass = (pos?: string) => {
@@ -957,7 +1004,9 @@ const CaptionOverlay = ({
       letterSpacing: style.letterSpacing || 'normal',
       display: 'inline-block',
       margin: '0 4px',
-      transition: 'all 0.2s ease-in-out'
+      transition: 'all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+      fontStyle: style.italic ? 'italic' : 'normal',
+      fontWeight: style.fontWeight || 'bold'
     };
 
     if (style.border === 'thin') {
@@ -1058,6 +1107,95 @@ const CaptionOverlay = ({
     );
   }
 
+  // Zeemo Pro Style
+  if (animation === 'zeemo') {
+    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+    if (!currentLine) return null;
+
+    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
+    const linePosition = lineWords[0]?.position || style.position;
+
+    return (
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
+        <div className="flex flex-wrap justify-center gap-x-4 px-4">
+          {lineWords.map((w, i) => {
+            const isActive = currentTime >= w.start && currentTime <= w.end;
+            return (
+              <motion.span
+                key={`zeemo-${i}-${w.start}`}
+                initial={{ scale: 1 }}
+                animate={{ 
+                  scale: isActive ? 1.3 : 1,
+                  color: isActive ? '#FFD700' : '#FFFFFF'
+                }}
+                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                style={{
+                  ...getWordStyle(w, i),
+                  WebkitTextStroke: '3px #000000',
+                  textShadow: '4px 4px 0px #000000',
+                  color: isActive ? '#FFD700' : '#FFFFFF',
+                }}
+              >
+                {w.word}
+              </motion.span>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Kinetic Stacking Style
+  if (animation === 'kinetic') {
+    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+    if (!currentLine) return null;
+
+    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
+    const linePosition = lineWords[0]?.position || style.position;
+
+    // Split words into lines: Line 1 (1st word), Line 2 (rest)
+    const lines = [
+      [lineWords[0]],
+      lineWords.slice(1)
+    ].filter(l => l.length > 0);
+
+    return (
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
+        <div className="flex flex-col items-center gap-2 px-4">
+          <AnimatePresence mode="popLayout">
+            {lines.map((line, lineIdx) => (
+              <motion.div
+                key={`kinetic-line-${lineIdx}-${line[0].start}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                className="flex flex-wrap justify-center gap-x-3"
+              >
+                {line.map((w, i) => {
+                  const isActive = currentTime >= w.start && currentTime <= w.end;
+                  return (
+                    <span
+                      key={`kinetic-word-${i}-${w.start}`}
+                      style={{
+                        ...getWordStyle(w, i),
+                        color: isActive ? '#FFD700' : '#FFFFFF',
+                        fontWeight: '900',
+                        transition: 'color 0.1s ease'
+                      }}
+                    >
+                      {w.word}
+                    </span>
+                  );
+                })}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
   // Pop Up animation
   if (animation === 'pop') {
     return (
@@ -1121,7 +1259,7 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab }: { onSelect: (voi
     const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       v.tags?.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    if (v.id === 'original' && activeTab !== 'dubbing') return false;
+    if (v.id === 'original') return false;
     return matchesSearch;
   });
 
@@ -1516,13 +1654,6 @@ function Sidebar({
           Voice Changer
         </button>
         <button 
-          onClick={() => { setActiveTab('dubbing'); setIsMobileMenuOpen(false); }}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dubbing' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
-        >
-          <Video size={20} />
-          AI Dubbing
-        </button>
-        <button 
           onClick={() => { setActiveTab('captions'); setIsMobileMenuOpen(false); }}
           className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'captions' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
         >
@@ -1664,17 +1795,11 @@ function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts' | 'dubbing'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts'>('generate');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [dubbingFile, setDubbingFile] = useState<File | null>(null);
   const [targetLanguage, setTargetLanguage] = useState('English');
   const [sourceLanguage, setSourceLanguage] = useState('Auto');
-  const [dubbingResult, setDubbingResult] = useState<any>(null);
-  const [dubbingMode, setDubbingMode] = useState<'convert' | 'dub'>('convert');
-  const [isDubbing, setIsDubbing] = useState(false);
-  const [dubbingStep, setDubbingStep] = useState('');
-  const [dubbingProgress, setDubbingProgress] = useState(0);
   const [isVoiceChanging, setIsVoiceChanging] = useState(false);
   const [voiceChangingStep, setVoiceChangingStep] = useState('');
   const [voiceChangingProgress, setVoiceChangingProgress] = useState(0);
@@ -2214,94 +2339,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return new Blob([data], { type: 'video/mp4' });
   };
 
-  const mergeDubbing = async (videoFile: File, audioData: string) => {
+  const mergeAudioWithVideo = async (videoFile: File, audioData: string) => {
     if (!ffmpegRef.current) await loadFFmpeg();
     const ffmpeg = ffmpegRef.current;
     
     const { fetchFile } = await import('@ffmpeg/util');
     const inputVideo = 'video.mp4';
     const inputAudio = 'audio.wav';
-    const outputName = 'dubbed.mp4';
+    const outputName = 'processed.mp4';
     
-    setDubbingProgress(30);
     await ffmpeg.writeFile(inputVideo, await fetchFile(videoFile));
-    setDubbingProgress(50);
     await ffmpeg.writeFile(inputAudio, await fetchFile(audioData));
-    setDubbingProgress(70);
     
     // Merge audio and video, replacing original audio
     await ffmpeg.exec(['-i', inputVideo, '-i', inputAudio, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-shortest', outputName]);
-    setDubbingProgress(90);
     
     const data = await ffmpeg.readFile(outputName);
     return new Blob([data], { type: 'video/mp4' });
-  };
-
-  const handleDubbing = async () => {
-    if (!dubbingFile) return;
-    const limit = currentUser ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB for logged in, 100MB for guest
-    if (dubbingFile.size > limit) {
-      setError(`File is too large (> ${currentUser ? '1GB' : '100MB'}). Please upload a smaller file.`);
-      return;
-    }
-    setIsDubbing(true);
-    setDubbingProgress(0);
-    setDubbingStep('Preparing file...');
-
-    try {
-      const fileData = await fileToBase64(dubbingFile);
-      setDubbingProgress(20);
-      setDubbingStep('Uploading to AI engine...');
-
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch('/api/voice-changer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          fileData,
-          voice_id: selectedVoice.id,
-          mode: 'dub',
-          targetLanguage,
-          sourceLanguage
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to dub video');
-      }
-
-      setDubbingProgress(60);
-      setDubbingStep('Processing audio...');
-
-      const { audioData } = await response.json();
-      
-      if (dubbingFile.type.startsWith('video/')) {
-        setDubbingStep('Merging with video...');
-        const videoBlob = await mergeDubbing(dubbingFile, audioData);
-        setDubbingResult({
-          url: URL.createObjectURL(videoBlob),
-          type: 'video'
-        });
-      } else {
-        setDubbingResult({
-          url: `data:audio/wav;base64,${audioData}`,
-          type: 'audio'
-        });
-      }
-
-      setDubbingProgress(100);
-      setDubbingStep('Complete!');
-      showToast("Video dubbed successfully!");
-      if (auth.currentUser) fetchUserProfile(auth.currentUser);
-    } catch (err: any) {
-      setError(`Dubbing failed: ${err.message}`);
-    } finally {
-      setIsDubbing(false);
-    }
   };
 
   const handleVoiceChanger = async () => {
@@ -2346,7 +2400,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       
       if (voiceChangingFile.type.startsWith('video/')) {
         setVoiceChangingStep('Merging with video...');
-        const videoBlob = await mergeDubbing(voiceChangingFile, audioData);
+        const videoBlob = await mergeAudioWithVideo(voiceChangingFile, audioData);
         setVoiceChangingResult({
           url: URL.createObjectURL(videoBlob),
           type: 'video'
@@ -2481,14 +2535,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const creditCost = text.length;
     
     // Check for premium voice restriction
-    if (selectedVoice.isPremium) {
+      if (selectedVoice.isPremium) {
       if (!currentUser) {
         setError(`The voice "${selectedVoice.name}" is a Premium feature. Please login and upgrade your plan to access high-quality cinematic voices.`);
         setIsPricingModalOpen(true);
         return;
       }
-      if ((!userProfile || userProfile.plan === 'free') && !isWhitelisted(currentUser.email || '')) {
-        setError(`The voice "${selectedVoice.name}" is a Premium feature. Please upgrade your plan to access high-quality cinematic voices.`);
+      if ((!userProfile || userProfile.plan === 'free') && !isWhitelisted(currentUser.email || '') && (userProfile?.premium_usage_count || 0) >= 3) {
+        setError(`The voice "${selectedVoice.name}" is a Premium feature. You have used your 3 free premium generations. Please upgrade your plan to access high-quality cinematic voices.`);
         setIsPricingModalOpen(true);
         return;
       }
@@ -2758,7 +2812,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
   };
 
-  const playFromHistory = (audioData: string, id: string | number) => {
+  const playFromHistory = (audioData: string | null | undefined, id: string | number) => {
     try {
       if (playingId === id) {
         if (audioRef.current) {
@@ -2768,7 +2822,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return;
       }
 
-      if (!audioData) throw new Error("No audio data available");
+      if (!audioData || audioData === "null" || audioData === "undefined") {
+        setError("This audio was too large to be stored in history. You can only play audio generated within the last few minutes.");
+        return;
+      }
+
       if (audioData === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
         setError("This audio was too large to be stored in history.");
         return;
@@ -3003,7 +3061,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={() => playFromHistory(item.audio_data, item.id)}
+                          onClick={() => {
+                            if (!item.audio_data) {
+                              setError("This audio was too large to be stored in history.");
+                              return;
+                            }
+                            playFromHistory(item.audio_data, item.id);
+                          }}
                           className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white' : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600'}`}
                         >
                           {playingId === item.id ? <Pause size={18} /> : <Play size={18} />}
@@ -3498,164 +3562,92 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     </div>
                     
                     <div 
-                      onClick={() => document.getElementById('audio-upload-vc')?.click()}
-                      className="p-12 bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center space-y-4 cursor-pointer hover:bg-zinc-100 transition-all"
+                      onClick={() => document.getElementById('audio-upload-vc-alt')?.click()}
+                      className={`p-12 rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center text-center space-y-4 cursor-pointer transition-all ${voiceChangingFile ? 'border-purple-500/50 bg-purple-50' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'}`}
                     >
                       <input 
-                        type="file" id="audio-upload-vc" hidden accept="audio/*" 
+                        type="file" id="audio-upload-vc-alt" hidden accept="audio/*,video/*" 
                         onChange={(e) => {
-                          setDubbingFile(e.target.files?.[0] || null);
-                          setDubbingResult(null);
-                          setDubbingMode('convert');
+                          setVoiceChangingFile(e.target.files?.[0] || null);
+                          setVoiceChangingResult(null);
                         }}
                       />
-                      <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-400">
-                        <Upload size={32} />
-                      </div>
-                      <div>
-                        <p className="text-zinc-900 font-bold">Upload Audio File</p>
-                        <p className="text-zinc-500 text-sm">Drag and drop or click to browse (MP3, WAV, M4A)</p>
-                      </div>
+                      {voiceChangingFile ? (
+                        <>
+                          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-purple-500">
+                            {voiceChangingFile.type.startsWith('video/') ? <Video size={32} /> : <Mic size={32} />}
+                          </div>
+                          <div>
+                            <p className="text-zinc-900 font-bold">{voiceChangingFile.name}</p>
+                            <p className="text-zinc-500 text-sm">{(voiceChangingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-400">
+                            <Upload size={32} />
+                          </div>
+                          <div>
+                            <p className="text-zinc-900 font-bold">Upload Audio or Video File</p>
+                            <p className="text-zinc-500 text-sm">Drag and drop or click to browse (MP3, WAV, MP4, etc.)</p>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </motion.div>
-                )}
 
-                {activeTab === 'dubbing' && (
-                  <motion.div 
-                    key="dubbing"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
-                  >
-                    <div className="mb-12">
-                      <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <Video size={12} />
-                          AI Dubbing
-                        </div>
-                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
-                          Dub Your <span className="text-blue-500">Videos</span>
-                        </h2>
-                        <p className="text-zinc-500 text-lg max-w-2xl">
-                          Automatically translate and dub your videos into multiple languages while preserving the original voice and emotion.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                      <div className="space-y-8">
-                        <div 
-                          onClick={() => document.getElementById('video-upload-dub')?.click()}
-                          className={`p-12 rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center text-center space-y-4 cursor-pointer transition-all ${dubbingFile ? 'border-blue-500/50 bg-blue-50' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'}`}
-                        >
-                          <input 
-                            type="file" id="video-upload-dub" hidden accept="video/*,audio/*" 
-                            onChange={(e) => {
-                              setDubbingFile(e.target.files?.[0] || null);
-                              setDubbingResult(null);
-                            }}
-                          />
-                          {dubbingFile ? (
-                            <>
-                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-blue-500">
-                                <Video size={32} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                      <div className="space-y-6">
+                        <div className="space-y-3">
+                          <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Select Target Voice</label>
+                          <div 
+                            onClick={() => setShowVoiceLibrary(true)}
+                            className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-sm font-bold text-white shadow-sm`}>
+                                {selectedVoice.name[0]}
                               </div>
                               <div>
-                                <p className="text-zinc-900 font-bold">{dubbingFile.name}</p>
-                                <p className="text-zinc-500 text-sm">{(dubbingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                <p className="text-sm font-bold text-zinc-900">{selectedVoice.name}</p>
+                                <p className="text-[10px] text-zinc-400 uppercase tracking-widest">{selectedVoice.gender} • {selectedVoice.tags?.[0]}</p>
                               </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-400">
-                                <Upload size={32} />
-                              </div>
-                              <div>
-                                <p className="text-zinc-900 font-bold">Upload Video File</p>
-                                <p className="text-zinc-500 text-sm">Drag and drop or click to browse (MP4, WEBM, MOV)</p>
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="space-y-3">
-                            <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Source Language</label>
-                            <select 
-                              value={sourceLanguage}
-                              onChange={(e) => setSourceLanguage(e.target.value)}
-                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                            >
-                              <option value="Auto">Auto Detect</option>
-                              {LANGUAGES.map(lang => (
-                                <option key={lang.code} value={lang.name}>{lang.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="space-y-3">
-                            <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Target Language</label>
-                            <select 
-                              value={targetLanguage}
-                              onChange={(e) => setTargetLanguage(e.target.value)}
-                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                            >
-                              {LANGUAGES.map(lang => (
-                                <option key={lang.code} value={lang.name}>{lang.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="space-y-3">
-                            <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Target Voice</label>
-                            <div 
-                              onClick={() => setShowVoiceLibrary(true)}
-                              className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}>
-                                  {selectedVoice.name[0]}
-                                </div>
-                                <span className="text-sm font-medium text-zinc-900">{selectedVoice.name}</span>
-                              </div>
-                              <ChevronDown size={16} className="text-zinc-400" />
                             </div>
+                            <ChevronDown size={20} className="text-zinc-400" />
                           </div>
                         </div>
 
                         <button 
-                          onClick={handleDubbing}
-                          disabled={isDubbing || !dubbingFile}
-                          className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isDubbing ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !dubbingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-blue-500 text-white hover:bg-blue-600 shadow-blue-500/20'}`}
+                          onClick={handleVoiceChanger}
+                          disabled={isVoiceChanging || !voiceChangingFile}
+                          className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isVoiceChanging ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !voiceChangingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-purple-500 text-white hover:bg-purple-600 shadow-purple-500/20'}`}
                         >
-                          {isDubbing ? (
+                          {isVoiceChanging ? (
                             <div className="flex flex-col items-center gap-1">
                               <div className="flex items-center gap-2">
                                 <Loader2 className="animate-spin" size={24} />
-                                <span className="font-bold">Dubbing...</span>
+                                <span className="font-bold">Changing Voice...</span>
                               </div>
-                              <span className="text-[10px] opacity-70 animate-pulse">{dubbingStep}</span>
+                              <span className="text-[10px] opacity-70 animate-pulse">{voiceChangingStep}</span>
                             </div>
                           ) : (
                             <>
-                              <Sparkles size={24} />
-                              {currentUser ? 'Start Dubbing (10 Credits)' : 'Try Dubbing for Free'}
+                              <RefreshCw size={24} />
+                              {currentUser ? 'Transform Voice (5 Credits)' : 'Try for Free'}
                             </>
                           )}
                         </button>
 
-                        {isDubbing && (
+                        {isVoiceChanging && (
                           <div className="space-y-2">
                             <div className="flex justify-between text-[10px] text-zinc-500">
-                              <span>{dubbingStep}</span>
-                              <span>{dubbingProgress}%</span>
+                              <span>{voiceChangingStep}</span>
+                              <span>{voiceChangingProgress}%</span>
                             </div>
                             <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
                               <motion.div 
                                 initial={{ width: 0 }}
-                                animate={{ width: `${dubbingProgress}%` }}
-                                className="h-full bg-blue-500"
+                                animate={{ width: `${voiceChangingProgress}%` }}
+                                className="h-full bg-purple-500"
                               />
                             </div>
                           </div>
@@ -3663,7 +3655,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
 
                       <div className="space-y-6">
-                        {dubbingResult ? (
+                        {voiceChangingResult ? (
                           <motion.div 
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -3671,13 +3663,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           >
                             <div className="flex items-center justify-between mb-4">
                               <h3 className="text-white font-bold flex items-center gap-2">
-                                <Sparkles className="text-blue-400" /> Dubbed Result
+                                <Sparkles className="text-purple-400" /> Result
                               </h3>
                               <button 
                                 onClick={() => {
                                   const a = document.createElement('a');
-                                  a.href = dubbingResult.url;
-                                  a.download = `dubbed-${Date.now()}.${dubbingResult.type === 'video' ? 'mp4' : 'wav'}`;
+                                  a.href = voiceChangingResult.url;
+                                  a.download = `transformed-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
                                   a.click();
                                 }}
                                 className="p-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all"
@@ -3686,28 +3678,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               </button>
                             </div>
 
-                            {dubbingResult.type === 'video' ? (
+                            {voiceChangingResult.type === 'video' ? (
                               <video 
-                                src={dubbingResult.url} 
+                                src={voiceChangingResult.url} 
                                 controls 
                                 className="w-full rounded-2xl shadow-lg aspect-video bg-black"
                               />
                             ) : (
                               <audio 
-                                src={dubbingResult.url} 
+                                src={voiceChangingResult.url} 
                                 controls 
                                 className="w-full"
                               />
                             )}
                           </motion.div>
                         ) : (
-                          <div className="h-full min-h-[400px] bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center p-12 space-y-4">
+                          <div className="h-full min-h-[300px] bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center p-12 space-y-4">
                             <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center text-zinc-300">
                               <Play size={40} />
                             </div>
                             <div>
                               <p className="text-zinc-900 font-bold">Preview Area</p>
-                              <p className="text-zinc-500 text-sm">Your dubbed video will appear here once processed.</p>
+                              <p className="text-zinc-500 text-sm">Your transformed audio/video will appear here.</p>
                             </div>
                           </div>
                         )}
@@ -3715,6 +3707,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     </div>
                   </motion.div>
                 )}
+
 
                 {activeTab === 'history' && (
                   <HistoryView 
@@ -3741,30 +3734,61 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   {currentUser ? "Maximum 5,000 characters reached" : "Guest limit: 200 characters. Sign up for more!"}
                 </motion.div>
               )}
-              {error && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="fixed inset-0 z-[500] bg-black/20 backdrop-blur-sm flex items-center justify-center p-4"
-                >
-                  <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl border border-zinc-100 space-y-6">
-                    <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto">
-                      <AlertCircle size={32} />
-                    </div>
-                    <div className="text-center space-y-2">
-                      <h3 className="text-xl font-bold text-zinc-900">System Message</h3>
-                      <p className="text-zinc-500 leading-relaxed">{error}</p>
-                    </div>
-                    <button 
-                      onClick={() => setError(null)}
-                      className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all"
+              <AnimatePresence>
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[500] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+                  >
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                      className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl border border-zinc-100 relative overflow-hidden"
                     >
-                      Dismiss
-                    </button>
-                  </div>
-                </motion.div>
-              )}
+                      <button 
+                        onClick={() => setError(null)}
+                        className="absolute top-6 right-6 p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-full transition-all"
+                      >
+                        <X size={20} />
+                      </button>
+
+                      <div className="space-y-6">
+                        <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center">
+                          <AlertCircle size={32} />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <h3 className="text-2xl font-display font-bold text-zinc-900">System Message</h3>
+                          <p className="text-zinc-500 leading-relaxed text-sm">
+                            {error}
+                          </p>
+                        </div>
+
+                        <div className="pt-4 flex flex-col gap-3">
+                          <button 
+                            onClick={() => {
+                              setError(null);
+                              setIsPricingModalOpen(true);
+                            }}
+                            className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20"
+                          >
+                            See available plans
+                          </button>
+                          <button 
+                            onClick={() => setError(null)}
+                            className="w-full py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <SettingsModal />
             </AnimatePresence>
 
@@ -4116,8 +4140,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         </div>
                         <div className="flex gap-2 mb-2">
                           <button 
-                            onClick={() => setSpeed(0.7)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 0.7 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            onClick={() => setSpeed(0.8)}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 0.8 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Slow
                           </button>
@@ -4128,8 +4152,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             Normal
                           </button>
                           <button 
-                            onClick={() => setSpeed(1.4)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.4 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            onClick={() => setSpeed(1.3)}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.3 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Fast
                           </button>
@@ -4157,7 +4181,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           <span>{pause}s</span>
                         </div>
                         <input 
-                          type="range" min="0.1" max="1" step="0.1" 
+                          type="range" min="0.1" max="2" step="0.1" 
                           value={pause} onChange={(e) => setPause(parseFloat(e.target.value))}
                           className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
                         />
@@ -4654,7 +4678,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         <div className="space-y-2">
                           <div className="flex justify-between text-[10px] text-zinc-500">
                             <span>Words Per Line</span>
-                            <span>{captionStyle.wordsPerLine}</span>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setCaptionStyle({...captionStyle, wordsPerLine: 1})}
+                                className={`px-2 py-0.5 rounded text-[8px] font-bold transition-all ${captionStyle.wordsPerLine === 1 ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500'}`}
+                              >
+                                1 Word
+                              </button>
+                              <button 
+                                onClick={() => setCaptionStyle({...captionStyle, wordsPerLine: 2})}
+                                className={`px-2 py-0.5 rounded text-[8px] font-bold transition-all ${captionStyle.wordsPerLine === 2 ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500'}`}
+                              >
+                                2 Words
+                              </button>
+                              <span className="ml-2 font-mono">{captionStyle.wordsPerLine}</span>
+                            </div>
                           </div>
                           <input 
                             type="range" min="1" max="10" 
@@ -4662,6 +4700,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             onChange={(e) => setCaptionStyle({...captionStyle, wordsPerLine: parseInt(e.target.value)})}
                             className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
                           />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[10px] text-zinc-500">
+                            <span>Letter Spacing</span>
+                            <span>{captionStyle.letterSpacing || 'normal'}</span>
+                          </div>
+                          <select 
+                            value={captionStyle.letterSpacing || 'normal'} 
+                            onChange={(e) => setCaptionStyle({...captionStyle, letterSpacing: e.target.value})}
+                            className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="0.02em">Tight</option>
+                            <option value="0.05em">Wide</option>
+                            <option value="0.1em">Extra Wide</option>
+                            <option value="0.2em">Ultra Wide</option>
+                          </select>
                         </div>
 
                         <div className="space-y-3">
@@ -4800,16 +4856,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
                         <div className="space-y-2 pt-2 border-t border-zinc-100">
                           <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span className="font-bold uppercase tracking-wider">Sync Offset</span>
-                            <span className="font-mono">{captionOffset > 0 ? '+' : ''}{captionOffset}ms</span>
+                            <span className="font-bold uppercase tracking-wider flex items-center gap-1">
+                              <Clock size={12} /> Fix Caption Lag
+                            </span>
+                            <span className="font-mono text-emerald-600 font-bold">{(captionOffset / 1000).toFixed(1)}s</span>
                           </div>
                           <input 
-                            type="range" min="-1000" max="1000" step="10"
+                            type="range" min="0" max="1500" step="100"
                             value={captionOffset} 
                             onChange={(e) => setCaptionOffset(parseInt(e.target.value))}
                             className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
                           />
-                          <p className="text-[9px] text-zinc-400 italic text-center">Adjust if captions are early or late</p>
+                          <div className="flex justify-between text-[8px] text-zinc-400 px-1">
+                            <span>No Fix</span>
+                            <span>1.5s Earlier</span>
+                          </div>
+                          <p className="text-[9px] text-zinc-400 italic text-center mt-1">Pull captions backwards to match audio</p>
                         </div>
                       </div>
                     </div>
@@ -4869,11 +4931,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   <div className="space-y-4">
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload File</label>
                     <div 
-                      onClick={() => document.getElementById('audio-upload-vc')?.click()}
+                      onClick={() => document.getElementById('audio-upload-vc-main')?.click()}
                       className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${voiceChangingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
                     >
                       <input 
-                        type="file" id="audio-upload-vc" hidden accept="audio/*,video/*" 
+                        type="file" id="audio-upload-vc-main" hidden accept="audio/*,video/*" 
                         onChange={(e) => {
                           setVoiceChangingFile(e.target.files?.[0] || null);
                           setVoiceChangingResult(null);
@@ -5592,7 +5654,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {VOICES.filter(v => {
                   const matchesSearch = v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
-                  if (v.id === 'original' && activeTab !== 'dubbing') return false;
+                  if (v.id === 'original') return false;
                   return matchesSearch;
                 }).map((voice) => (
                   <div 

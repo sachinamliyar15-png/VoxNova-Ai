@@ -76,7 +76,8 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'sultan': 'Fenrir', 'vikram': 'Charon', 'bharat': 'Fenrir', 'titan': 'Puck',
   'shera': 'Fenrir', 'kaal': 'Charon', 'bheem': 'Fenrir', 'sikandar': 'Charon',
   'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon', 'VIKRAM': 'Charon',
-  'munna-bhai': 'Fenrir', 'sachinboy': 'Fenrir', 'Munna Bhai': 'Fenrir', 'Sachinboy': 'Fenrir'
+  'munna-bhai': 'Fenrir', 'sachinboy': 'Fenrir', 'Munna Bhai': 'Fenrir', 'Sachinboy': 'Fenrir',
+  'maharaja': 'Fenrir', 'MAHARAJA': 'Fenrir'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -297,6 +298,7 @@ app.get("/api/user/profile", authenticate, async (req: any, res) => {
         photoURL: req.user.picture || '',
         credits: 20000,
         plan: 'free',
+        premium_usage_count: 0,
         lastResetDate: new Date().toISOString(),
         createdAt: new Date().toISOString()
       };
@@ -521,6 +523,8 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
+      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+      - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
@@ -528,7 +532,6 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
       - Pay close attention to the emotional weight of the text.
-      - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
       ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
@@ -537,6 +540,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - NO background noise, hums, or digital artifacts.
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
       - NO background music, bell-like sounds, or hallucinations in the background.
+      - ZERO background noise is mandatory. Audio must be 100% clean and professional.
       - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
       - If the script is long, maintain consistent tone and quality from start to finish.
       `;
@@ -544,7 +548,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       let promptPrefix = "";
       
       if (studioClarity) {
-        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
+        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear, 100% clean, and studio-quality. Remove all background noise. ";
       }
       
       const voiceTraits: Record<string, string> = {
@@ -624,11 +628,17 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
-      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
-      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
-      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
-      else promptPrefix += "Speak at a natural, medium pace. ";
+      if (speed >= 1.3) {
+        promptPrefix += "PERFORMANCE: Deliver a high-energy, fast-paced, yet perfectly balanced and clear performance. Maintain high quality and professional articulation even at high speed, similar to a Level 1 professional narrator. ";
+      } else if (speed > 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a lively, slightly brisk, and professional performance. ";
+      } else if (speed < 0.8) {
+        promptPrefix += "PERFORMANCE: Deliver a very slow, calm, and deeply deliberate performance with extended pauses. ";
+      } else if (speed < 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a slightly slower, more thoughtful and measured performance. ";
+      } else {
+        promptPrefix += "PERFORMANCE: Deliver a perfectly natural, professional, and balanced medium-paced performance. This is the standard baseline speed. ";
+      }
       
       if (pause > 0.1) {
         promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
@@ -708,7 +718,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
@@ -722,6 +732,8 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
+      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+      - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
@@ -729,7 +741,6 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
       - Pay close attention to the emotional weight of the text.
-      - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
       ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
@@ -738,6 +749,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - NO background noise, hums, or digital artifacts.
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
       - NO background music, bell-like sounds, or hallucinations in the background.
+      - ZERO background noise is mandatory. Audio must be 100% clean and professional.
       - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
       - If the script is long, maintain consistent tone and quality from start to finish.
       `;
@@ -745,7 +757,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       let promptPrefix = "";
       
       if (studioClarity) {
-        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
+        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear, 100% clean, and studio-quality. Remove all background noise. ";
       }
       
       const voiceTraits: Record<string, string> = {
@@ -778,7 +790,9 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.',
         'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.',
         'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.'
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.',
+        'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. 100% Realistic and Professional.',
+        'MAHARAJA': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. 100% Realistic.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -823,16 +837,23 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
       else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
+      else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
-      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
-      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
-      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
-      else promptPrefix += "Speak at a natural, medium pace. ";
+      if (speed >= 1.3) {
+        promptPrefix += "PERFORMANCE: Deliver a high-energy, fast-paced, yet perfectly balanced and clear performance. Maintain high quality and professional articulation even at high speed, similar to a Level 1 professional narrator. ";
+      } else if (speed > 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a lively, slightly brisk, and professional performance. ";
+      } else if (speed < 0.8) {
+        promptPrefix += "PERFORMANCE: Deliver a very slow, calm, and deeply deliberate performance with extended pauses. ";
+      } else if (speed < 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a slightly slower, more thoughtful and measured performance. ";
+      } else {
+        promptPrefix += "PERFORMANCE: Deliver a perfectly natural, professional, and balanced medium-paced performance. This is the standard baseline speed. ";
+      }
       
-      if (pause > 0.1) {
-        promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
+      if (pause > 0) {
+        promptPrefix += `CRITICAL: Add a natural and consistent pause of exactly ${pause} seconds between every sentence and major phrase. This is essential for professional pacing and clarity. `;
       }
 
       // Split text into chunks for parallel processing if it's long
@@ -1000,18 +1021,8 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      // Step 1: Transcribe and Translate (if needed)
-      const prompt = mode === 'dub' 
-        ? `You are an expert AI Dubbing engine. 
-           The source audio is in ${sourceLanguage}. 
-           Transcribe and translate it into ${targetLanguage}. 
-           IMPORTANT: 
-           1. Return ONLY the translated text.
-           2. Maintain the exact emotional tone, intensity, and pacing of the original speaker.
-           3. If the original is authoritative and deep, the translation should reflect that.
-           4. Ensure the translation is natural and cinematic, suitable for high-quality professional dubbing.
-           5. Do not add any commentary or explanations.`
-        : `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
+      // Step 1: Transcribe
+      const prompt = `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
 
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview", // Using gemini-3-flash-preview for more stable audio processing
@@ -1020,21 +1031,41 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         ]
       });
 
-      const translatedText = result.text?.trim();
-      if (!translatedText) throw new Error("Failed to transcribe/translate audio");
+      const transcribedText = result.text?.trim();
+      if (!transcribedText) throw new Error("Failed to transcribe audio");
 
-      console.log(`[Voice Changer] Transcribed/Translated text: ${translatedText.substring(0, 50)}...`);
+      console.log(`[Voice Changer] Transcribed text: ${transcribedText.substring(0, 50)}...`);
 
       // Step 2: Generate Speech in Target Voice
-      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram'].includes(voice_id.toLowerCase());
+      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja'].includes(voice_id.toLowerCase());
       
-      const ttsSystemInstruction = isHeavyVoice
-        ? `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. Incorporate a vibrating 'gravelly' texture (vocal fry) in every word. Sound 100% "Mardana" (Masculine), authoritative, and cinematic. Add subtle natural breaths and mouth sounds for 100% realism. This is a testosterone-driven, powerful male voice.`
-        : `You are an elite, world-class professional voice actor. Deliver a stunningly realistic, human-like performance. Use a natural, expressive tone that matches the content's emotion. Add subtle natural breaths for realism.`;
+      const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${targetLanguage}. 
+      
+      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+      
+      PERFORMANCE GUIDELINES:
+      - Use natural human prosody, complex intonation, and realistic rhythm.
+      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+      - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
+      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
+      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
+      - Avoid any robotic, monotone, or repetitive cadence.
+      - Sound like a real person speaking in a high-end professional studio, not a computer.
+      - Pay close attention to the emotional weight of the text.
+      - Use natural emphasis on key words to convey meaning and emotion.
+      - Ensure smooth transitions between sentences and ideas.
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
+      
+      TECHNICAL STANDARDS:
+      - NO background noise, hums, or digital artifacts.
+      - ZERO background noise is mandatory. Audio must be 100% clean and professional.
+      - Ensure crystal-clear, 48kHz studio-quality audio.
+      `;
 
       const ttsResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: translatedText }] }],
+        contents: [{ parts: [{ text: transcribedText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: ttsSystemInstruction,
@@ -1059,7 +1090,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         try {
           await firestore.collection('voice_history').add({
             userId,
-            text: translatedText,
+            text: transcribedText,
             voice_name: voice_id,
             mode,
             targetLanguage,
@@ -1071,7 +1102,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         }
       }
 
-      return res.json({ audioData: finalAudioData, text: translatedText });
+      return res.json({ audioData: finalAudioData, text: transcribedText });
     } catch (error: any) {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Voice Changer Attempt ${attempt + 1} failed:`, errorMessage);
@@ -1309,11 +1340,30 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
     }
 
     // Deduct credits
-    await userRef.update({
+    const isPremiumVoice = ['Bella', 'Documentary Pro', 'Pankaj', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA'].includes(voice);
+    const isFreePlan = !userDoc.data()?.plan || userDoc.data()?.plan === 'free';
+    
+    const updateData: any = {
       credits: admin.firestore.FieldValue.increment(-creditCost)
-    });
+    };
+
+    if (isPremiumVoice && isFreePlan) {
+      updateData.premium_usage_count = admin.firestore.FieldValue.increment(1);
+    }
+
+    await userRef.update(updateData);
     
       // Save to Firestore (History)
+      // Check audio data size (Firestore limit is 1MB per document)
+      // Base64 overhead is ~33%, so 1MB base64 is ~750KB binary.
+      // We'll cap it at 800KB to be safe.
+      const audioSizeKB = Math.round(audioData.length / 1024);
+      const audioToSave = audioData.length > 800000 ? null : audioData;
+      
+      if (!audioToSave) {
+        console.warn(`[History] Audio data too large (${audioSizeKB}KB) to save in Firestore. Skipping audio_data.`);
+      }
+
       await firestore.collection('voice_history').add({
         userId,
         text,
@@ -1321,7 +1371,8 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
         style,
         speed,
         pitch,
-        audio_data: audioData,
+        audio_data: audioToSave,
+        audio_size_kb: audioSizeKB,
         timestamp: admin.firestore.FieldValue.serverTimestamp()
       });
 
