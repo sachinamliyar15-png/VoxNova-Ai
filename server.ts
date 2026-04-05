@@ -525,7 +525,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - Use natural human prosody, complex intonation, and realistic rhythm.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
       - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior or a king.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Avoid any robotic, monotone, or repetitive cadence.
@@ -534,10 +534,10 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - Pay close attention to the emotional weight of the text.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-      - NO background noise, hums, or digital artifacts.
+      - NO background noise, hums, hissing, or digital artifacts.
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
       - NO background music, bell-like sounds, or hallucinations in the background.
       - ZERO background noise is mandatory. Audio must be 100% clean and professional.
@@ -548,7 +548,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       let promptPrefix = "";
       
       if (studioClarity) {
-        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear, 100% clean, and studio-quality. Remove all background noise. ";
+        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
       }
       
       const voiceTraits: Record<string, string> = {
@@ -628,24 +628,26 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      if (speed >= 1.3) {
-        promptPrefix += "PERFORMANCE: Deliver a high-energy, fast-paced, yet perfectly balanced and clear performance. Maintain high quality and professional articulation even at high speed, similar to a Level 1 professional narrator. ";
+      if (speed >= 1.4) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
       } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a lively, slightly brisk, and professional performance. ";
-      } else if (speed < 0.8) {
-        promptPrefix += "PERFORMANCE: Deliver a very slow, calm, and deeply deliberate performance with extended pauses. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
+      } else if (speed <= 0.7) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
       } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a slightly slower, more thoughtful and measured performance. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a perfectly natural, professional, and balanced medium-paced performance. This is the standard baseline speed. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
       }
       
       if (pause > 0.1) {
-        promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
+        promptPrefix += `Add a natural pause of exactly ${pause} seconds between every sentence and major phrase to ensure clarity and professional pacing. `;
       }
       
+      promptPrefix += "CRITICAL: The audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static. ";
+      
       const currentPrompt = attempt === 0 
-        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
+        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
       const response = await ai.models.generateContent({
@@ -734,7 +736,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - Use natural human prosody, complex intonation, and realistic rhythm.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
       - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior or a king.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Avoid any robotic, monotone, or repetitive cadence.
@@ -743,10 +745,10 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - Pay close attention to the emotional weight of the text.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-      - NO background noise, hums, or digital artifacts.
+      - NO background noise, hums, hissing, or digital artifacts.
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
       - NO background music, bell-like sounds, or hallucinations in the background.
       - ZERO background noise is mandatory. Audio must be 100% clean and professional.
@@ -757,7 +759,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       let promptPrefix = "";
       
       if (studioClarity) {
-        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear, 100% clean, and studio-quality. Remove all background noise. ";
+        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
       }
       
       const voiceTraits: Record<string, string> = {
@@ -840,21 +842,23 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      if (speed >= 1.3) {
-        promptPrefix += "PERFORMANCE: Deliver a high-energy, fast-paced, yet perfectly balanced and clear performance. Maintain high quality and professional articulation even at high speed, similar to a Level 1 professional narrator. ";
+      if (speed >= 1.4) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
       } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a lively, slightly brisk, and professional performance. ";
-      } else if (speed < 0.8) {
-        promptPrefix += "PERFORMANCE: Deliver a very slow, calm, and deeply deliberate performance with extended pauses. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
+      } else if (speed <= 0.7) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
       } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a slightly slower, more thoughtful and measured performance. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a perfectly natural, professional, and balanced medium-paced performance. This is the standard baseline speed. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
       }
       
       if (pause > 0) {
-        promptPrefix += `CRITICAL: Add a natural and consistent pause of exactly ${pause} seconds between every sentence and major phrase. This is essential for professional pacing and clarity. `;
+        promptPrefix += `Add a natural pause of exactly ${pause} seconds between every sentence and major phrase to ensure clarity and professional pacing. `;
       }
+      
+      promptPrefix += "CRITICAL: The audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static. ";
 
       // Split text into chunks for parallel processing if it's long
       const CHUNK_SIZE = 800; // characters
@@ -882,7 +886,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         const batch = chunks.slice(i, i + CONCURRENCY);
         const batchPromises = batch.map(async (chunk, idx) => {
           const currentPrompt = attempt === 0 
-            ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}`
+            ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
             : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunk}`;
 
           const response = await ai.models.generateContent({
@@ -1046,20 +1050,21 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
-      - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Avoid any robotic, monotone, or repetitive cadence.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
       - Pay close attention to the emotional weight of the text.
+      - 100% REALISM IS MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
       ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
-      - ZERO background noise is mandatory. Audio must be 100% clean and professional.
+      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
+      - NO background music, bell-like sounds, or hallucinations in the background.
       - Ensure crystal-clear, 48kHz studio-quality audio.
       `;
 

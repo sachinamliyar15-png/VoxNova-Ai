@@ -1060,7 +1060,7 @@ const CaptionOverlay = ({
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {visibleWords.map((w, i) => (
             <motion.span 
-              key={`typewriter-${i}-${w.start}`} 
+              key={`typewriter-${w.word}-${w.start}-${i}`} 
               initial={{ opacity: 0, scale: 0.8, y: 5 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               style={getWordStyle(w, i)}
@@ -1090,7 +1090,7 @@ const CaptionOverlay = ({
             const isActive = currentTime >= w.start && currentTime <= w.end;
             return (
               <span 
-                key={`karaoke-${i}-${w.start}`} 
+                key={`karaoke-${w.word}-${w.start}-${i}`} 
                 className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
                 style={{
                   ...getWordStyle(w, i),
@@ -1165,7 +1165,7 @@ const CaptionOverlay = ({
           <AnimatePresence mode="popLayout">
             {lines.map((line, lineIdx) => (
               <motion.div
-                key={`kinetic-line-${lineIdx}-${line[0].start}`}
+                key={`kinetic-line-${lineIdx}-${line[0]?.start || 0}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
@@ -1176,7 +1176,7 @@ const CaptionOverlay = ({
                   const isActive = currentTime >= w.start && currentTime <= w.end;
                   return (
                     <span
-                      key={`kinetic-word-${i}-${w.start}`}
+                      key={`kinetic-word-${w.word}-${w.start}-${i}`}
                       style={{
                         ...getWordStyle(w, i),
                         color: isActive ? '#FFD700' : '#FFFFFF',
@@ -1295,10 +1295,10 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab }: { onSelect: (voi
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredVoices.map((voice, idx) => (
           <div 
-            key={`${voice.id}-${idx}`} 
+            key={`voice-item-${voice.id}-${idx}`} 
             onClick={() => onSelect(voice)}
             className={`p-6 bg-white rounded-3xl border transition-all group cursor-pointer relative overflow-hidden ${selectedVoiceId === voice.id ? 'border-emerald-500 ring-4 ring-emerald-500/10' : 'border-zinc-100 hover:border-zinc-300 shadow-sm hover:shadow-md'}`}
           >
@@ -1320,8 +1320,8 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab }: { onSelect: (voi
             </div>
             <p className="text-xs text-zinc-500 line-clamp-2 mb-4">{voice.description}</p>
             <div className="flex flex-wrap gap-2">
-              {voice.tags?.map((tag) => (
-                <span key={tag} className="px-2 py-1 bg-zinc-50 text-zinc-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+              {voice.tags?.map((tag, tagIdx) => (
+                <span key={`voice-tag-${voice.id}-${tag}-${tagIdx}`} className="px-2 py-1 bg-zinc-50 text-zinc-500 rounded-lg text-[10px] font-bold uppercase tracking-wider">
                   {tag}
                 </span>
               ))}
@@ -1383,7 +1383,7 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredHistory.map((gen, idx) => (
-            <div key={`${gen.id}-${idx}`} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
+            <div key={`history-view-item-${gen.id}-${idx}-${gen.created_at || ''}`} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3">
                   <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${gen.type === 'caption' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -3046,7 +3046,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </div>
               ) : (
                 filteredHistory.map((item, idx) => (
-                  <div key={`${item.id}-${idx}`} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
+                  <div key={`modal-history-item-${item.id}-${idx}-${item.created_at || ''}`} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
@@ -3434,7 +3434,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                     <div className="max-h-64 overflow-y-auto custom-scrollbar">
                                       {VOICES.slice(0, 8).map((voice, idx) => (
                                         <button
-                                          key={`${voice.id}-${idx}`}
+                                          key={`quick-voice-item-${voice.id}-${idx}`}
                                           onClick={() => {
                                             setSelectedVoice(voice);
                                             setIsFeatureMenuOpen(false);
@@ -4140,8 +4140,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         </div>
                         <div className="flex gap-2 mb-2">
                           <button 
-                            onClick={() => setSpeed(0.8)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 0.8 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            onClick={() => setSpeed(0.7)}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 0.7 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Slow
                           </button>
@@ -4152,8 +4152,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             Normal
                           </button>
                           <button 
-                            onClick={() => setSpeed(1.3)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.3 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            onClick={() => setSpeed(1.4)}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.4 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Fast
                           </button>
@@ -5085,7 +5085,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </div>
                 ) : (
                   history.map((item, idx) => (
-                    <div key={`${item.id}-${idx}`} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
+                    <div key={`main-history-item-${item.id}-${idx}-${item.created_at || item.timestamp?._seconds || ''}`} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           {item.type === 'caption' ? (
@@ -5656,9 +5656,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   const matchesSearch = v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
                   if (v.id === 'original') return false;
                   return matchesSearch;
-                }).map((voice) => (
+                }).map((voice, idx) => (
                   <div 
-                    key={voice.id}
+                    key={`voice-lib-item-${voice.id}-${idx}`}
                     className={`p-6 rounded-2xl border transition-all group relative ${selectedVoice.id === voice.id ? 'bg-zinc-50 border-zinc-900' : 'bg-white border-zinc-100 hover:border-zinc-300'}`}
                   >
                     <div 
