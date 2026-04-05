@@ -600,19 +600,19 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
       }
 
-      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro') {
-        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
+      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
+        promptPrefix += `You are a world-class cinematic ${style === 'authoritative' ? 'authoritative' : 'documentary'} narrator. Your voice is deep, mature, intelligent, and ${style === 'authoritative' ? 'highly authoritative' : 'cinematic'}, similar to National Geographic or a premium Netflix documentary. 
         
         CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
-        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
+        1. BASE TONE: ${style === 'authoritative' ? 'Commanding, serious, and powerful' : 'Calm, deep, and controlled'} storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
         2. EMOTIONAL MODULATION: 
-           - For normal parts: Calm, steady, and informative.
+           - For normal parts: ${style === 'authoritative' ? 'Firm and decisive' : 'Calm, steady, and informative'}.
            - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
            - For intense/war parts: Sound stronger, brave, and commanding.
            - For emotional parts: Sound warm, respectful, and inspiring.
            - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
         3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
-        4. PACING: Medium pace generally, but slow down for dramatic effect.
+        4. PACING: ${style === 'authoritative' ? 'Slow and deliberate' : 'Medium pace generally'}, but slow down for dramatic effect.
         5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
       } else if (style === 'emotional') {
         promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
@@ -628,6 +628,14 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
+      
+      // Voice-specific speed normalization
+      if (['Puck', 'Charon'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
+      } else if (['Fenrir'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
+      }
+
       if (speed >= 1.4) {
         promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
       } else if (speed > 1.0) {
@@ -813,19 +821,19 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
       }
 
-      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro') {
-        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel. 
+      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
+        promptPrefix += `You are a world-class cinematic ${style === 'authoritative' ? 'authoritative' : 'documentary'} narrator. Your voice is deep, mature, intelligent, and ${style === 'authoritative' ? 'highly authoritative' : 'cinematic'}, similar to National Geographic or a premium Netflix documentary. 
         
         CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
-        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
+        1. BASE TONE: ${style === 'authoritative' ? 'Commanding, serious, and powerful' : 'Calm, deep, and controlled'} storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
         2. EMOTIONAL MODULATION: 
-           - For normal parts: Calm, steady, and informative.
+           - For normal parts: ${style === 'authoritative' ? 'Firm and decisive' : 'Calm, steady, and informative'}.
            - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
            - For intense/war parts: Sound stronger, brave, and commanding.
            - For emotional parts: Sound warm, respectful, and inspiring.
            - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
         3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
-        4. PACING: Medium pace generally, but slow down for dramatic effect.
+        4. PACING: ${style === 'authoritative' ? 'Slow and deliberate' : 'Medium pace generally'}, but slow down for dramatic effect.
         5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
       } else if (style === 'emotional') {
         promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
@@ -842,6 +850,14 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
+      
+      // Voice-specific speed normalization
+      if (['Puck', 'Charon'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
+      } else if (['Fenrir'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
+      }
+
       if (speed >= 1.4) {
         promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
       } else if (speed > 1.0) {

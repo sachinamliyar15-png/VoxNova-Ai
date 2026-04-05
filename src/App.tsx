@@ -1974,8 +1974,8 @@ function App() {
         fetchUserProfile(user);
       } else {
         setUserProfile(null);
-        // Load guest history from sessionStorage when logged out
-        const guestHistory = sessionStorage.getItem('voxnova_guest_history');
+        // Load guest history from localStorage when logged out
+        const guestHistory = localStorage.getItem('voxnova_guest_history');
         if (guestHistory) {
           try {
             setHistory(JSON.parse(guestHistory));
@@ -2208,13 +2208,13 @@ function App() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [showWelcome, setShowWelcome] = useState(() => {
-    // Check if welcome was already shown in this session
-    return !sessionStorage.getItem('voxnova_welcome_shown');
+    // Check if welcome was already shown
+    return !localStorage.getItem('voxnova_welcome_shown');
   });
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
-    sessionStorage.setItem('voxnova_welcome_shown', 'true');
+    localStorage.setItem('voxnova_welcome_shown', 'true');
   };
 
   const resetSettings = () => {
@@ -2624,6 +2624,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     };
 
     try {
+      // Smart Script Parser: Extract only [VOICEOVER] parts if tags are present
+      // This ensures "realistic" output by ignoring visual directions
+      const parseScriptTags = (t: string) => {
+        if (!t.includes('[VOICEOVER]') && !t.includes('[VOICE]')) return t;
+        
+        const voiceoverParts = t.match(/\[VOICEOVER\]:?([\s\S]*?)(?=\[|$)/gi);
+        if (voiceoverParts && voiceoverParts.length > 0) {
+          return voiceoverParts.map(p => p.replace(/\[VOICEOVER\]:?/i, '').trim()).join('\n\n');
+        }
+        return t;
+      };
+
+      const processedText = parseScriptTags(text);
+
       // Sanitize text: remove problematic characters that might crash the TTS model
       const sanitizeText = (t: string) => {
         return t.replace(/[*_#`~[\]()<>|\\{}]/g, '') // Remove markdown-like chars
@@ -2631,15 +2645,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 .trim();
       };
 
-      const sanitizedText = sanitizeText(text);
+      const sanitizedText = sanitizeText(processedText);
       if (sanitizedText.length === 0) {
-        setError("Please enter some valid text to generate voice.");
+        setError("Please enter some valid text to generate voice. If using tags, ensure [VOICEOVER] content is present.");
         setIsGenerating(false);
         return;
       }
 
       // 1. Split text into chunks for long-form stability
-      // Increased chunk size to 3500 for faster processing of long scripts
       const chunks = splitTextIntoChunks(sanitizedText, 3500); 
       
       // Increased concurrency to 8 for faster generation while staying within safe limits
@@ -2723,30 +2736,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const audioUrl = URL.createObjectURL(finalBlob);
       setCurrentAudio(audioUrl);
       
-      // Convert the final blob to base64 for history storage
-      const reader = new FileReader();
-      const finalBase64 = await new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64String = reader.result as string;
-          resolve(base64String.split(',')[1]);
-        };
-        reader.readAsDataURL(finalBlob);
-      });
-
-      // Firestore has a 1MB limit. If audio is too large, we store a placeholder.
-      const isTooLarge = finalBase64.length > 800000;
-      const audioToSave = isTooLarge ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : finalBase64;
-
       // Create local generation object for immediate UI update
       const newGen: Generation = {
         id: Date.now(),
         type: 'voice',
-        text: text,
+        text: processedText,
         voice_name: selectedVoice.name,
         style: style,
         speed: speed,
         pitch: pitch,
-        audio_data: audioToSave === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" ? null : audioToSave,
+        audio_data: null, // Will be updated if small enough
         created_at: new Date().toISOString(),
         timestamp: { _seconds: Math.floor(Date.now() / 1000) }
       };
@@ -2762,6 +2761,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
       // 4. Save to History (Backend or Session)
       if (currentUser) {
+        // Convert the final blob to base64 for history storage
+        const reader = new FileReader();
+        const finalBase64 = await new Promise<string>((resolve) => {
+          reader.onloadend = () => {
+            const base64String = reader.result as string;
+            resolve(base64String.split(',')[1]);
+          };
+          reader.readAsDataURL(finalBlob);
+        });
+
+        // Firestore has a 1MB limit. If audio is too large, we store a placeholder.
+        const isTooLarge = finalBase64.length > 800000;
+        const audioToSave = isTooLarge ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : finalBase64;
+
+        // Update local gen with audio data if available
+        setHistory(prev => prev.map(item => item.id === newGen.id ? { ...item, audio_data: audioToSave } : item));
+
         // Save to history & Deduct Credits
         try {
           const token = await currentUser.getIdToken();
@@ -2772,13 +2788,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-              text,
+              text: processedText,
               voice: selectedVoice.name,
               style,
               speed,
               pitch,
               audioData: audioToSave,
-              creditCost: Math.ceil(text.length / 10)
+              creditCost: Math.ceil(processedText.length / 10)
             })
           });
           
@@ -2802,8 +2818,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           setError(`Saved locally, but failed to sync: ${saveErr.message}`);
         }
       } else {
-        // Guest mode: Save to sessionStorage
-        const guestHistory = sessionStorage.getItem('voxnova_guest_history');
+        // Guest mode: Save to localStorage
+        const guestHistory = localStorage.getItem('voxnova_guest_history');
         let historyArray: Generation[] = [];
         if (guestHistory) {
           try {
@@ -2811,9 +2827,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           } catch (e) {}
         }
         historyArray.unshift(newGen);
-        // Limit guest history to 10 items to avoid storage limits
-        if (historyArray.length > 10) historyArray = historyArray.slice(0, 10);
-        sessionStorage.setItem('voxnova_guest_history', JSON.stringify(historyArray));
+        // Limit guest history to 20 items to avoid storage limits
+        if (historyArray.length > 20) historyArray = historyArray.slice(0, 20);
+        localStorage.setItem('voxnova_guest_history', JSON.stringify(historyArray));
 
         if (analytics) {
           logEvent(analytics, 'generate_voice_guest_success', {
@@ -2849,13 +2865,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   };
 
   const deleteHistoryItem = async (id: string | number, type?: string) => {
-    if (!window.confirm("Are you sure you want to delete this generation?")) return;
-    
-    // If guest mode, just delete from local state and sessionStorage
+    // If guest mode, just delete from local state and localStorage
     if (!currentUser) {
       const newHistory = history.filter(item => item.id !== id);
       setHistory(newHistory);
-      sessionStorage.setItem('voxnova_guest_history', JSON.stringify(newHistory));
+      localStorage.setItem('voxnova_guest_history', JSON.stringify(newHistory));
       return;
     }
 
@@ -4169,7 +4183,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     </div>
                   </div>
 
-                  <div className="glass-panel p-4 rounded-2xl space-y-3">
+                      <div className="glass-panel p-4 rounded-2xl space-y-3">
                     <label className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                       <Sparkles size={14} /> Style
                     </label>
@@ -4181,6 +4195,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       <option value="normal" className="bg-white">Normal</option>
                       <option value="documentary" className="bg-white">Documentary</option>
                       <option value="doc-pro" className="bg-white">Professional Documentary</option>
+                      <option value="cinematic" className="bg-white">Cinematic</option>
+                      <option value="authoritative" className="bg-white">Authoritative</option>
                       <option value="emotional" className="bg-white">Emotional</option>
                       <option value="storytelling" className="bg-white">Storytelling</option>
                       <option value="motivational" className="bg-white">Motivational</option>
