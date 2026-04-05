@@ -1778,8 +1778,23 @@ function App() {
     "Optimizing audio quality...",
     "Finalizing generation..."
   ];
+  const [exhaustedCount, setExhaustedCount] = useState(0);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [history, setHistory] = useState<Generation[]>([]);
   const [currentAudio, setCurrentAudio] = useState<string | null>(null);
+
+  // Load guest history from sessionStorage on mount
+  useEffect(() => {
+    const guestHistory = sessionStorage.getItem('voxnova_guest_history');
+    if (guestHistory && !currentUser) {
+      try {
+        setHistory(JSON.parse(guestHistory));
+      } catch (e) {
+        console.error("Failed to parse guest history", e);
+      }
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     return () => {
@@ -1790,10 +1805,6 @@ function App() {
   }, [currentAudio]);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
   const [showLimitToast, setShowLimitToast] = useState(false);
-
-  const [exhaustedCount, setExhaustedCount] = useState(0);
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts'>('generate');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -1963,7 +1974,17 @@ function App() {
         fetchUserProfile(user);
       } else {
         setUserProfile(null);
-        setHistory([]);
+        // Load guest history from sessionStorage when logged out
+        const guestHistory = sessionStorage.getItem('voxnova_guest_history');
+        if (guestHistory) {
+          try {
+            setHistory(JSON.parse(guestHistory));
+          } catch (e) {
+            setHistory([]);
+          }
+        } else {
+          setHistory([]);
+        }
       }
     }, (error) => {
       console.error("Auth State Error:", error);
@@ -2186,7 +2207,15 @@ function App() {
   const [showFAQ, setShowFAQ] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historySearchTerm, setHistorySearchTerm] = useState('');
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    // Check if welcome was already shown in this session
+    return !sessionStorage.getItem('voxnova_welcome_shown');
+  });
+
+  const handleWelcomeComplete = () => {
+    setShowWelcome(false);
+    sessionStorage.setItem('voxnova_welcome_shown', 'true');
+  };
 
   const resetSettings = () => {
     setSpeed(1.0);
@@ -2694,29 +2723,45 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const audioUrl = URL.createObjectURL(finalBlob);
       setCurrentAudio(audioUrl);
       
+      // Convert the final blob to base64 for history storage
+      const reader = new FileReader();
+      const finalBase64 = await new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          resolve(base64String.split(',')[1]);
+        };
+        reader.readAsDataURL(finalBlob);
+      });
+
+      // Firestore has a 1MB limit. If audio is too large, we store a placeholder.
+      const isTooLarge = finalBase64.length > 800000;
+      const audioToSave = isTooLarge ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : finalBase64;
+
+      // Create local generation object for immediate UI update
+      const newGen: Generation = {
+        id: Date.now(),
+        type: 'voice',
+        text: text,
+        voice_name: selectedVoice.name,
+        style: style,
+        speed: speed,
+        pitch: pitch,
+        audio_data: audioToSave === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" ? null : audioToSave,
+        created_at: new Date().toISOString(),
+        timestamp: { _seconds: Math.floor(Date.now() / 1000) }
+      };
+
+      // Update local history state immediately
+      setHistory(prev => [newGen, ...prev]);
+
       setTimeout(() => {
         if (audioRef.current) {
           audioRef.current.play().catch(e => console.error("Auto-play failed:", e));
         }
       }, 100);
 
-      // 4. Save to History (Backend)
+      // 4. Save to History (Backend or Session)
       if (currentUser) {
-        // Convert the final blob to base64 for history storage
-        const reader = new FileReader();
-        const finalBase64 = await new Promise<string>((resolve) => {
-          reader.onloadend = () => {
-            const base64String = reader.result as string;
-            resolve(base64String.split(',')[1]);
-          };
-          reader.readAsDataURL(finalBlob);
-        });
-
-        // Firestore has a 1MB limit. If audio is too large, we store a placeholder.
-        // Base64 is ~1.33x the size of binary. 800KB base64 is ~600KB binary.
-        const isTooLarge = finalBase64.length > 800000;
-        const audioToSave = isTooLarge ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : finalBase64;
-
         // Save to history & Deduct Credits
         try {
           const token = await currentUser.getIdToken();
@@ -2749,6 +2794,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             });
           }
           
+          // Refresh history from server to get the real ID and timestamp
           fetchHistory(currentUser);
           fetchUserProfile(currentUser);
         } catch (saveErr: any) {
@@ -2756,7 +2802,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           setError(`Saved locally, but failed to sync: ${saveErr.message}`);
         }
       } else {
-        // Guest mode: Just log locally if needed or just finish
+        // Guest mode: Save to sessionStorage
+        const guestHistory = sessionStorage.getItem('voxnova_guest_history');
+        let historyArray: Generation[] = [];
+        if (guestHistory) {
+          try {
+            historyArray = JSON.parse(guestHistory);
+          } catch (e) {}
+        }
+        historyArray.unshift(newGen);
+        // Limit guest history to 10 items to avoid storage limits
+        if (historyArray.length > 10) historyArray = historyArray.slice(0, 10);
+        sessionStorage.setItem('voxnova_guest_history', JSON.stringify(historyArray));
+
         if (analytics) {
           logEvent(analytics, 'generate_voice_guest_success', {
             voice_name: selectedVoice.name,
@@ -2792,8 +2850,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const deleteHistoryItem = async (id: string | number, type?: string) => {
     if (!window.confirm("Are you sure you want to delete this generation?")) return;
+    
+    // If guest mode, just delete from local state and sessionStorage
+    if (!currentUser) {
+      const newHistory = history.filter(item => item.id !== id);
+      setHistory(newHistory);
+      sessionStorage.setItem('voxnova_guest_history', JSON.stringify(newHistory));
+      return;
+    }
+
     try {
-      const token = await currentUser!.getIdToken();
+      const token = await currentUser.getIdToken();
       const res = await fetch(`/api/history/${id}${type ? `?type=${type}` : ''}`, {
         method: 'DELETE',
         headers: {
@@ -2867,7 +2934,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   };
 
   const handleRestoreScript = (item: Generation) => {
-    setText(item.text);
+    if (item.text) setText(item.text);
     const voice = VOICES.find(v => v.name === item.voice_name);
     if (voice) setSelectedVoice(voice);
     setSpeed(item.speed || 1);
@@ -3192,7 +3259,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             <p className="mt-4 text-zinc-500 font-medium animate-pulse">Initializing VoxNova...</p>
           </motion.div>
         ) : showWelcome ? (
-          <WelcomeScreen onComplete={() => setShowWelcome(false)} />
+          <WelcomeScreen onComplete={handleWelcomeComplete} />
         ) : (
           <div key="app" className="min-h-screen flex flex-col md:flex-row bg-white text-zinc-900 relative overflow-hidden">
           {/* Mobile Header */}
