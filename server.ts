@@ -77,7 +77,10 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'shera': 'Fenrir', 'kaal': 'Charon', 'bheem': 'Fenrir', 'sikandar': 'Charon',
   'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon', 'VIKRAM': 'Charon',
   'munna-bhai': 'Fenrir', 'sachinboy': 'Fenrir', 'Munna Bhai': 'Fenrir', 'Sachinboy': 'Fenrir',
-  'maharaja': 'Fenrir', 'MAHARAJA': 'Fenrir'
+  'maharaja': 'Fenrir', 'MAHARAJA': 'Fenrir', 'emperor-pro': 'Fenrir', 'EMPEROR PRO': 'Fenrir',
+  'kabir': 'Charon', 'KABIR': 'Charon', 'aryan': 'Puck', 'ARYAN': 'Puck',
+  'ishani': 'Kore', 'ISHANI': 'Kore', 'zoravar': 'Fenrir', 'ZORAVAR': 'Fenrir',
+  'rudra': 'Fenrir', 'RUDRA': 'Fenrir'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -504,12 +507,14 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
         'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
         'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
-        'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon'
+        'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon',
+        'EMPEROR PRO': 'Fenrir', 'KABIR': 'Charon', 'ARYAN': 'Puck', 'ISHANI': 'Kore', 'ZORAVAR': 'Fenrir', 'RUDRA': 'Fenrir',
+        'Munna Bhai': 'Zephyr', 'Sachinboy': 'Fenrir', 'MAHARAJA': 'Fenrir'
       };
 
       const targetVoice = voiceMapping[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
@@ -581,7 +586,14 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.',
         'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.',
         'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.'
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.',
+        'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. 100% Realistic and Professional.',
+        'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. 100% Realistic.',
+        'KABIR': 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives and soulful storytelling. 100% Realistic.',
+        'ARYAN': 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation and sports commentary. 100% Realistic.',
+        'ISHANI': 'The Elegant Narrator. Smooth, sophisticated, and professional female voice. Ideal for luxury brands and high-end documentaries. 100% Realistic.',
+        'ZORAVAR': 'The Heavyweight. An ultra-deep, chest-rattling baritone with immense power. 100% Realistic.',
+        'RUDRA': 'The Intense Narrator. Gritty, serious, and highly authoritative. Best for crime thrillers and investigative content. 100% Realistic.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -598,6 +610,24 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
 
       if (language === 'hi') {
         promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
+      }
+
+      if (style === 'professional-auto') {
+        try {
+          const analysisResponse = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [{ parts: [{ text: `Analyze the following script and determine its category (e.g., Documentary, Fitness, Motivation, Story, News, Corporate) and the ideal vocal tone, pace, and emotional weight. Provide a brief professional instruction for a voice actor to perform this script perfectly.
+            
+            SCRIPT:
+            ${text}` }] }]
+          });
+          const analysis = analysisResponse.text;
+          promptPrefix += `PROFESSIONAL SCRIPT ANALYSIS & INSTRUCTIONS: ${analysis} 
+          CRITICAL: Perform this script with 100% realism, matching the analyzed tone and category perfectly. Use natural human prosody and emotional depth. `;
+        } catch (analysisError) {
+          console.error("Script analysis failed, falling back to general professional style:", analysisError);
+          promptPrefix += "Use a highly professional, balanced, and realistic narrator tone suitable for this script. ";
+        }
       }
 
       if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
@@ -728,7 +758,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
@@ -802,7 +832,12 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
         'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.',
         'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. 100% Realistic and Professional.',
-        'MAHARAJA': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. 100% Realistic.'
+        'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. 100% Realistic.',
+        'KABIR': 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives and soulful storytelling. 100% Realistic.',
+        'ARYAN': 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation and sports commentary. 100% Realistic.',
+        'ISHANI': 'The Elegant Narrator. Smooth, sophisticated, and professional female voice. Ideal for luxury brands and high-end documentaries. 100% Realistic.',
+        'ZORAVAR': 'The Heavyweight. An ultra-deep, chest-rattling baritone with immense power. 100% Realistic.',
+        'RUDRA': 'The Intense Narrator. Gritty, serious, and highly authoritative. Best for crime thrillers and investigative content. 100% Realistic.'
       };
 
       promptPrefix += `${voiceTraits[voice_name] || ''} `;
@@ -819,6 +854,24 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
 
       if (language === 'hi') {
         promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
+      }
+
+      if (style === 'professional-auto') {
+        try {
+          const analysisResponse = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [{ parts: [{ text: `Analyze the following script and determine its category (e.g., Documentary, Fitness, Motivation, Story, News, Corporate) and the ideal vocal tone, pace, and emotional weight. Provide a brief professional instruction for a voice actor to perform this script perfectly.
+            
+            SCRIPT:
+            ${text}` }] }]
+          });
+          const analysis = analysisResponse.text;
+          promptPrefix += `PROFESSIONAL SCRIPT ANALYSIS & INSTRUCTIONS: ${analysis} 
+          CRITICAL: Perform this script with 100% realism, matching the analyzed tone and category perfectly. Use natural human prosody and emotional depth. `;
+        } catch (analysisError) {
+          console.error("Script analysis failed, falling back to general professional style:", analysisError);
+          promptPrefix += "Use a highly professional, balanced, and realistic narrator tone suitable for this script. ";
+        }
       }
 
       if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
@@ -1406,10 +1459,10 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
 
 // Generate Captions via Gemini API
 app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
-  const { videoData, language, scriptType = 'hindi', translateToEnglish = false, smartHighlights = false, advancedCaptions = false } = req.body;
+  const { videoData, language, scriptType = 'hindi', translateToEnglish = false } = req.body;
   const userId = req.user?.uid;
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  const creditCost = advancedCaptions ? 10 : 5;
+  const creditCost = 5;
 
   if (!videoData) {
     return res.status(400).json({ error: "Video data is required" });
@@ -1473,22 +1526,15 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       The content is primarily in ${language}.
       ${scriptInstruction}
       ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions. The output 'word' field must be in English." : ""}
-      ${smartHighlights ? "CRITICAL: Identify the most important, high-impact, or emotional words in the script and mark them with 'isHighlighted': true. These are words that should stand out visually for a viral video effect." : ""}
-      ${advancedCaptions ? `CRITICAL: This is for ADVANCED CAPTIONING. 
-        1. Only generate captions for the most IMPORTANT, high-impact segments of the video. Skip silence or filler segments.
-        2. For each caption segment, assign a dynamic 'position' from: ['top', 'middle', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'].
-        3. Randomize the positions to create a dynamic, professional editing feel.
-        4. If the video is in Hindi, you can mix Hindi and English captions (Hinglish) to make it look modern and attractive.
-        5. Occasionally use different 'fontSize' (e.g., 32, 48, 64) to emphasize words.` : ""}
       
-      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), "end" (in seconds), and optionally "isHighlighted" (boolean), "position" (string), "fontSize" (number).
-      Example: [{"word": "hello", "start": 0.52, "end": 0.88, "isHighlighted": true, "position": "top-right", "fontSize": 48}, ...]
+      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
+      Example: [{"word": "hello", "start": 0.52, "end": 0.88}, ...]
       
       CRITICAL FOR SYNC: 
       1. The timestamps MUST be perfectly aligned with the audio. 
       2. Use exactly 3 decimal places for maximum precision.
       3. If a word is spoken quickly, ensure the start and end times reflect that.
-      4. DO NOT skip any words ${advancedCaptions ? "within the important segments" : ""}.
+      4. DO NOT skip any words.
       5. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the speaker finishes that word.
       6. COMPENSATE FOR ANY AI LATENCY: The timestamps must be absolute relative to the start of the file.
       

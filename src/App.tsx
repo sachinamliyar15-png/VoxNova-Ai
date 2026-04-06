@@ -61,7 +61,8 @@ import {
   Wind,
   Heart,
   Cloud,
-  Star
+  Star,
+  Highlighter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VOICES, Voice, Generation, LANGUAGES } from './types';
@@ -329,6 +330,7 @@ interface CaptionWord {
   start: number;
   end: number;
   isHighlighted?: boolean;
+  highlightColor?: string;
   position?: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   color?: string;
   fontSize?: number;
@@ -364,6 +366,50 @@ interface CaptionPreset {
 }
 
 const CAPTION_PRESETS: CaptionPreset[] = [
+  {
+    id: 'professional-viral',
+    name: 'Professional Viral',
+    style: {
+      fontSize: 64,
+      color: '#ffffff',
+      glow: false,
+      border: 'thick' as const,
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 4,
+      fontWeight: '900',
+      isDynamic: true
+    },
+    animation: 'professional'
+  },
+  {
+    id: 'professional-three-color',
+    name: 'Professional Three-Color',
+    style: {
+      fontSize: 56,
+      color: '#ffffff',
+      glow: false,
+      border: 'thick' as const,
+      font: 'Inter',
+      position: 'middle' as const,
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase' as const,
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 3,
+      fontWeight: '900',
+      isDynamic: true // Flag for multi-color logic
+    },
+    animation: 'pop'
+  },
   {
     id: 'zeemo-pro',
     name: 'Zeemo Pro',
@@ -834,14 +880,28 @@ const CaptionOverlay = ({
   animation: string,
   shadowColor: string
 }) => {
+  // Add a small offset (e.g., 0.4s) to compensate for processing lag and make captions feel snappier
+  const adjustedTime = currentTime + 0.4;
+  
   const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine), [words, style.wordsPerLine]);
-  const currentWord = displayWords.find(w => currentTime >= w.start && currentTime <= w.end);
+  const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
+  const currentWord = displayWords[currentWordIndex];
   
   if (!currentWord) return null;
 
-  // Dynamic color cycling for "Trending Dynamic" style
+  const getThreeColor = () => {
+    // Find the global index of this word in the original words array for consistent coloring
+    const globalIndex = words.findIndex(w => w.start === currentWord.start && w.word === currentWord.word);
+    const patternIndex = globalIndex === -1 ? 0 : globalIndex % 15;
+    
+    if (patternIndex < 5) return '#ffffff'; // White
+    if (patternIndex < 10) return '#ffff00'; // Yellow
+    return '#00ff00'; // Green
+  };
+
   const getDynamicColor = (index: number) => {
-    const colors = ['#ffffff', '#ffff00', '#00ff00', '#ff00ff', '#00ffff']; // White, Yellow, Green, Pink, Cyan
+    if (style.isDynamic) return getThreeColor();
+    const colors = ['#ffffff', '#ffff00', '#00ff00', '#ff00ff', '#00ffff'];
     return colors[index % colors.length];
   };
 
@@ -849,9 +909,31 @@ const CaptionOverlay = ({
     switch (animation) {
       case 'pop':
         return {
-          initial: { scale: 0.5, opacity: 0 },
+          initial: { scale: 0.8, opacity: 0 },
           animate: { scale: 1, opacity: 1 },
-          transition: { type: 'spring' as const, stiffness: 300, damping: 20 }
+          transition: { type: 'spring' as const, stiffness: 400, damping: 15 }
+        };
+      case 'professional':
+        return {
+          initial: { scale: 0.5, opacity: 0, y: 15 },
+          animate: { scale: 1, opacity: 1, y: 0 },
+          transition: { 
+            type: "spring" as const,
+            stiffness: 500,
+            damping: 20,
+            duration: 0.1
+          }
+        };
+      case 'snappy':
+        return {
+          initial: { scale: 0, opacity: 0 },
+          animate: { scale: 1, opacity: 1 },
+          transition: { 
+            type: "spring" as const,
+            stiffness: 600,
+            damping: 15,
+            duration: 0.08
+          }
         };
       case 'shake':
         return {
@@ -928,7 +1010,7 @@ const CaptionOverlay = ({
         return {
           initial: { opacity: 0, y: 10 },
           animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.2 }
+          transition: { duration: 0.2, ease: "easeOut" as const }
         };
       case 'glow':
         return {
@@ -1023,20 +1105,15 @@ const CaptionOverlay = ({
       baseStyle.textShadow = `${shadowColor} 2px 2px 4px`;
     }
     
-    // Smart Highlights
+    // Highlight logic
     if (word.isHighlighted) {
       return {
         ...baseStyle,
-        backgroundColor: '#facc15', // Viral Yellow highlight
+        backgroundColor: word.highlightColor || '#facc15', // Use custom color or default viral yellow
         color: '#000000',
         transform: 'rotate(-2deg) scale(1.15)',
         fontWeight: '900',
-        boxShadow: `4px 4px 0px ${shadowColor}4D`, // 30% opacity shadow
-        padding: '6px 14px',
-        borderRadius: '8px',
-        WebkitTextStroke: '0',
-        textShadow: 'none',
-        zIndex: 20
+        boxShadow: `4px 4px 0px ${shadowColor}4D`,
       };
     }
 
@@ -1060,7 +1137,7 @@ const CaptionOverlay = ({
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {visibleWords.map((w, i) => (
             <motion.span 
-              key={`typewriter-${w.word}-${w.start}-${i}`} 
+              key={`typewriter-${i}-${w.start}`} 
               initial={{ opacity: 0, scale: 0.8, y: 5 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               style={getWordStyle(w, i)}
@@ -1090,7 +1167,7 @@ const CaptionOverlay = ({
             const isActive = currentTime >= w.start && currentTime <= w.end;
             return (
               <span 
-                key={`karaoke-${w.word}-${w.start}-${i}`} 
+                key={`karaoke-${i}-${w.start}`} 
                 className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
                 style={{
                   ...getWordStyle(w, i),
@@ -1383,7 +1460,7 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredHistory.map((gen, idx) => (
-            <div key={`history-view-item-${gen.id}-${idx}-${gen.created_at || ''}`} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
+            <div key={`history-view-item-${gen.id}-${idx}`} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3">
                   <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${gen.type === 'caption' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -1565,39 +1642,81 @@ const CaptionEditor = ({
     onUpdate(newWords);
   };
 
+  const toggleHighlight = (idx: number) => {
+    const newWords = [...words];
+    newWords[idx].isHighlighted = !newWords[idx].isHighlighted;
+    if (!newWords[idx].isHighlighted) {
+      delete newWords[idx].highlightColor;
+    } else {
+      newWords[idx].highlightColor = '#facc15'; // Default
+    }
+    onUpdate(newWords);
+  };
+
+  const setHighlightColor = (idx: number, color: string) => {
+    const newWords = [...words];
+    newWords[idx].highlightColor = color;
+    onUpdate(newWords);
+  };
+
   return (
     <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
       {words.map((word, idx) => (
-        <div key={`caption-word-${idx}`} className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100 group">
-          <input 
-            type="text" 
-            value={word.word} 
-            onChange={(e) => {
-              const newWords = [...words];
-              newWords[idx].word = e.target.value;
-              onUpdate(newWords);
-            }}
-            className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
-          />
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-center">
-              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+        <div key={`caption-word-${idx}`} className="flex flex-col gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-100 group transition-all hover:border-emerald-200">
+          <div className="flex items-center gap-2">
+            <input 
+              type="text" 
+              value={word.word} 
+              onChange={(e) => {
+                const newWords = [...words];
+                newWords[idx].word = e.target.value;
+                onUpdate(newWords);
+              }}
+              className="flex-1 bg-transparent text-sm font-bold focus:outline-none text-zinc-900"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => toggleHighlight(idx)}
+                className={`p-2 rounded-lg transition-all ${word.isHighlighted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
+                title="Highlight Word"
+              >
+                <Highlighter size={14} />
+              </button>
+              <button 
+                onClick={() => deleteWord(idx)}
+                className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
                 <button onClick={() => adjustTime(idx, 'start', -0.1)} className="hover:text-zinc-900">«</button>
-                <span>{word.start.toFixed(2)}s</span>
+                <span className="w-12 text-center">{word.start.toFixed(2)}s</span>
                 <button onClick={() => adjustTime(idx, 'start', 0.1)} className="hover:text-zinc-900">»</button>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono">
+              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
                 <button onClick={() => adjustTime(idx, 'end', -0.1)} className="hover:text-zinc-900">«</button>
-                <span>{word.end.toFixed(2)}s</span>
+                <span className="w-12 text-center">{word.end.toFixed(2)}s</span>
                 <button onClick={() => adjustTime(idx, 'end', 0.1)} className="hover:text-zinc-900">»</button>
               </div>
             </div>
-            <button 
-              onClick={() => deleteWord(idx)}
-              className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-            >
-              <Trash2 size={14} />
-            </button>
+
+            {word.isHighlighted && (
+              <div className="flex items-center gap-1.5">
+                {['#facc15', '#4ade80', '#60a5fa', '#f87171', '#c084fc'].map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setHighlightColor(idx, color)}
+                    className={`w-4 h-4 rounded-full border-2 transition-all ${word.highlightColor === color ? 'border-zinc-900 scale-125' : 'border-transparent hover:scale-110'}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -1877,9 +1996,7 @@ function App() {
   const [captionStep, setCaptionStep] = useState('');
   const [captionProgress, setCaptionProgress] = useState(0);
   const [showConfigError, setShowConfigError] = useState(false);
-  const [smartHighlights, setSmartHighlights] = useState(true);
   const [translateToEnglish, setTranslateToEnglish] = useState(false);
-  const [advancedCaptions, setAdvancedCaptions] = useState(false);
   const [shadowColor, setShadowColor] = useState('#000000');
 
   // Auto-save feature
@@ -2479,9 +2596,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           videoData,
           language: targetLanguage,
           scriptType: captionScriptType,
-          smartHighlights,
-          translateToEnglish,
-          advancedCaptions
+          translateToEnglish
         })
       });
 
@@ -2738,7 +2853,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       
       // Create local generation object for immediate UI update
       const newGen: Generation = {
-        id: Date.now(),
+        id: Date.now() + Math.random(),
         type: 'voice',
         text: processedText,
         voice_name: selectedVoice.name,
@@ -3120,10 +3235,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-              {filteredHistory.length === 0 ? (
+              {history.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-zinc-400 space-y-4">
                   <History size={48} className="opacity-20" />
-                  <p>No matching history found.</p>
+                  <p>No generations yet. Start by creating some audio!</p>
+                </div>
+              ) : filteredHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-zinc-400 space-y-4">
+                  <Search size={48} className="opacity-20" />
+                  <p>No matching history found for "{historySearchTerm}".</p>
                 </div>
               ) : (
                 filteredHistory.map((item, idx) => (
@@ -4193,6 +4313,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       className="w-full bg-transparent text-sm focus:outline-none cursor-pointer"
                     >
                       <option value="normal" className="bg-white">Normal</option>
+                      <option value="professional-auto" className="bg-white">Professional Auto (Smart)</option>
                       <option value="documentary" className="bg-white">Documentary</option>
                       <option value="doc-pro" className="bg-white">Professional Documentary</option>
                       <option value="cinematic" className="bg-white">Cinematic</option>
@@ -4506,42 +4627,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   {!captionResult && !isCaptioning && captionFile && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center justify-between p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                              <Sparkles size={20} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-emerald-900">Smart Highlights</p>
-                              <p className="text-[10px] text-emerald-600 font-medium">Auto-highlight viral keywords</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setSmartHighlights(!smartHighlights)}
-                            className={`w-12 h-6 rounded-full transition-all relative ${smartHighlights ? 'bg-emerald-500' : 'bg-zinc-200'}`}
-                          >
-                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${smartHighlights ? 'translate-x-6' : 'translate-x-0'}`} />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                              <Zap size={20} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-blue-900">Advanced Captions</p>
-                              <p className="text-[10px] text-blue-600">Dynamic positions & important highlights</p>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => setAdvancedCaptions(!advancedCaptions)}
-                            className={`w-12 h-6 rounded-full transition-all relative ${advancedCaptions ? 'bg-blue-500' : 'bg-zinc-200'}`}
-                          >
-                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${advancedCaptions ? 'translate-x-6' : 'translate-x-0'}`} />
-                          </button>
-                        </div>
-
                         <div className="flex items-center justify-between p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
@@ -4704,23 +4789,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    <div className="space-y-4 pt-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                          <Star size={14} /> Smart Highlights
-                        </label>
-                        <button 
-                          onClick={() => setSmartHighlights(!smartHighlights)}
-                          className={`w-10 h-5 rounded-full transition-all relative ${smartHighlights ? 'bg-emerald-500' : 'bg-zinc-200'}`}
-                        >
-                          <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${smartHighlights ? 'left-6' : 'left-1'}`} />
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-zinc-400 leading-relaxed">
-                        Automatically detect and highlight important keywords with viral effects.
-                      </p>
                     </div>
 
                     <div className="space-y-4 pt-2">
@@ -5168,7 +5236,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </div>
                 ) : (
                   history.map((item, idx) => (
-                    <div key={`main-history-item-${item.id}-${idx}-${item.created_at || item.timestamp?._seconds || ''}`} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
+                    <div key={`main-history-item-${item.id}-${idx}-${item.created_at || ''}`} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           {item.type === 'caption' ? (

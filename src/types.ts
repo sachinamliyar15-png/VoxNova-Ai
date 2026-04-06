@@ -63,11 +63,51 @@ export const VOICES: Voice[] = [
     isPremium: true
   },
   {
-    id: 'maharaja',
-    name: 'MAHARAJA',
+    id: 'emperor-pro',
+    name: 'EMPEROR PRO',
     gender: 'male',
     color: 'from-yellow-600 via-amber-700 to-yellow-900',
     description: 'The King of all voices. The most powerful, authoritative, and legendary deep baritone ever created. It commands absolute respect and attention. Perfect for royal narrations, epic storytelling, and the most impactful videos.',
+    isPremium: true
+  },
+  {
+    id: 'kabir',
+    name: 'KABIR',
+    gender: 'male',
+    color: 'from-orange-700 to-amber-900',
+    description: 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives, audiobooks, and soulful storytelling.',
+    isPremium: true
+  },
+  {
+    id: 'aryan',
+    name: 'ARYAN',
+    gender: 'male',
+    color: 'from-blue-600 to-cyan-800',
+    description: 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation, sports commentary, and high-intensity content.',
+    isPremium: true
+  },
+  {
+    id: 'ishani',
+    name: 'ISHANI',
+    gender: 'female',
+    color: 'from-rose-600 to-pink-800',
+    description: 'The Elegant Narrator. Smooth, sophisticated, and professional. Ideal for luxury brands, high-end documentaries, and corporate storytelling.',
+    isPremium: true
+  },
+  {
+    id: 'zoravar',
+    name: 'ZORAVAR',
+    gender: 'male',
+    color: 'from-zinc-900 to-black',
+    description: 'The Heavyweight. An ultra-deep, chest-rattling baritone with immense power. Perfect for intense movie trailers and dark narrations.',
+    isPremium: true
+  },
+  {
+    id: 'rudra',
+    name: 'RUDRA',
+    gender: 'male',
+    color: 'from-red-900 to-black',
+    description: 'The Intense Narrator. Gritty, serious, and highly authoritative. Best for crime thrillers, horror, and deep investigative content.',
     isPremium: true
   }
 ];
