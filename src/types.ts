@@ -140,11 +140,12 @@ export interface Generation {
   type?: 'voice' | 'caption';
   text?: string;
   voice_name?: string;
-  style?: string;
+  style?: any;
   speed?: number;
   pitch?: number;
   audio_data?: string;
   words?: any[];
+  animation?: any;
   language?: string;
   timestamp?: any;
   created_at?: string;

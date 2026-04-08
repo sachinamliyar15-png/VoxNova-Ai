@@ -1432,7 +1432,7 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
       // Base64 overhead is ~33%, so 1MB base64 is ~750KB binary.
       // We'll cap it at 800KB to be safe.
       const audioSizeKB = Math.round(audioData.length / 1024);
-      const audioToSave = audioData.length > 800000 ? null : audioData;
+      const audioToSave = audioData.length > 1000000 ? null : audioData;
       
       if (!audioToSave) {
         console.warn(`[History] Audio data too large (${audioSizeKB}KB) to save in Firestore. Skipping audio_data.`);

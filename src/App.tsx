@@ -44,6 +44,8 @@ import {
   Type,
   Plus,
   Edit2,
+  Edit3,
+  Highlighter,
   PanelLeft,
   Copy,
   Send,
@@ -61,8 +63,7 @@ import {
   Wind,
   Heart,
   Cloud,
-  Star,
-  Highlighter
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VOICES, Voice, Generation, LANGUAGES } from './types';
@@ -351,6 +352,7 @@ interface CaptionStyle {
   shadowColor?: string;
   strokeWidth?: number;
   isDynamic?: boolean;
+  threeColors?: string[];
   padding?: string;
   borderRadius?: string;
   letterSpacing?: string;
@@ -390,9 +392,9 @@ const CAPTION_PRESETS: CaptionPreset[] = [
   },
   {
     id: 'professional-three-color',
-    name: 'Professional Three-Color',
+    name: 'Viral 3-Color',
     style: {
-      fontSize: 56,
+      fontSize: 64,
       color: '#ffffff',
       glow: false,
       border: 'thick' as const,
@@ -404,11 +406,12 @@ const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
+      strokeWidth: 4,
       fontWeight: '900',
-      isDynamic: true // Flag for multi-color logic
+      isDynamic: true,
+      threeColors: ['#ffffff', '#ffff00', '#00ff00']
     },
-    animation: 'pop'
+    animation: 'snappy-pop'
   },
   {
     id: 'zeemo-pro',
@@ -890,13 +893,14 @@ const CaptionOverlay = ({
   if (!currentWord) return null;
 
   const getThreeColor = () => {
+    const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
     // Find the global index of this word in the original words array for consistent coloring
     const globalIndex = words.findIndex(w => w.start === currentWord.start && w.word === currentWord.word);
     const patternIndex = globalIndex === -1 ? 0 : globalIndex % 15;
     
-    if (patternIndex < 5) return '#ffffff'; // White
-    if (patternIndex < 10) return '#ffff00'; // Yellow
-    return '#00ff00'; // Green
+    if (patternIndex < 5) return colors[0]; // Color 1
+    if (patternIndex < 10) return colors[1]; // Color 2
+    return colors[2]; // Color 3
   };
 
   const getDynamicColor = (index: number) => {
@@ -933,6 +937,17 @@ const CaptionOverlay = ({
             stiffness: 600,
             damping: 15,
             duration: 0.08
+          }
+        };
+      case 'snappy-pop':
+        return {
+          initial: { scale: 0.5, opacity: 0, y: 10 },
+          animate: { scale: 1.2, opacity: 1, y: 0 },
+          transition: { 
+            type: 'spring' as const, 
+            stiffness: 700, 
+            damping: 15,
+            mass: 0.5
           }
         };
       case 'shake':
@@ -1630,6 +1645,9 @@ const CaptionEditor = ({
   words: CaptionWord[], 
   onUpdate: (words: CaptionWord[]) => void 
 }) => {
+  const [isBulkEditing, setIsBulkEditing] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+
   const deleteWord = (idx: number) => {
     const newWords = [...words];
     newWords.splice(idx, 1);
@@ -1640,6 +1658,40 @@ const CaptionEditor = ({
     const newWords = [...words];
     newWords[idx][field] = Math.max(0, newWords[idx][field] + delta);
     onUpdate(newWords);
+  };
+
+  const insertWord = (idx: number) => {
+    const newWords = [...words];
+    const prevWord = words[idx];
+    const nextWord = words[idx + 1];
+    
+    const newStart = prevWord.end + 0.1;
+    const newEnd = nextWord ? Math.min(nextWord.start - 0.1, newStart + 0.5) : newStart + 0.5;
+    
+    newWords.splice(idx + 1, 0, {
+      word: 'New',
+      start: newStart,
+      end: newEnd
+    });
+    onUpdate(newWords);
+  };
+
+  const handleBulkUpdate = () => {
+    const newWordsText = bulkText.split(/\s+/).filter(w => w.length > 0);
+    if (newWordsText.length === 0) return;
+
+    // Try to preserve timings as much as possible
+    const newWords: CaptionWord[] = newWordsText.map((text, i) => {
+      if (i < words.length) {
+        return { ...words[i], word: text };
+      } else {
+        const lastWord = i > 0 ? { start: 0, end: 0, word: '' } : words[words.length - 1];
+        const start = lastWord ? lastWord.end + 0.1 : i * 0.5;
+        return { word: text, start, end: start + 0.4 };
+      }
+    });
+    onUpdate(newWords);
+    setIsBulkEditing(false);
   };
 
   const toggleHighlight = (idx: number) => {
@@ -1660,66 +1712,130 @@ const CaptionEditor = ({
   };
 
   return (
-    <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-      {words.map((word, idx) => (
-        <div key={`caption-word-${idx}`} className="flex flex-col gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-100 group transition-all hover:border-emerald-200">
-          <div className="flex items-center gap-2">
-            <input 
-              type="text" 
-              value={word.word} 
-              onChange={(e) => {
-                const newWords = [...words];
-                newWords[idx].word = e.target.value;
-                onUpdate(newWords);
-              }}
-              className="flex-1 bg-transparent text-sm font-bold focus:outline-none text-zinc-900"
-            />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => toggleHighlight(idx)}
-                className={`p-2 rounded-lg transition-all ${word.isHighlighted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
-                title="Highlight Word"
-              >
-                <Highlighter size={14} />
-              </button>
-              <button 
-                onClick={() => deleteWord(idx)}
-                className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-2">
+        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Word Timeline</span>
+        <button 
+          onClick={() => {
+            if (!isBulkEditing) setBulkText(words.map(w => w.word).join(' '));
+            setIsBulkEditing(!isBulkEditing);
+          }}
+          className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg transition-all"
+        >
+          {isBulkEditing ? <X size={12} /> : <Edit3 size={12} />}
+          {isBulkEditing ? 'Cancel' : 'Bulk Edit'}
+        </button>
+      </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
-                <button onClick={() => adjustTime(idx, 'start', -0.1)} className="hover:text-zinc-900">«</button>
-                <span className="w-12 text-center">{word.start.toFixed(2)}s</span>
-                <button onClick={() => adjustTime(idx, 'start', 0.1)} className="hover:text-zinc-900">»</button>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
-                <button onClick={() => adjustTime(idx, 'end', -0.1)} className="hover:text-zinc-900">«</button>
-                <span className="w-12 text-center">{word.end.toFixed(2)}s</span>
-                <button onClick={() => adjustTime(idx, 'end', 0.1)} className="hover:text-zinc-900">»</button>
-              </div>
-            </div>
-
-            {word.isHighlighted && (
-              <div className="flex items-center gap-1.5">
-                {['#facc15', '#4ade80', '#60a5fa', '#f87171', '#c084fc'].map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setHighlightColor(idx, color)}
-                    className={`w-4 h-4 rounded-full border-2 transition-all ${word.highlightColor === color ? 'border-zinc-900 scale-125' : 'border-transparent hover:scale-110'}`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+      {isBulkEditing ? (
+        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <textarea 
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            className="w-full h-48 bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 custom-scrollbar"
+            placeholder="Enter all words separated by spaces..."
+          />
+          <button 
+            onClick={handleBulkUpdate}
+            className="w-full py-3 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-900/10"
+          >
+            Apply Changes
+          </button>
         </div>
-      ))}
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+          {words.map((word, idx) => (
+            <React.Fragment key={`caption-word-fragment-${idx}`}>
+              <div className="flex flex-col gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-100 group transition-all hover:border-emerald-200">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-500 shrink-0">
+                    {idx + 1}
+                  </div>
+                  <input 
+                    type="text" 
+                    value={word.word} 
+                    onChange={(e) => {
+                      const newWords = [...words];
+                      newWords[idx].word = e.target.value;
+                      onUpdate(newWords);
+                    }}
+                    className="flex-1 bg-transparent text-sm font-bold focus:outline-none text-zinc-900"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleHighlight(idx)}
+                      className={`p-2 rounded-lg transition-all ${word.isHighlighted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
+                      title="Highlight Word"
+                    >
+                      <Highlighter size={14} />
+                    </button>
+                    <button 
+                      onClick={() => deleteWord(idx)}
+                      className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
+                        <button onClick={() => adjustTime(idx, 'start', -0.1)} className="hover:text-zinc-900">«</button>
+                        <span className="w-12 text-center">{word.start.toFixed(2)}s</span>
+                        <button onClick={() => adjustTime(idx, 'start', 0.1)} className="hover:text-zinc-900">»</button>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
+                        <button onClick={() => adjustTime(idx, 'end', -0.1)} className="hover:text-zinc-900">«</button>
+                        <span className="w-12 text-center">{word.end.toFixed(2)}s</span>
+                        <button onClick={() => adjustTime(idx, 'end', 0.1)} className="hover:text-zinc-900">»</button>
+                      </div>
+                    </div>
+                    
+                    {/* Visual Timeline Bar */}
+                    <div className="h-1.5 w-full bg-zinc-200 rounded-full overflow-hidden relative">
+                      <div 
+                        className="absolute h-full bg-emerald-500/40 rounded-full"
+                        style={{ 
+                          left: `${(word.start / (words[words.length-1].end || 1)) * 100}%`,
+                          width: `${((word.end - word.start) / (words[words.length-1].end || 1)) * 100}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2 ml-4">
+                    {word.isHighlighted && (
+                      <div className="flex items-center gap-1.5">
+                        {['#facc15', '#4ade80', '#60a5fa', '#f87171', '#c084fc'].map(color => (
+                          <button
+                            key={color}
+                            onClick={() => setHighlightColor(idx, color)}
+                            className={`w-4 h-4 rounded-full border-2 transition-all ${word.highlightColor === color ? 'border-zinc-900 scale-125' : 'border-transparent hover:scale-110'}`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Insert Button between words */}
+              <div className="flex justify-center -my-1 opacity-100 sm:opacity-0 sm:hover:opacity-100 transition-all">
+                <button 
+                  onClick={() => insertWord(idx)}
+                  className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg hover:scale-125 transition-all z-10"
+                  title="Insert Word"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -2455,8 +2571,20 @@ Style: Default,${fontName},${style.fontSize},${assColor},&H000000FF,${assOutline
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
-    displayWords.forEach(w => {
-      const text = style.case === 'uppercase' ? w.word.toUpperCase() : style.case === 'lowercase' ? w.word.toLowerCase() : w.word;
+    displayWords.forEach((w, idx) => {
+      let text = style.case === 'uppercase' ? w.word.toUpperCase() : style.case === 'lowercase' ? w.word.toLowerCase() : w.word;
+      
+      if (style.isDynamic) {
+        const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+        const patternIndex = idx % 15;
+        let color = colors[0];
+        if (patternIndex >= 5 && patternIndex < 10) color = colors[1];
+        else if (patternIndex >= 10) color = colors[2];
+        
+        const assWordColor = hexToAss(color);
+        text = `{\\c${assWordColor}}${text}`;
+      }
+      
       ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${text}\n`;
     });
 
@@ -3248,49 +3376,72 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               ) : (
                 filteredHistory.map((item, idx) => (
                   <div key={`modal-history-item-${item.id}-${idx}-${item.created_at || ''}`} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                            {item.voice_name}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex-1 space-y-2 min-w-0 w-full">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-wider">
+                            {item.voice_name || (item.type === 'caption' ? 'Transcription' : 'AI Voice')}
                           </span>
                           <span className="text-[10px] text-zinc-400 uppercase tracking-wider">
                             {new Date(item.created_at).toLocaleDateString()}
                           </span>
+                          {item.type === 'caption' && (
+                            <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">Captions</span>
+                          )}
                         </div>
-                        <p className="text-sm text-zinc-600 line-clamp-2 italic">"{item.text}"</p>
+                        <p className="text-sm text-zinc-600 line-clamp-2 italic w-full">
+                          {item.type === 'caption' ? `${item.words?.length || 0} words transcribed` : `"${item.text}"`}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
                         <button 
                           onClick={() => {
-                            if (!item.audio_data) {
+                            if (!item.audio_data && item.type !== 'caption') {
                               setError("This audio was too large to be stored in history.");
                               return;
                             }
-                            playFromHistory(item.audio_data, item.id);
+                            if (item.type === 'caption') {
+                              // Handle caption restoration
+                              setCaptionWords(item.words || []);
+                              if (item.style && typeof item.style === 'object') {
+                                setCaptionStyle(item.style);
+                              }
+                              if (item.animation) {
+                                setCaptionAnimation(item.animation);
+                              }
+                              setActiveTab('captions');
+                              setShowHistoryModal(false);
+                            } else {
+                              playFromHistory(item.audio_data, item.id);
+                            }
                           }}
-                          className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white' : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600'}`}
+                          className={`p-2.5 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white' : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600'}`}
+                          title={item.type === 'caption' ? "Edit Captions" : "Play Audio"}
                         >
-                          {playingId === item.id ? <Pause size={18} /> : <Play size={18} />}
+                          {playingId === item.id ? <Pause size={16} /> : item.type === 'caption' ? <Edit3 size={16} /> : <Play size={16} />}
                         </button>
                         <button 
                           onClick={() => handleRestoreScript(item)}
                           title="Restore Script & Settings"
-                          className="p-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
+                          className="p-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
                         >
-                          <RefreshCw size={18} />
+                          <RefreshCw size={16} />
                         </button>
-                        <button 
-                          onClick={() => downloadAudio(item.audio_data, `voxnova-${item.voice_name.toLowerCase()}-${item.id}.wav`)}
-                          className="p-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
-                        >
-                          <Download size={18} />
-                        </button>
+                        {item.audio_data && (
+                          <button 
+                            onClick={() => downloadAudio(item.audio_data, `voxnova-${(item.voice_name || 'audio').toLowerCase()}-${item.id}.wav`)}
+                            title="Download"
+                            className="p-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
+                          >
+                            <Download size={16} />
+                          </button>
+                        )}
                         <button 
                           onClick={() => deleteHistoryItem(item.id, item.type)}
-                          className="p-3 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all border border-red-100"
+                          title="Delete"
+                          className="p-2.5 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white rounded-xl transition-all border border-red-100"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
@@ -4732,22 +4883,45 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                 : 'bg-white border-zinc-100 text-zinc-600 hover:border-emerald-200 hover:bg-emerald-50/30'
                             } group`}
                           >
-                            <div className="w-full aspect-video bg-zinc-900 rounded-lg flex items-center justify-center overflow-hidden relative">
-                               <div 
-                                 className="font-bold text-[10px] text-center px-1"
+                            <div className="w-full aspect-video bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-lg flex items-center justify-center overflow-hidden relative group-hover:from-emerald-900 group-hover:to-zinc-900 transition-all duration-500">
+                               <motion.div 
+                                 animate={{ 
+                                   scale: [1, 1.1, 1],
+                                   rotate: preset.animation === 'rotate' ? [0, 5, -5, 0] : 0,
+                                   y: preset.animation === 'bounce' ? [0, -5, 0] : 0,
+                                   x: preset.animation === 'shake' ? [0, -3, 3, -3, 3, 0] : 0,
+                                   opacity: preset.animation === 'fade' ? [0.5, 1, 0.5] : 1
+                                 }}
+                                 transition={{ 
+                                   duration: 2, 
+                                   repeat: Infinity,
+                                   ease: "easeInOut"
+                                 }}
+                                 className="font-bold text-[10px] text-center px-2 py-1 rounded shadow-lg"
                                  style={{
                                    color: preset.style.color,
                                    fontFamily: preset.style.font,
                                    textTransform: preset.style.case === 'uppercase' ? 'uppercase' : preset.style.case === 'lowercase' ? 'lowercase' : 'none',
+                                   backgroundColor: preset.style.backgroundColor !== 'transparent' ? preset.style.backgroundColor : 'transparent',
                                    textShadow: preset.style.shadow 
                                      ? `${preset.style.shadowColor} 1px 1px 2px` 
                                      : preset.style.glow 
                                        ? `0 0 5px ${preset.style.color}` 
                                        : 'none',
                                    WebkitTextStroke: preset.style.border !== 'none' ? `${(preset.style.strokeWidth || 1) / 2}px ${preset.style.outlineColor}` : 'none',
+                                   fontStyle: preset.style.italic ? 'italic' : 'normal',
                                  }}
                                >
                                  {preset.name}
+                               </motion.div>
+                               
+                               {/* Animated background particles for "attractive" look */}
+                               <div className="absolute inset-0 pointer-events-none opacity-20">
+                                 <motion.div 
+                                   animate={{ opacity: [0.2, 0.5, 0.2], scale: [1, 1.2, 1] }}
+                                   transition={{ duration: 3, repeat: Infinity }}
+                                   className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-emerald-500/20"
+                                 />
                                </div>
                             </div>
                             <span className={selectedPresetId === preset.id ? 'text-emerald-700' : 'group-hover:text-emerald-600'}>
@@ -4766,6 +4940,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         {[
                           { id: 'none', name: 'Static', icon: <Square size={14} /> },
                           { id: 'pop', name: 'Pop Up', icon: <Zap size={14} /> },
+                          { id: 'snappy-pop', name: 'Snappy Pop', icon: <Sparkles size={14} /> },
                           { id: 'fade', name: 'Fade', icon: <Monitor size={14} /> },
                           { id: 'glow', name: 'Glow', icon: <Sparkles size={14} /> },
                           { id: 'shake', name: 'Shake', icon: <Activity size={14} /> },
@@ -4892,6 +5067,49 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               />
                             ))}
                           </div>
+                        </div>
+
+                        <div className="space-y-4 pt-4 border-t border-zinc-100">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-2">
+                              <Sparkles size={12} className="text-emerald-500" /> Dynamic 3-Color Mode
+                            </span>
+                            <button 
+                              onClick={() => setCaptionStyle({...captionStyle, isDynamic: !captionStyle.isDynamic})}
+                              className={`w-10 h-5 rounded-full transition-all relative ${captionStyle.isDynamic ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                            >
+                              <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${captionStyle.isDynamic ? 'left-6' : 'left-1'}`} />
+                            </button>
+                          </div>
+                          
+                          {captionStyle.isDynamic && (
+                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <p className="text-[10px] text-zinc-400">Cycle through 3 colors every 5 words. Click to change.</p>
+                              <div className="flex gap-4">
+                                {[0, 1, 2].map(idx => (
+                                  <div key={idx} className="flex-1 space-y-1.5">
+                                    <span className="text-[8px] text-zinc-400 font-bold uppercase">Color {idx + 1}</span>
+                                    <div className="relative">
+                                      <input 
+                                        type="color"
+                                        value={(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx]}
+                                        onChange={(e) => {
+                                          const newColors = [...(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
+                                          newColors[idx] = e.target.value;
+                                          setCaptionStyle({...captionStyle, threeColors: newColors});
+                                        }}
+                                        className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
+                                      />
+                                      <div 
+                                        className="w-full h-8 rounded-lg border border-zinc-200 shadow-sm"
+                                        style={{ backgroundColor: (captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx] }}
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 pt-2">
