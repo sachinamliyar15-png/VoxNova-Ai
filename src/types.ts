@@ -150,3 +150,45 @@ export interface Generation {
   timestamp?: any;
   created_at?: string;
 }
+
+export interface CaptionWord {
+  word: string;
+  start: number;
+  end: number;
+  isHighlighted?: boolean;
+  highlightColor?: string;
+  position?: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  color?: string;
+  fontSize?: number;
+}
+
+export interface CaptionStyle {
+  fontSize: number;
+  color: string;
+  glow: boolean;
+  border: 'none' | 'thin' | 'thick';
+  font: string;
+  position: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  backgroundColor?: string;
+  outlineColor?: string;
+  case: 'original' | 'uppercase' | 'lowercase';
+  wordsPerLine: number;
+  shadow?: boolean;
+  shadowColor?: string;
+  strokeWidth?: number;
+  isDynamic?: boolean;
+  threeColors?: string[];
+  padding?: string;
+  borderRadius?: string;
+  letterSpacing?: string;
+  italic?: boolean;
+  fontWeight?: string;
+  isSmart?: boolean;
+}
+
+export interface CaptionPreset {
+  id: string;
+  name: string;
+  style: CaptionStyle;
+  animation: string;
+}

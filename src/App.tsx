@@ -26,7 +26,6 @@ import {
   CreditCard,
   Crown,
   Upload,
-  Languages as LangIcon,
   RefreshCw,
   Pause,
   Music,
@@ -63,10 +62,24 @@ import {
   Wind,
   Heart,
   Cloud,
-  Star
+  Star,
+  Smile,
+  Palette,
+  AlignLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { VOICES, Voice, Generation, LANGUAGES } from './types';
+import { 
+  VOICES, 
+  Voice, 
+  Generation, 
+  LANGUAGES, 
+  CaptionWord, 
+  CaptionStyle, 
+  CaptionPreset 
+} from './types';
+import { CAPTION_PRESETS } from './constants/captionPresets';
+import { FONTS } from './constants/fonts';
+import CaptionEditor from './components/CaptionEditor';
 import emailjs from 'emailjs-com';
 import Markdown from 'react-markdown';
 import { 
@@ -326,526 +339,6 @@ const createWavHeader = (pcmData: ArrayBuffer, sampleRate: number = 44100) => {
   return buffer;
 };
 
-interface CaptionWord {
-  word: string;
-  start: number;
-  end: number;
-  isHighlighted?: boolean;
-  highlightColor?: string;
-  position?: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-  color?: string;
-  fontSize?: number;
-}
-
-interface CaptionStyle {
-  fontSize: number;
-  color: string;
-  glow: boolean;
-  border: 'none' | 'thin' | 'thick';
-  font: string;
-  position: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-  backgroundColor?: string;
-  outlineColor?: string;
-  case: 'original' | 'uppercase' | 'lowercase';
-  wordsPerLine: number;
-  shadow?: boolean;
-  shadowColor?: string;
-  strokeWidth?: number;
-  isDynamic?: boolean;
-  threeColors?: string[];
-  padding?: string;
-  borderRadius?: string;
-  letterSpacing?: string;
-  italic?: boolean;
-  fontWeight?: string;
-}
-
-interface CaptionPreset {
-  id: string;
-  name: string;
-  style: CaptionStyle;
-  animation: string;
-}
-
-const CAPTION_PRESETS: CaptionPreset[] = [
-  {
-    id: 'professional-viral',
-    name: 'Professional Viral',
-    style: {
-      fontSize: 64,
-      color: '#ffffff',
-      glow: false,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: '#000000',
-      strokeWidth: 4,
-      fontWeight: '900',
-      isDynamic: true
-    },
-    animation: 'professional'
-  },
-  {
-    id: 'professional-three-color',
-    name: 'Viral 3-Color',
-    style: {
-      fontSize: 64,
-      color: '#ffffff',
-      glow: false,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: '#000000',
-      strokeWidth: 4,
-      fontWeight: '900',
-      isDynamic: true,
-      threeColors: ['#ffffff', '#ffff00', '#00ff00']
-    },
-    animation: 'snappy-pop'
-  },
-  {
-    id: 'zeemo-pro',
-    name: 'Zeemo Pro',
-    style: {
-      fontSize: 64,
-      color: '#ffffff',
-      glow: false,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: '#000000',
-      strokeWidth: 3,
-      letterSpacing: '0.05em',
-      italic: true,
-      fontWeight: '900'
-    },
-    animation: 'zeemo'
-  },
-  {
-    id: 'kinetic-stacking',
-    name: 'Kinetic Stacking',
-    style: {
-      fontSize: 48,
-      color: '#ffffff',
-      glow: false,
-      border: 'none' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      case: 'uppercase' as const,
-      wordsPerLine: 4,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 0,
-      fontWeight: '900'
-    },
-    animation: 'kinetic'
-  },
-  {
-    id: 'hindi-viral-yellow',
-    name: 'Hindi Viral Yellow',
-    style: {
-      fontSize: 52,
-      color: '#ffff00',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.8)',
-      strokeWidth: 2
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'hindi-neon-green',
-    name: 'Hindi Neon Green',
-    style: {
-      fontSize: 48,
-      color: '#00ff00',
-      glow: true,
-      border: 'thin' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 1
-    },
-    animation: 'glow'
-  },
-  {
-    id: 'karaoke-blue',
-    name: 'Karaoke Blue',
-    style: {
-      fontSize: 40,
-      color: '#ffffff',
-      glow: false,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'bottom' as const,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      outlineColor: '#3b82f6',
-      case: 'original' as const,
-      wordsPerLine: 5,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2
-    },
-    animation: 'karaoke'
-  },
-  {
-    id: 'typewriter-white',
-    name: 'Typewriter White',
-    style: {
-      fontSize: 36,
-      color: '#ffffff',
-      glow: false,
-      border: 'none' as const,
-      font: 'Courier New',
-      position: 'bottom' as const,
-      backgroundColor: 'transparent',
-      case: 'original' as const,
-      wordsPerLine: 8,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.8)',
-      strokeWidth: 0
-    },
-    animation: 'typewriter'
-  },
-  {
-    id: 'hindi-shadow-white',
-    name: 'Hindi Shadow White',
-    style: {
-      fontSize: 50,
-      color: '#ffffff',
-      glow: false,
-      border: 'none' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: '#000000',
-      strokeWidth: 0
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'hindi-gradient-cyan',
-    name: 'Hindi Gradient Cyan',
-    style: {
-      fontSize: 46,
-      color: '#00ffff',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#ff00ff',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: false,
-      shadowColor: 'transparent',
-      strokeWidth: 1.5
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'hindi-bold-red',
-    name: 'Hindi Bold Red',
-    style: {
-      fontSize: 54,
-      color: '#ff0000',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#ffffff',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(255,0,0,0.4)',
-      strokeWidth: 3
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'hindi-royal-gold',
-    name: 'Hindi Royal Gold',
-    style: {
-      fontSize: 48,
-      color: '#ffd700',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.7)',
-      strokeWidth: 2
-    },
-    animation: 'glow'
-  },
-  {
-    id: 'hindi-soft-pink',
-    name: 'Hindi Soft Pink',
-    style: {
-      fontSize: 44,
-      color: '#ff69b4',
-      glow: true,
-      border: 'thin' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(255,105,180,0.3)',
-      strokeWidth: 2
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'hindi-classic-blue',
-    name: 'Hindi Classic Blue',
-    style: {
-      fontSize: 46,
-      color: '#1e90ff',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#ffffff',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'viral-reel',
-    name: 'Viral Reel',
-    style: {
-      fontSize: 48,
-      color: '#fbbf24', // Amber 400
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'minimalist',
-    name: 'Minimalist',
-    style: {
-      fontSize: 32,
-      color: '#ffffff',
-      glow: false,
-      border: 'none' as const,
-      font: 'Inter',
-      position: 'bottom' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'original' as const,
-      wordsPerLine: 3,
-      shadow: false,
-      shadowColor: 'transparent',
-      strokeWidth: 0
-    },
-    animation: 'fade'
-  },
-  {
-    id: 'neon-pink',
-    name: 'Neon Pink',
-    style: {
-      fontSize: 48,
-      color: '#ff00ff',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#ffffff',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'subtitles-pro',
-    name: 'Subtitles Pro',
-    style: {
-      fontSize: 24,
-      color: '#ffffff',
-      glow: false,
-      border: 'none' as const,
-      font: 'Inter',
-      position: 'bottom' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'original' as const,
-      wordsPerLine: 8,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.8)',
-      strokeWidth: 0
-    },
-    animation: 'none'
-  },
-  {
-    id: 'comic-style',
-    name: 'Comic Style',
-    style: {
-      fontSize: 42,
-      color: '#000000',
-      glow: false,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: '#ffffff',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 2,
-      shadow: false,
-      shadowColor: 'transparent',
-      strokeWidth: 2
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'viral-vibrant',
-    name: 'Viral Vibrant',
-    style: {
-      fontSize: 48,
-      color: '#ffffff',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2,
-      isDynamic: true,
-      padding: '4px 12px',
-      borderRadius: '8px',
-      letterSpacing: '0.05em'
-    },
-    animation: 'skate'
-  },
-  {
-    id: 'minimal-sticker',
-    name: 'Minimal Sticker',
-    style: {
-      fontSize: 32,
-      color: '#000000',
-      glow: false,
-      border: 'none' as const,
-      font: 'Inter',
-      position: 'bottom' as const,
-      backgroundColor: '#ffffff',
-      outlineColor: 'transparent',
-      case: 'original' as const,
-      wordsPerLine: 3,
-      shadow: false,
-      shadowColor: 'transparent',
-      strokeWidth: 0,
-      padding: '6px 16px',
-      borderRadius: '99px',
-      letterSpacing: 'normal'
-    },
-    animation: 'float'
-  },
-  {
-    id: 'trending-dynamic',
-    name: 'Trending Dynamic',
-    style: {
-      fontSize: 52,
-      color: '#ffffff',
-      glow: true,
-      border: 'thick' as const,
-      font: 'Inter',
-      position: 'middle' as const,
-      backgroundColor: 'transparent',
-      outlineColor: '#000000',
-      case: 'uppercase' as const,
-      wordsPerLine: 1,
-      shadow: true,
-      shadowColor: 'rgba(0,0,0,0.8)',
-      strokeWidth: 3,
-      isDynamic: true
-    },
-    animation: 'pop'
-  },
-  {
-    id: 'typing-style',
-    name: 'Typing Effect',
-    style: {
-      fontSize: 36,
-      color: '#ffffff',
-      glow: false,
-      border: 'none' as const,
-      font: 'Inter',
-      position: 'bottom' as const,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      padding: '12px 24px',
-      borderRadius: '16px',
-      case: 'original' as const,
-      wordsPerLine: 5,
-      shadow: false,
-      shadowColor: 'transparent',
-      strokeWidth: 0
-    },
-    animation: 'typing'
-  }
-];
-
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -855,10 +348,35 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number): CaptionWord[] => {
-  if (wordsPerLine <= 1) return words;
+const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart?: boolean): CaptionWord[] => {
+  if (!isSmart && wordsPerLine <= 1) return words;
   
   const grouped: CaptionWord[] = [];
+  
+  if (isSmart) {
+    let i = 0;
+    while (i < words.length) {
+      // Smart logic: Decide between 1 or 2 words based on length or alternating
+      // If the word is long (> 8 chars), keep it solo. Otherwise, try to group with next.
+      const currentWord = words[i];
+      const nextWord = words[i + 1];
+      
+      let count = 1;
+      if (nextWord && currentWord.word.length < 6 && nextWord.word.length < 6) {
+        count = 2;
+      }
+      
+      const chunk = words.slice(i, i + count);
+      grouped.push({
+        word: chunk.map(w => w.word).join(' '),
+        start: chunk[0].start,
+        end: chunk[chunk.length - 1].end
+      });
+      i += count;
+    }
+    return grouped;
+  }
+
   for (let i = 0; i < words.length; i += wordsPerLine) {
     const chunk = words.slice(i, i + wordsPerLine);
     grouped.push({
@@ -886,25 +404,34 @@ const CaptionOverlay = ({
   // Add a small offset (e.g., 0.4s) to compensate for processing lag and make captions feel snappier
   const adjustedTime = currentTime + 0.4;
   
-  const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine), [words, style.wordsPerLine]);
+  const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine, style.isSmart), [words, style.wordsPerLine, style.isSmart]);
   const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
   const currentWord = displayWords[currentWordIndex];
   
+  // Floating offset for Smart Mode
+  const floatingOffset = React.useMemo(() => {
+    if (!style.isSmart || !currentWord) return { x: 0, y: 0 };
+    // Generate a semi-random offset based on the word index to make it feel "alive"
+    const seed = currentWordIndex * 123.45;
+    return {
+      x: Math.sin(seed) * 10,
+      y: Math.cos(seed) * 15
+    };
+  }, [style.isSmart, currentWordIndex, currentWord]);
+
   if (!currentWord) return null;
 
-  const getThreeColor = () => {
-    const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-    // Find the global index of this word in the original words array for consistent coloring
-    const globalIndex = words.findIndex(w => w.start === currentWord.start && w.word === currentWord.word);
-    const patternIndex = globalIndex === -1 ? 0 : globalIndex % 15;
-    
-    if (patternIndex < 5) return colors[0]; // Color 1
-    if (patternIndex < 10) return colors[1]; // Color 2
-    return colors[2]; // Color 3
-  };
-
-  const getDynamicColor = (index: number) => {
-    if (style.isDynamic) return getThreeColor();
+  const getDynamicColor = (index: number, word: CaptionWord) => {
+    if (style.isDynamic) {
+      const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+      // Use the word's actual index in the original words array for consistent coloring
+      const globalIndex = words.findIndex(w => w.start === word.start && w.word === word.word);
+      const patternIndex = globalIndex === -1 ? index : globalIndex % 15;
+      
+      if (patternIndex < 5) return colors[0];
+      if (patternIndex < 10) return colors[1];
+      return colors[2];
+    }
     const colors = ['#ffffff', '#ffff00', '#00ff00', '#ff00ff', '#00ffff'];
     return colors[index % colors.length];
   };
@@ -1029,9 +556,17 @@ const CaptionOverlay = ({
         };
       case 'glow':
         return {
-          initial: { opacity: 0, filter: 'blur(10px)' },
-          animate: { opacity: 1, filter: 'blur(0px)' },
-          transition: { duration: 0.3 }
+          initial: { opacity: 0, scale: 0.8, filter: 'drop-shadow(0 0 0px transparent)' },
+          animate: { 
+            opacity: 1, 
+            scale: 1,
+            filter: [
+              'drop-shadow(0 0 0px transparent)',
+              'drop-shadow(0 0 15px currentColor)',
+              'drop-shadow(0 0 5px currentColor)'
+            ]
+          },
+          transition: { duration: 0.4 }
         };
       case 'karaoke':
         return {
@@ -1060,11 +595,13 @@ const CaptionOverlay = ({
     fontFamily: style.font,
     textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
     textShadow: style.shadow 
-      ? `${style.shadowColor} 2px 2px 4px` 
+      ? `2px 2px 0px ${style.shadowColor || 'rgba(0,0,0,0.5)'}` 
       : style.glow 
         ? `0 0 10px ${style.color}, 0 0 20px ${style.color}` 
         : 'none',
-    WebkitTextStroke: style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor}` : 'none',
+    WebkitTextStroke: style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor || '#000000'}` : 'none',
+    paintOrder: 'stroke fill',
+    ['WebkitPaintOrder' as any]: 'stroke fill',
     backgroundColor: style.backgroundColor,
     padding: style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
     borderRadius: '8px',
@@ -1094,7 +631,7 @@ const CaptionOverlay = ({
     const baseStyle: React.CSSProperties = {
       fontFamily: style.font,
       fontSize: `${word.fontSize || style.fontSize}px`,
-      color: word.color || (style.isDynamic ? getDynamicColor(index) : style.color),
+      color: word.color || (style.isDynamic ? getDynamicColor(index, word) : style.color),
       textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
       padding: style.padding || '0 4px',
       borderRadius: style.borderRadius || '4px',
@@ -1107,9 +644,11 @@ const CaptionOverlay = ({
     };
 
     if (style.border === 'thin') {
-      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1}px ${style.outlineColor}`;
+      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1}px ${style.outlineColor || '#000000'}`;
+      (baseStyle as any).paintOrder = 'stroke fill';
     } else if (style.border === 'thick') {
-      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 1) * 2}px ${style.outlineColor}`;
+      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 2.5) * 2}px ${style.outlineColor || '#000000'}`;
+      (baseStyle as any).paintOrder = 'stroke fill';
     }
 
     if (style.glow) {
@@ -1117,7 +656,7 @@ const CaptionOverlay = ({
     }
 
     if (style.shadow) {
-      baseStyle.textShadow = `${shadowColor} 2px 2px 4px`;
+      baseStyle.textShadow = `${style.shadowColor || '#000000'} 3px 3px 0px`;
     }
     
     // Highlight logic
@@ -1186,7 +725,7 @@ const CaptionOverlay = ({
                 className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
                 style={{
                   ...getWordStyle(w, i),
-                  color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i) : style.color)) : 'rgba(255,255,255,0.5)',
+                  color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.5)',
                   textShadow: isActive ? (style.shadow ? `${shadowColor} 2px 2px 4px` : 'none') : 'none',
                 }}
               >
@@ -1214,18 +753,21 @@ const CaptionOverlay = ({
             const isActive = currentTime >= w.start && currentTime <= w.end;
             return (
               <motion.span
-                key={`zeemo-${i}-${w.start}`}
-                initial={{ scale: 1 }}
+                key={`zeemo-${i}-${w.start}-${w.word}`}
+                initial={{ scale: 1, y: 0 }}
                 animate={{ 
-                  scale: isActive ? 1.3 : 1,
-                  color: isActive ? '#FFD700' : '#FFFFFF'
+                  scale: isActive ? 1.2 : 1,
+                  y: isActive ? -5 : 0,
+                  color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF'
                 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                 style={{
                   ...getWordStyle(w, i),
-                  WebkitTextStroke: '3px #000000',
-                  textShadow: '4px 4px 0px #000000',
-                  color: isActive ? '#FFD700' : '#FFFFFF',
+                  WebkitTextStroke: '2px #000000',
+                  paintOrder: 'stroke fill',
+                  ['WebkitPaintOrder' as any]: 'stroke fill',
+                  textShadow: '3px 3px 0px rgba(0,0,0,0.8)',
+                  color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF',
                 }}
               >
                 {w.word}
@@ -1296,7 +838,12 @@ const CaptionOverlay = ({
           <motion.div
             key={currentWord.word + currentWord.start}
             initial={{ scale: 0.5, opacity: 0, y: 20 }}
-            animate={{ scale: 1.2, opacity: 1, y: 0 }}
+            animate={{ 
+              scale: 1.2, 
+              opacity: 1, 
+              y: style.isSmart ? floatingOffset.y : 0,
+              x: style.isSmart ? floatingOffset.x : 0
+            }}
             exit={{ scale: 0.8, opacity: 0 }}
             style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
             className="font-bold text-center px-4"
@@ -1316,7 +863,12 @@ const CaptionOverlay = ({
           <motion.div
             key={currentWord.word + currentWord.start}
             initial={{ opacity: 0, filter: 'blur(10px)' }}
-            animate={{ opacity: 1, filter: 'blur(0px)' }}
+            animate={{ 
+              opacity: 1, 
+              filter: 'blur(0px)',
+              y: style.isSmart ? floatingOffset.y : 0,
+              x: style.isSmart ? floatingOffset.x : 0
+            }}
             exit={{ opacity: 0, filter: 'blur(10px)' }}
             style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
             className="font-bold text-center px-4"
@@ -1334,6 +886,11 @@ const CaptionOverlay = ({
         <motion.div
           key={currentWord.word + currentWord.start}
           {...getAnimationProps()}
+          animate={{
+            ...getAnimationProps().animate,
+            x: style.isSmart ? floatingOffset.x : 0,
+            y: style.isSmart ? floatingOffset.y : 0
+          }}
           style={getWordStyle(currentWord, words.indexOf(currentWord))}
           className="font-bold text-center px-4"
         >
@@ -1634,208 +1191,6 @@ const PricingModal = ({ onClose, onSelect }: { onClose: () => void, onSelect: (p
           </p>
         </div>
       </motion.div>
-    </div>
-  );
-};
-
-const CaptionEditor = ({ 
-  words, 
-  onUpdate 
-}: { 
-  words: CaptionWord[], 
-  onUpdate: (words: CaptionWord[]) => void 
-}) => {
-  const [isBulkEditing, setIsBulkEditing] = useState(false);
-  const [bulkText, setBulkText] = useState('');
-
-  const deleteWord = (idx: number) => {
-    const newWords = [...words];
-    newWords.splice(idx, 1);
-    onUpdate(newWords);
-  };
-
-  const adjustTime = (idx: number, field: 'start' | 'end', delta: number) => {
-    const newWords = [...words];
-    newWords[idx][field] = Math.max(0, newWords[idx][field] + delta);
-    onUpdate(newWords);
-  };
-
-  const insertWord = (idx: number) => {
-    const newWords = [...words];
-    const prevWord = words[idx];
-    const nextWord = words[idx + 1];
-    
-    const newStart = prevWord.end + 0.1;
-    const newEnd = nextWord ? Math.min(nextWord.start - 0.1, newStart + 0.5) : newStart + 0.5;
-    
-    newWords.splice(idx + 1, 0, {
-      word: 'New',
-      start: newStart,
-      end: newEnd
-    });
-    onUpdate(newWords);
-  };
-
-  const handleBulkUpdate = () => {
-    const newWordsText = bulkText.split(/\s+/).filter(w => w.length > 0);
-    if (newWordsText.length === 0) return;
-
-    // Try to preserve timings as much as possible
-    const newWords: CaptionWord[] = newWordsText.map((text, i) => {
-      if (i < words.length) {
-        return { ...words[i], word: text };
-      } else {
-        const lastWord = i > 0 ? { start: 0, end: 0, word: '' } : words[words.length - 1];
-        const start = lastWord ? lastWord.end + 0.1 : i * 0.5;
-        return { word: text, start, end: start + 0.4 };
-      }
-    });
-    onUpdate(newWords);
-    setIsBulkEditing(false);
-  };
-
-  const toggleHighlight = (idx: number) => {
-    const newWords = [...words];
-    newWords[idx].isHighlighted = !newWords[idx].isHighlighted;
-    if (!newWords[idx].isHighlighted) {
-      delete newWords[idx].highlightColor;
-    } else {
-      newWords[idx].highlightColor = '#facc15'; // Default
-    }
-    onUpdate(newWords);
-  };
-
-  const setHighlightColor = (idx: number, color: string) => {
-    const newWords = [...words];
-    newWords[idx].highlightColor = color;
-    onUpdate(newWords);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between px-2">
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Word Timeline</span>
-        <button 
-          onClick={() => {
-            if (!isBulkEditing) setBulkText(words.map(w => w.word).join(' '));
-            setIsBulkEditing(!isBulkEditing);
-          }}
-          className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg transition-all"
-        >
-          {isBulkEditing ? <X size={12} /> : <Edit3 size={12} />}
-          {isBulkEditing ? 'Cancel' : 'Bulk Edit'}
-        </button>
-      </div>
-
-      {isBulkEditing ? (
-        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-          <textarea 
-            value={bulkText}
-            onChange={(e) => setBulkText(e.target.value)}
-            className="w-full h-48 bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 custom-scrollbar"
-            placeholder="Enter all words separated by spaces..."
-          />
-          <button 
-            onClick={handleBulkUpdate}
-            className="w-full py-3 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-900/10"
-          >
-            Apply Changes
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-          {words.map((word, idx) => (
-            <React.Fragment key={`caption-word-fragment-${idx}`}>
-              <div className="flex flex-col gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-100 group transition-all hover:border-emerald-200">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-500 shrink-0">
-                    {idx + 1}
-                  </div>
-                  <input 
-                    type="text" 
-                    value={word.word} 
-                    onChange={(e) => {
-                      const newWords = [...words];
-                      newWords[idx].word = e.target.value;
-                      onUpdate(newWords);
-                    }}
-                    className="flex-1 bg-transparent text-sm font-bold focus:outline-none text-zinc-900"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleHighlight(idx)}
-                      className={`p-2 rounded-lg transition-all ${word.isHighlighted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
-                      title="Highlight Word"
-                    >
-                      <Highlighter size={14} />
-                    </button>
-                    <button 
-                      onClick={() => deleteWord(idx)}
-                      className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
-                        <button onClick={() => adjustTime(idx, 'start', -0.1)} className="hover:text-zinc-900">«</button>
-                        <span className="w-12 text-center">{word.start.toFixed(2)}s</span>
-                        <button onClick={() => adjustTime(idx, 'start', 0.1)} className="hover:text-zinc-900">»</button>
-                      </div>
-                      <div className="flex items-center gap-1 text-[10px] text-zinc-400 font-mono bg-white px-2 py-1 rounded-lg border border-zinc-100">
-                        <button onClick={() => adjustTime(idx, 'end', -0.1)} className="hover:text-zinc-900">«</button>
-                        <span className="w-12 text-center">{word.end.toFixed(2)}s</span>
-                        <button onClick={() => adjustTime(idx, 'end', 0.1)} className="hover:text-zinc-900">»</button>
-                      </div>
-                    </div>
-                    
-                    {/* Visual Timeline Bar */}
-                    <div className="h-1.5 w-full bg-zinc-200 rounded-full overflow-hidden relative">
-                      <div 
-                        className="absolute h-full bg-emerald-500/40 rounded-full"
-                        style={{ 
-                          left: `${(word.start / (words[words.length-1].end || 1)) * 100}%`,
-                          width: `${((word.end - word.start) / (words[words.length-1].end || 1)) * 100}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-2 ml-4">
-                    {word.isHighlighted && (
-                      <div className="flex items-center gap-1.5">
-                        {['#facc15', '#4ade80', '#60a5fa', '#f87171', '#c084fc'].map(color => (
-                          <button
-                            key={color}
-                            onClick={() => setHighlightColor(idx, color)}
-                            className={`w-4 h-4 rounded-full border-2 transition-all ${word.highlightColor === color ? 'border-zinc-900 scale-125' : 'border-transparent hover:scale-110'}`}
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Insert Button between words */}
-              <div className="flex justify-center -my-1 opacity-100 sm:opacity-0 sm:hover:opacity-100 transition-all">
-                <button 
-                  onClick={() => insertWord(idx)}
-                  className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg hover:scale-125 transition-all z-10"
-                  title="Insert Word"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-            </React.Fragment>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -4771,7 +4126,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         </h3>
                         <p className="text-xs text-zinc-400">Changes are saved locally for preview</p>
                       </div>
-                      <CaptionEditor words={captionWords} onUpdate={setCaptionWords} />
+                      <CaptionEditor 
+                        words={captionWords} 
+                        onUpdate={setCaptionWords}
+                        style={captionStyle}
+                        onUpdateStyle={setCaptionStyle}
+                        animation={captionAnimation}
+                        onUpdateAnimation={setCaptionAnimation}
+                      />
                     </motion.div>
                   )}
 
@@ -4909,6 +4271,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                        ? `0 0 5px ${preset.style.color}` 
                                        : 'none',
                                    WebkitTextStroke: preset.style.border !== 'none' ? `${(preset.style.strokeWidth || 1) / 2}px ${preset.style.outlineColor}` : 'none',
+                                   paintOrder: 'stroke fill',
+                                   ['WebkitPaintOrder' as any]: 'stroke fill',
                                    fontStyle: preset.style.italic ? 'italic' : 'normal',
                                  }}
                                >

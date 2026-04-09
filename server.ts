@@ -1098,7 +1098,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const prompt = `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
 
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview", // Using gemini-3-flash-preview for more stable audio processing
+        model: "gemini-1.5-flash", // Using gemini-1.5-flash for more stable transcription
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
@@ -1119,7 +1119,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative. Use a slow, deliberate pace with heavy emphasis.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Avoid any robotic, monotone, or repetitive cadence.
@@ -1129,6 +1129,11 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
       ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
+      
+      HINDI LANGUAGE NUANCES (if applicable):
+      - Use natural Hindi intonation and stress patterns.
+      - Ensure correct pronunciation of "Nukta" sounds (z, f, kh, gh, q).
+      - Maintain a professional "Shuddh" (Pure) or "Hindustani" (Conversational) tone as appropriate for the text.
       
       TECHNICAL STANDARDS:
       - NO background noise, hums, or digital artifacts.
