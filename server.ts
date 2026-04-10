@@ -531,7 +531,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
       - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
-      - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
+      - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
       - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
       - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
@@ -548,7 +548,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
       - NO background music, bell-like sounds, or hallucinations in the background.
       - ZERO background noise is mandatory. Audio must be 100% clean and professional.
-      - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
+      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
       - If the script is long, maintain consistent tone, energy, and quality from start to finish.
       `;
       
@@ -777,7 +777,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
       - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
-      - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
+      - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
       - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
       - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
@@ -794,7 +794,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
       - NO background music, bell-like sounds, or hallucinations in the background.
       - ZERO background noise is mandatory. Audio must be 100% clean and professional.
-      - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
+      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
       - If the script is long, maintain consistent tone, energy, and quality from start to finish.
       `;
       
@@ -1132,8 +1132,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Avoid any robotic, monotone, or repetitive cadence.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
-      - Pay close attention to the emotional weight of the text.
-      - 100% REALISM IS MANDATORY.
+      - 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
       - Use natural emphasis on key words to convey meaning and emotion.
       - Ensure smooth transitions between sentences and ideas.
       ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
@@ -1147,7 +1146,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       - NO background noise, hums, or digital artifacts.
       - NO robotic glitches, metallic sounds, or synthetic "buzzing".
       - NO background music, bell-like sounds, or hallucinations in the background.
-      - Ensure crystal-clear, 48kHz studio-quality audio.
+      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts.
       `;
 
       const ttsResponse = await ai.models.generateContent({
@@ -1408,10 +1407,10 @@ app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
 
 // Save generation to history & Deduct Credits
 app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
-  const { text, voice, style, speed, pitch, audioData, creditCost } = req.body;
+  const { text, voice, style, speed, pitch, audioData, creditCost, type, words } = req.body;
   const userId = req.user.uid;
 
-  if (!audioData) {
+  if (!audioData && type !== 'caption') {
     return res.status(400).json({ error: "Audio data is required" });
   }
 
@@ -1422,16 +1421,16 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
     const userRef = firestore.collection('users').doc(userId);
     const userDoc = await userRef.get();
     
-    if (!userDoc.exists || (userDoc.data()?.credits || 0) < creditCost) {
+    if (!userDoc.exists || (userDoc.data()?.credits || 0) < (creditCost || 0)) {
       return res.status(403).json({ error: "Insufficient credits" });
     }
 
     // Deduct credits
-    const isPremiumVoice = ['Bella', 'Documentary Pro', 'Pankaj', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA'].includes(voice);
+    const isPremiumVoice = voice && ['Bella', 'Documentary Pro', 'Pankaj', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA'].includes(voice);
     const isFreePlan = !userDoc.data()?.plan || userDoc.data()?.plan === 'free';
     
     const updateData: any = {
-      credits: admin.firestore.FieldValue.increment(-creditCost)
+      credits: admin.firestore.FieldValue.increment(-(creditCost || 0))
     };
 
     if (isPremiumVoice && isFreePlan) {
@@ -1441,29 +1440,23 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
     await userRef.update(updateData);
     
       // Save to Firestore (History)
-      // Check audio data size (Firestore limit is 1MB per document)
-      // Base64 overhead is ~33%, so 1MB base64 is ~750KB binary.
-      // We'll cap it at 800KB to be safe.
-      const audioSizeKB = Math.round(audioData.length / 1024);
-      const audioToSave = audioData.length > 1000000 ? null : audioData;
+      const audioToSave = audioData && audioData.length > 1000000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData;
       
-      if (!audioToSave) {
-        console.warn(`[History] Audio data too large (${audioSizeKB}KB) to save in Firestore. Skipping audio_data.`);
-      }
-
-      await firestore.collection('voice_history').add({
+      const historyRef = firestore.collection('voice_history');
+      const docRef = await historyRef.add({
         userId,
-        text,
-        voice_name: voice,
-        style,
-        speed,
-        pitch,
-        audio_data: audioToSave,
-        audio_size_kb: audioSizeKB,
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
+        text: text || '',
+        voice_name: voice || (type === 'caption' ? 'Captions' : 'Unknown'),
+        style: style || 'Default',
+        speed: speed || 1.0,
+        pitch: pitch || 1.0,
+        audio_data: audioToSave || (type === 'caption' ? null : "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY"),
+        type: type || 'tts',
+        words: words || null,
+        created_at: admin.firestore.FieldValue.serverTimestamp()
       });
 
-    res.json({ success: true });
+      res.json({ success: true, id: docRef.id });
   } catch (error: any) {
     console.error("Database save error:", error);
     res.status(500).json({ error: error.message });

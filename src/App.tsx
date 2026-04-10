@@ -1484,6 +1484,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [captionOffset, setCaptionOffset] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionStep, setCaptionStep] = useState('');
   const [captionProgress, setCaptionProgress] = useState(0);
@@ -1927,7 +1928,7 @@ function App() {
     };
 
     const alignment = style.position === 'top' ? 8 : style.position === 'middle' ? 5 : 2;
-    const fontName = style.font === 'JetBrains Mono' ? 'Courier New' : 'Arial'; // Fallback for ffmpeg
+    const fontName = 'Arial'; // Standard fallback
     
     const hexToAss = (hex: string) => {
       const cleanHex = hex.replace('#', '');
@@ -1991,17 +1992,62 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const inputName = 'input.mp4';
     const outputName = 'output.mp4';
     const assName = 'subtitles.ass';
+    const fontName = 'Inter-Bold.ttf';
     
+    setCaptionStep('Loading video engine...');
     await ffmpeg.writeFile(inputName, await fetchFile(videoFile));
-    setCaptionProgress(30);
-    await ffmpeg.writeFile(assName, generateASS(words, style));
+    
+    setCaptionStep('Loading professional font...');
+    try {
+      // Load Inter-Bold for high quality captions
+      const fontData = await fetchFile('https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter-Bold.ttf');
+      await ffmpeg.writeFile(fontName, fontData);
+    } catch (e) {
+      console.warn("Font load failed, using fallback", e);
+    }
+    
+    setCaptionStep('Generating subtitle data...');
+    // We update generateASS to use the font we just loaded
+    const assContent = generateASS(words, style).replace(/Fontname, Arial/g, `Fontname, ${fontName}`);
+    await ffmpeg.writeFile(assName, assContent);
+    
+    setCaptionStep('Burning captions (this may take a minute)...');
     setCaptionProgress(50);
     
     // Run ffmpeg command to burn subtitles
-    await ffmpeg.exec(['-i', inputName, '-vf', `ass=${assName}`, '-c:a', 'copy', outputName]);
+    // We use libx264 and ensure the font path is handled
+    try {
+      await ffmpeg.exec([
+        '-i', inputName, 
+        '-vf', `ass=${assName}`, 
+        '-c:v', 'libx264', 
+        '-preset', 'ultrafast', 
+        '-crf', '23',
+        '-c:a', 'copy', 
+        outputName
+      ]);
+    } catch (e) {
+      console.error("FFmpeg primary exec failed:", e);
+      // Fallback to subtitles filter if ass fails
+      await ffmpeg.exec([
+        '-i', inputName, 
+        '-vf', `subtitles=${assName}`, 
+        '-c:v', 'libx264', 
+        '-preset', 'ultrafast', 
+        '-c:a', 'copy', 
+        outputName
+      ]);
+    }
+    
     setCaptionProgress(90);
+    setCaptionStep('Finalizing video...');
+    
+    // Small delay to ensure file system is synced
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     const data = await ffmpeg.readFile(outputName);
+    if (!data || data.length === 0) throw new Error("Generated video is empty");
+    
     return new Blob([data], { type: 'video/mp4' });
   };
 
@@ -2089,6 +2135,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
   };
 
+  const toggleFullScreen = () => {
+    if (!videoContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      videoContainerRef.current.requestFullscreen().catch(err => {
+        showToast(`Error: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   const handleCaptioning = async () => {
     if (!captionFile) return;
     const limit = currentUser ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB for logged in, 100MB for guest
@@ -2151,6 +2208,53 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         srt,
         words: data.words
       });
+
+      // Save to History
+      const newGen: Generation = {
+        id: `cap-${Date.now()}`,
+        text: `${data.words.length} words transcribed`,
+        voice_name: 'Captions',
+        style: 'Default',
+        created_at: new Date().toISOString(),
+        type: 'caption',
+        words: data.words,
+        timestamp: { _seconds: Math.floor(Date.now() / 1000) }
+      };
+
+      setHistory(prev => [newGen, ...prev]);
+
+      if (currentUser) {
+        try {
+          const token = await currentUser.getIdToken();
+          await fetch('/api/save', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              text: `${data.words.length} words transcribed`,
+              type: 'caption',
+              words: data.words,
+              creditCost: 10 // Fixed cost for captioning for now
+            })
+          });
+          fetchHistory(currentUser);
+        } catch (saveErr) {
+          console.error("Failed to save caption history:", saveErr);
+        }
+      } else {
+        const guestHistory = localStorage.getItem('voxnova_guest_history');
+        let historyArray: Generation[] = [];
+        if (guestHistory) {
+          try {
+            historyArray = JSON.parse(guestHistory);
+          } catch (e) {}
+        }
+        historyArray.unshift(newGen);
+        if (historyArray.length > 20) historyArray = historyArray.slice(0, 20);
+        localStorage.setItem('voxnova_guest_history', JSON.stringify(historyArray));
+      }
       
       setCaptionProgress(100);
       setCaptionStep('Captions ready!');
@@ -3773,7 +3877,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   ) : (
                     <>
                       <Play size={24} fill="currentColor" />
-                      <span>Generate Speech</span>
+                      <span>Generate Voice</span>
                     </>
                   )}
                 </button>
@@ -3887,12 +3991,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       <label className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <Settings2 size={14} /> Controls
                       </label>
-                      <button 
-                        onClick={resetSettings}
-                        className="text-[10px] text-zinc-400 hover:text-zinc-900 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
-                      >
-                        <RefreshCw size={10} /> Reset
-                      </button>
                     </div>
                     <div className="space-y-4">
                       <div className="space-y-1">
@@ -3998,13 +4096,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </div>
                 </div>
 
-              <div className="flex flex-col md:flex-row gap-4 pt-4">
+              <div className="flex flex-col gap-4 pt-6">
                   <button 
-                    onClick={resetSettings}
-                    className="md:w-32 h-14 glass-panel flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-900 transition-all"
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !text || !selectedVoice}
+                    className="w-full py-5 px-6 bg-gradient-to-br from-zinc-800 to-zinc-900 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:from-zinc-700 hover:to-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-zinc-900/40 border border-zinc-700/50"
                   >
-                    <RefreshCw size={18} />
-                    Reset
+                    {isGenerating ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={24} />
+                        <span>Generating {generationProgress}%</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Play size={24} fill="currentColor" />
+                        <span>Generate Voice</span>
+                      </>
+                    )}
                   </button>
                   {currentAudio && (
                     <div className="flex gap-2">
@@ -4097,7 +4205,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   {/* Video Preview Area */}
                   <div className="glass-panel p-4 rounded-[2.5rem] border-zinc-100 bg-zinc-900 relative overflow-hidden aspect-video flex items-center justify-center">
                     {captionFile ? (
-                      <div className="relative w-full h-full">
+                      <div ref={videoContainerRef} className="relative w-full h-full group bg-black">
                         <video 
                           ref={videoRef}
                           src={captionResult ? captionResult.videoUrl : URL.createObjectURL(captionFile)} 
@@ -4114,6 +4222,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             shadowColor={shadowColor}
                           />
                         )}
+                        <button 
+                          onClick={toggleFullScreen}
+                          className="absolute bottom-4 right-12 p-2 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 hover:bg-black/70"
+                          title="Toggle Full Screen (with Captions)"
+                        >
+                          <Maximize size={20} />
+                        </button>
                       </div>
                     ) : (
                       <div 
