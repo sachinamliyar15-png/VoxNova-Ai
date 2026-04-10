@@ -349,15 +349,13 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart?: boolean): CaptionWord[] => {
-  if (!isSmart && wordsPerLine <= 1) return words;
+  if (words.length === 0) return [];
   
   const grouped: CaptionWord[] = [];
   
   if (isSmart) {
     let i = 0;
     while (i < words.length) {
-      // Smart logic: Decide between 1 or 2 words based on length or alternating
-      // If the word is long (> 8 chars), keep it solo. Otherwise, try to group with next.
       const currentWord = words[i];
       const nextWord = words[i + 1];
       
@@ -374,17 +372,36 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
       });
       i += count;
     }
-    return grouped;
+  } else if (wordsPerLine <= 1) {
+    grouped.push(...words);
+  } else {
+    for (let i = 0; i < words.length; i += wordsPerLine) {
+      const chunk = words.slice(i, i + wordsPerLine);
+      grouped.push({
+        word: chunk.map(w => w.word).join(' '),
+        start: chunk[0].start,
+        end: chunk[chunk.length - 1].end
+      });
+    }
   }
 
-  for (let i = 0; i < words.length; i += wordsPerLine) {
-    const chunk = words.slice(i, i + wordsPerLine);
-    grouped.push({
-      word: chunk.map(w => w.word).join(' '),
-      start: chunk[0].start,
-      end: chunk[chunk.length - 1].end
-    });
+  // CRITICAL FIX: Close gaps between captions to prevent flickering/disappearing
+  // We extend the 'end' of each caption to the 'start' of the next one if the gap is small (< 1.5s)
+  for (let i = 0; i < grouped.length - 1; i++) {
+    const current = grouped[i];
+    const next = grouped[i + 1];
+    const gap = next.start - current.end;
+    
+    if (gap > 0 && gap < 1.5) {
+      current.end = next.start;
+    }
   }
+
+  // Ensure the first caption starts at 0 if it's very close to the start
+  if (grouped.length > 0 && grouped[0].start < 0.5) {
+    grouped[0].start = 0;
+  }
+
   return grouped;
 };
 
@@ -689,7 +706,7 @@ const CaptionOverlay = ({
     const linePosition = lineWords[0]?.position || style.position;
 
     return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(linePosition)}`}>
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {visibleWords.map((w, i) => (
             <motion.span 
@@ -717,7 +734,7 @@ const CaptionOverlay = ({
     const linePosition = lineWords[0]?.position || style.position;
     
     return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(linePosition)}`}>
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {lineWords.map((w, i) => {
             const isActive = currentTime >= w.start && currentTime <= w.end;
@@ -749,7 +766,7 @@ const CaptionOverlay = ({
     const linePosition = lineWords[0]?.position || style.position;
 
     return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
+      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(linePosition)}`}>
         <div className="flex flex-wrap justify-center gap-x-4 px-4">
           {lineWords.map((w, i) => {
             const isActive = currentTime >= w.start && currentTime <= w.end;
@@ -4771,6 +4788,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           Download SRT
                         </button>
                         <button 
+                          onClick={handleExportCaptions}
                           className="w-full py-4 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20"
                         >
                           <Video size={18} />

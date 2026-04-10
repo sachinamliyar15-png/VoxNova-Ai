@@ -46,6 +46,11 @@ export const VOICES: Voice[] = [
   { id: 'bheem', name: 'BHEEM', gender: 'male', color: 'from-stone-800 to-stone-950', description: 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking.', isPremium: true },
   { id: 'sikandar', name: 'SIKANDAR', gender: 'male', color: 'from-blue-900 to-indigo-950', description: 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration.', isPremium: true },
   { id: 'vikram', name: 'VIKRAM', gender: 'male', color: 'from-slate-800 to-zinc-900', description: 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Ideal for crime thrillers and horror stories.', isPremium: true },
+  { id: 'veer', name: 'VEER', gender: 'male', color: 'from-orange-500 to-red-700', description: 'The Brave. High-energy, loud, and incredibly powerful. Perfect for energetic announcements and viral reels.' },
+  { id: 'shakti', name: 'SHAKTI', gender: 'female', color: 'from-rose-500 to-red-600', description: 'The Power. Strong, authoritative, and commanding female voice. Ideal for leadership and motivational content.' },
+  { id: 'raja', name: 'RAJA', gender: 'male', color: 'from-yellow-500 to-amber-700', description: 'The Royal. Deep, resonant, and highly professional. Sounds like a king delivering a message.' },
+  { id: 'toofan', name: 'TOOFAN', gender: 'male', color: 'from-blue-400 to-indigo-600', description: 'The Storm. Fast-paced, energetic, and loud. Great for high-intensity sports and action content.' },
+  { id: 'bhairav', name: 'BHAIRAV', gender: 'male', color: 'from-zinc-700 to-zinc-900', description: 'The Intense. Deep, gritty, and incredibly powerful. Perfect for serious and impactful narration.' },
   {
     id: 'munna-bhai',
     name: 'Munna Bhai',

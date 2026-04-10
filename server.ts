@@ -80,7 +80,10 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'maharaja': 'Fenrir', 'MAHARAJA': 'Fenrir', 'emperor-pro': 'Fenrir', 'EMPEROR PRO': 'Fenrir',
   'kabir': 'Charon', 'KABIR': 'Charon', 'aryan': 'Puck', 'ARYAN': 'Puck',
   'ishani': 'Kore', 'ISHANI': 'Kore', 'zoravar': 'Fenrir', 'ZORAVAR': 'Fenrir',
-  'rudra': 'Fenrir', 'RUDRA': 'Fenrir'
+  'rudra': 'Fenrir', 'RUDRA': 'Fenrir',
+  'veer': 'Fenrir', 'VEER': 'Fenrir', 'shakti': 'Zephyr', 'SHAKTI': 'Zephyr',
+  'raja': 'Charon', 'RAJA': 'Charon', 'toofan': 'Puck', 'TOOFAN': 'Puck',
+  'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -509,12 +512,15 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
         'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon',
         'EMPEROR PRO': 'Fenrir', 'KABIR': 'Charon', 'ARYAN': 'Puck', 'ISHANI': 'Kore', 'ZORAVAR': 'Fenrir', 'RUDRA': 'Fenrir',
-        'Munna Bhai': 'Zephyr', 'Sachinboy': 'Fenrir', 'MAHARAJA': 'Fenrir'
+        'Munna Bhai': 'Zephyr', 'Sachinboy': 'Fenrir', 'MAHARAJA': 'Fenrir',
+        'veer': 'Fenrir', 'VEER': 'Fenrir', 'shakti': 'Zephyr', 'SHAKTI': 'Zephyr',
+        'raja': 'Charon', 'RAJA': 'Charon', 'toofan': 'Puck', 'TOOFAN': 'Puck',
+        'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir'
       };
 
       const targetVoice = voiceMapping[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
@@ -532,6 +538,8 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
       - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
+      - THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
+      - USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
       - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
       - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
@@ -760,7 +768,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
@@ -778,6 +786,8 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
       - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
+      - THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
+      - USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
       ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
       - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
       - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
@@ -1118,7 +1128,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Step 2: Generate Speech in Target Voice
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
       
-      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra'].includes(voice_id.toLowerCase());
+      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'].includes(voice_id.toLowerCase());
       
       const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${targetLanguage}. 
       
@@ -1442,7 +1452,8 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
       // Save to Firestore (History)
       const audioToSave = audioData && audioData.length > 1000000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData;
       
-      const historyRef = firestore.collection('voice_history');
+      const collectionName = type === 'caption' ? 'caption_history' : 'voice_history';
+      const historyRef = firestore.collection(collectionName);
       const docRef = await historyRef.add({
         userId,
         text: text || '',
@@ -1576,7 +1587,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
           userId,
           words,
           language,
-          timestamp: admin.firestore.FieldValue.serverTimestamp()
+          created_at: admin.firestore.FieldValue.serverTimestamp()
         });
       }
 
@@ -1606,13 +1617,13 @@ app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) =
 
     const voiceHistory = await firestore.collection('voice_history')
       .where('userId', '==', userId)
-      .orderBy('timestamp', 'desc')
+      .orderBy('created_at', 'desc')
       .limit(500)
       .get();
 
     const captionHistory = await firestore.collection('caption_history')
       .where('userId', '==', userId)
-      .orderBy('timestamp', 'desc')
+      .orderBy('created_at', 'desc')
       .limit(500)
       .get();
 
@@ -1623,7 +1634,7 @@ app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) =
           id: doc.id, 
           type: 'voice', 
           ...data,
-          created_at: data.timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString()
         };
       }),
       ...captionHistory.docs.map(doc => {
@@ -1632,12 +1643,12 @@ app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) =
           id: doc.id, 
           type: 'caption', 
           ...data,
-          created_at: data.timestamp?.toDate?.()?.toISOString() || new Date().toISOString()
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString()
         };
       })
     ].sort((a: any, b: any) => {
-      const timeA = a.timestamp?.toMillis() || 0;
-      const timeB = b.timestamp?.toMillis() || 0;
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
       return timeB - timeA;
     });
 
