@@ -526,20 +526,22 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
       - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
       
-      PERFORMANCE GUIDELINES:
-      - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+      PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
+      - CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
+      - The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
+      - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
+      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
       - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior or a king.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
-      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
-      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
-      - Avoid any robotic, monotone, or repetitive cadence.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
+      - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
+      - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
+      - Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
-      - Pay close attention to the emotional weight of the text.
+      - Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
       - Use natural emphasis on key words to convey meaning and emotion.
-      - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
+      - Ensure smooth, fluid transitions between sentences and ideas.
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       - NO background noise, hums, hissing, or digital artifacts.
@@ -547,7 +549,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       - NO background music, bell-like sounds, or hallucinations in the background.
       - ZERO background noise is mandatory. Audio must be 100% clean and professional.
       - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
-      - If the script is long, maintain consistent tone and quality from start to finish.
+      - If the script is long, maintain consistent tone, energy, and quality from start to finish.
       `;
       
       let promptPrefix = "";
@@ -581,14 +583,14 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
         'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
         'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
-        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. 100% Realistic.',
-        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. 100% Realistic.',
-        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.',
-        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.',
-        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.',
-        'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. 100% Realistic and Professional.',
-        'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. 100% Realistic.',
+        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. High speaker projection, open-mouthed and fearless. 100% Realistic.',
+        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, loud and energetic. 100% Realistic.',
+        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. Open throat resonance. 100% Realistic.',
+        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. High speaker volume. 100% Realistic.',
+        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. Open and clear projection. 100% Realistic.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. Clear and confident. 100% Realistic.',
+        'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. High speaker projection, energetic and loud. 100% Realistic and Professional.',
+        'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. High speaker projection, open and majestic. 100% Realistic.',
         'KABIR': 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives and soulful storytelling. 100% Realistic.',
         'ARYAN': 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation and sports commentary. 100% Realistic.',
         'ISHANI': 'The Elegant Narrator. Smooth, sophisticated, and professional female voice. Ideal for luxury brands and high-end documentaries. 100% Realistic.',
@@ -770,20 +772,22 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
       - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
       
-      PERFORMANCE GUIDELINES:
-      - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+      PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
+      - CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
+      - The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
+      - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
+      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
       - 100% REALISM AND EMOTIONAL DEPTH ARE MANDATORY.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior or a king.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
-      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
-      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
-      - Avoid any robotic, monotone, or repetitive cadence.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
+      - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
+      - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
+      - Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
       - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
       - Sound like a real person speaking in a high-end professional studio, not a computer.
-      - Pay close attention to the emotional weight of the text.
+      - Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
       - Use natural emphasis on key words to convey meaning and emotion.
-      - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible.' : '- The voice should sound professional, mature, and cinematic.'}
+      - Ensure smooth, fluid transitions between sentences and ideas.
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
       
       TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       - NO background noise, hums, hissing, or digital artifacts.
@@ -791,7 +795,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       - NO background music, bell-like sounds, or hallucinations in the background.
       - ZERO background noise is mandatory. Audio must be 100% clean and professional.
       - Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
-      - If the script is long, maintain consistent tone and quality from start to finish.
+      - If the script is long, maintain consistent tone, energy, and quality from start to finish.
       `;
       
       let promptPrefix = "";
@@ -825,14 +829,14 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
         'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
         'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
-        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. 100% Realistic.',
-        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. 100% Realistic.',
-        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.',
-        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.',
-        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
-        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.',
-        'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. 100% Realistic and Professional.',
-        'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. 100% Realistic.',
+        'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. High speaker projection, open-mouthed and fearless. 100% Realistic.',
+        'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, loud and energetic. 100% Realistic.',
+        'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. Open throat resonance. 100% Realistic.',
+        'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. High speaker volume. 100% Realistic.',
+        'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. Open and clear projection. 100% Realistic.',
+        'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. Clear and confident. 100% Realistic.',
+        'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. High speaker projection, energetic and loud. 100% Realistic and Professional.',
+        'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. High speaker projection, open and majestic. 100% Realistic.',
         'KABIR': 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives and soulful storytelling. 100% Realistic.',
         'ARYAN': 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation and sports commentary. 100% Realistic.',
         'ISHANI': 'The Elegant Narrator. Smooth, sophisticated, and professional female voice. Ideal for luxury brands and high-end documentaries. 100% Realistic.',

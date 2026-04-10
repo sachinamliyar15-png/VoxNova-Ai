@@ -600,8 +600,8 @@ const CaptionOverlay = ({
         ? `0 0 10px ${style.color}, 0 0 20px ${style.color}` 
         : 'none',
     WebkitTextStroke: style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor || '#000000'}` : 'none',
-    paintOrder: 'stroke fill',
-    ['WebkitPaintOrder' as any]: 'stroke fill',
+    paintOrder: 'stroke fill markers',
+    ['WebkitPaintOrder' as any]: 'stroke fill markers',
     backgroundColor: style.backgroundColor,
     padding: style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
     borderRadius: '8px',
@@ -645,10 +645,12 @@ const CaptionOverlay = ({
 
     if (style.border === 'thin') {
       (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1}px ${style.outlineColor || '#000000'}`;
-      (baseStyle as any).paintOrder = 'stroke fill';
+      (baseStyle as any).paintOrder = 'stroke fill markers';
+      (baseStyle as any).WebkitPaintOrder = 'stroke fill markers';
     } else if (style.border === 'thick') {
       (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 2.5) * 2}px ${style.outlineColor || '#000000'}`;
-      (baseStyle as any).paintOrder = 'stroke fill';
+      (baseStyle as any).paintOrder = 'stroke fill markers';
+      (baseStyle as any).WebkitPaintOrder = 'stroke fill markers';
     }
 
     if (style.glow) {
@@ -1875,6 +1877,22 @@ function App() {
     loadFFmpeg();
   }, []);
 
+  const generateSRT = (words: CaptionWord[]) => {
+    const formatTime = (seconds: number) => {
+      const date = new Date(0);
+      date.setSeconds(seconds);
+      const hh = date.getUTCHours().toString().padStart(2, '0');
+      const mm = date.getUTCMinutes().toString().padStart(2, '0');
+      const ss = date.getUTCSeconds().toString().padStart(2, '0');
+      const ms = Math.floor((seconds % 1) * 1000).toString().padStart(3, '0');
+      return `${hh}:${mm}:${ss},${ms}`;
+    };
+
+    return words.map((word, i) => {
+      return `${i + 1}\n${formatTime(word.start)} --> ${formatTime(word.end)}\n${word.word}\n`;
+    }).join('\n');
+  };
+
   const generateASS = (words: CaptionWord[], style: CaptionStyle) => {
     const displayWords = groupWordsIntoLines(words.map(w => ({
       ...w,
@@ -2782,10 +2800,36 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         >
                           <RefreshCw size={16} />
                         </button>
-                        {item.audio_data && (
+                        {item.type === 'caption' ? (
                           <button 
-                            onClick={() => downloadAudio(item.audio_data, `voxnova-${(item.voice_name || 'audio').toLowerCase()}-${item.id}.wav`)}
-                            title="Download"
+                            onClick={() => {
+                              const srtContent = item.words ? generateSRT(item.words) : '';
+                              const blob = new Blob([srtContent], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `captions-${item.id}.srt`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            title="Download SRT"
+                            className="p-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
+                          >
+                            <Download size={16} />
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              if (item.audio_data && item.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
+                                downloadAudio(item.audio_data, `voxnova-${(item.voice_name || 'audio').toLowerCase()}-${item.id}.wav`);
+                              } else if (currentAudio && idx === 0) {
+                                // If it's the most recent one and data is missing, try currentAudio
+                                downloadAudio(currentAudio, `voxnova-${(item.voice_name || 'audio').toLowerCase()}-${item.id}.wav`);
+                              } else {
+                                setError("Audio data is not available for download. Try playing it first to see if it can be restored.");
+                              }
+                            }}
+                            title="Download Audio"
                             className="p-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
                           >
                             <Download size={16} />
@@ -4839,11 +4883,30 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
                       
                       <div className="flex items-center gap-2 shrink-0">
-                        {item.type !== 'caption' && item.audio_data && (
+                        {item.type === 'caption' ? (
+                          <button 
+                            onClick={() => {
+                              // If it's a caption, we can download the SRT
+                              const srtContent = item.words ? generateSRT(item.words) : '';
+                              const blob = new Blob([srtContent], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `captions-${item.id}.srt`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="p-3 hover:bg-zinc-100 rounded-xl transition-all text-zinc-400 hover:text-zinc-600"
+                            title="Download SRT"
+                          >
+                            <Download size={20} />
+                          </button>
+                        ) : (
                           <>
                             <button 
                               onClick={() => playFromHistory(item.audio_data!, item.id)}
                               className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600'}`}
+                              title={playingId === item.id ? "Pause" : "Play"}
                             >
                               {playingId === item.id ? (
                                 <div className="flex items-center gap-1">
@@ -4857,8 +4920,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               )}
                             </button>
                             <button 
-                              onClick={() => downloadAudio(item.audio_data!, `voice-${item.id}`)}
+                              onClick={() => {
+                                if (item.audio_data && item.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
+                                  downloadAudio(item.audio_data, `voice-${item.id}`);
+                                } else if (currentAudio && idx === 0) {
+                                  downloadAudio(currentAudio, `voice-${item.id}`);
+                                } else {
+                                  setError("Audio data is not available for download.");
+                                }
+                              }}
                               className="p-3 hover:bg-zinc-100 rounded-xl transition-all text-zinc-400 hover:text-zinc-600"
+                              title="Download Audio"
                             >
                               <Download size={20} />
                             </button>
@@ -4867,6 +4939,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         <button 
                           onClick={() => handleDeleteHistory(item.id, item.type)}
                           className="p-3 hover:bg-red-50 rounded-xl transition-all text-zinc-400 hover:text-red-500"
+                          title="Delete"
                         >
                           <Trash2 size={20} />
                         </button>
@@ -5494,6 +5567,109 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Task Bar for background processes - Now as a subtle Toast */}
+      <AnimatePresence>
+        {(isGenerating || isCaptioning || isVoiceChanging) && (
+          <motion.div 
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 100, opacity: 0 }}
+            className="fixed top-24 right-4 z-[150] w-[calc(100%-32px)] max-w-sm md:right-8"
+          >
+            <div className="glass-panel p-4 rounded-2xl border-zinc-200 shadow-2xl flex items-center gap-4 bg-white/90 backdrop-blur-xl">
+              <div className="flex-1 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                  <Loader2 className="animate-spin" size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-xs font-bold text-zinc-900 truncate">
+                      {isGenerating ? "Generating Voice..." : isCaptioning ? "Generating Captions..." : "Changing Voice..."}
+                    </p>
+                    <span className="text-[10px] font-mono font-bold text-emerald-600">
+                      {isGenerating ? generationProgress : isCaptioning ? captionProgress : voiceChangingProgress}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${isGenerating ? generationProgress : isCaptioning ? captionProgress : voiceChangingProgress}%` }}
+                      className="h-full bg-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Toast for Results */}
+      <AnimatePresence>
+        {(currentAudio || captionResult || voiceChangingResult) && !isGenerating && !isCaptioning && !isVoiceChanging && (
+          <motion.div 
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 100, opacity: 0 }}
+            className="fixed top-24 right-4 z-[150] w-[calc(100%-32px)] max-w-sm md:right-8"
+          >
+            <div className="glass-panel p-3 rounded-2xl border-emerald-100 shadow-2xl flex items-center gap-3 bg-white/95 backdrop-blur-xl border-l-4 border-l-emerald-500">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
+                <Check size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-zinc-900">Success!</p>
+                <p className="text-[10px] text-zinc-500 truncate">Your content is ready.</p>
+              </div>
+              <div className="flex items-center gap-1">
+                {currentAudio && (
+                  <button 
+                    onClick={() => {
+                      if (isPlaying) {
+                        audioRef.current?.pause();
+                        setIsPlaying(false);
+                      } else {
+                        audioRef.current?.play();
+                        setIsPlaying(true);
+                      }
+                    }}
+                    className={`p-2 rounded-lg transition-all ${isPlaying ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                  >
+                    {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    if (currentAudio) downloadAudio(currentAudio, 'voxnova-audio');
+                    if (captionResult) handleExportCaptions();
+                    if (voiceChangingResult) {
+                      const a = document.createElement('a');
+                      a.href = voiceChangingResult.url;
+                      a.download = `transformed-${Date.now()}.wav`;
+                      a.click();
+                    }
+                  }}
+                  className="p-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-all"
+                  title="Download"
+                >
+                  <Download size={16} />
+                </button>
+                <button 
+                  onClick={() => {
+                    setCurrentAudio(null);
+                    setCaptionResult(null);
+                    setVoiceChangingResult(null);
+                  }}
+                  className="p-2 hover:bg-zinc-100 rounded-lg transition-all text-zinc-400 hover:text-zinc-600"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
       </main>
