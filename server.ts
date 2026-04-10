@@ -915,7 +915,9 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
       }
 
-      if (speed >= 1.4) {
+      if (speed > 1.6) {
+        promptPrefix += "PERFORMANCE: Deliver an ULTRA-FAST, high-energy, and professional narration. This is an 'Ultra Fast' style, significantly faster than normal but maintaining absolute clarity and articulation. Sound like a professional speed-narrator. ";
+      } else if (speed >= 1.4) {
         promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
       } else if (speed > 1.0) {
         promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
@@ -1102,7 +1104,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const prompt = `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
 
       const result = await ai.models.generateContent({
-        model: "gemini-1.5-flash", // Using gemini-1.5-flash for more stable transcription
+        model: "gemini-3-flash-preview",
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
@@ -1114,7 +1116,9 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       console.log(`[Voice Changer] Transcribed text: ${transcribedText.substring(0, 50)}...`);
 
       // Step 2: Generate Speech in Target Voice
-      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja'].includes(voice_id.toLowerCase());
+      const targetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
+      
+      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra'].includes(voice_id.toLowerCase());
       
       const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${targetLanguage}. 
       
@@ -1522,14 +1526,9 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      let scriptInstruction = "";
-      if (language === 'Hindi') {
-        if (scriptType === 'hinglish') {
-          scriptInstruction = "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto' instead of 'नमस्ते दोस्तों'.";
-        } else {
-          scriptInstruction = "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.";
-        }
-      }
+      const scriptInstruction = language === 'Hindi' 
+        ? (scriptType === 'hinglish' ? "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto'." : "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.")
+        : "";
 
       const prompt = `Transcribe the following video/audio at a word-level with EXTREMELY PRECISE timestamps. 
       The content is primarily in ${language}.
@@ -1546,10 +1545,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       4. DO NOT skip any words.
       5. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the speaker finishes that word.
       6. COMPENSATE FOR ANY AI LATENCY: The timestamps must be absolute relative to the start of the file.
-      
-      Correct any grammatical errors or misspellings in the transcription.
-      Support both Hindi and English (Hinglish if mixed).
-      Only return the JSON array, no other text.`;
+      7. Only return the JSON array, no other text.`;
 
       const mimeType = videoData.startsWith('data:') 
         ? videoData.split(';')[0].split(':')[1] 

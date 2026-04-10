@@ -1081,7 +1081,7 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
                       a.click();
                       URL.revokeObjectURL(url);
                     }}
-                    className="p-3 bg-zinc-50 text-zinc-600 rounded-xl hover:bg-zinc-100 transition-all"
+                    className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
                     title="Download Audio"
                   >
                     <Download size={18} />
@@ -2832,7 +2832,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               a.click();
                               URL.revokeObjectURL(url);
                             }}
-                            className="p-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
+                            className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
                             title="Download Audio"
                           >
                             <Download size={16} />
@@ -2851,7 +2851,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               URL.revokeObjectURL(url);
                             }}
                             title="Download SRT"
-                            className="p-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
+                            className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
                           >
                             <Download size={16} />
                           </button>
@@ -3902,10 +3902,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         </div>
                         <div className="flex gap-2 mb-2">
                           <button 
-                            onClick={() => setSpeed(0.7)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 0.7 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            onClick={() => setSpeed(1.7)}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.7 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
-                            Slow
+                            (U Fast)
                           </button>
                           <button 
                             onClick={() => setSpeed(1.0)}
@@ -4024,7 +4024,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </button>
                       <button 
                         onClick={() => downloadAudio(currentAudio, 'generated-voice')}
-                        className="w-14 h-14 glass-panel rounded-xl flex items-center justify-center hover:bg-white/5 transition-all"
+                        className="w-14 h-14 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
                       >
                         <Download size={24} />
                       </button>
@@ -4199,7 +4199,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     </div>
                   )}
 
-                  {isCaptioning && (
+                  {isCaptioning && !captionWords.length && (
                     <div className="glass-panel p-8 rounded-[2.5rem] border-zinc-100 space-y-4">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
