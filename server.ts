@@ -1091,7 +1091,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
     return res.status(500).json({ error: "Failed to process credits" });
   }
 
-  const targetVoice = INTERNAL_VOICE_MAPPING[voice_id] || voice_id;
+  const initialTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || voice_id;
   
   // Extract base64 data and mime type
   const matches = fileData.match(/^data:([^;]+);base64,(.+)$/);
@@ -1111,7 +1111,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const ai = new GoogleGenAI({ apiKey });
       
       // Step 1: Transcribe
-      const prompt = `Transcribe this audio/video exactly as it is. Return ONLY the transcribed text, no other commentary.`;
+      const prompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
 
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -1121,12 +1121,15 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       });
 
       const transcribedText = result.text?.trim();
-      if (!transcribedText) throw new Error("Failed to transcribe audio");
+      if (!transcribedText) {
+        console.log("[Voice Changer] No text transcribed or transcription failed.");
+        return res.status(400).json({ error: "Could not detect any speech in the uploaded file. Please ensure the audio is clear." });
+      }
 
       console.log(`[Voice Changer] Transcribed text: ${transcribedText.substring(0, 50)}...`);
 
       // Step 2: Generate Speech in Target Voice
-      const targetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
+      const currentTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
       
       const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'].includes(voice_id.toLowerCase());
       
@@ -1167,7 +1170,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
           systemInstruction: ttsSystemInstruction,
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: targetVoice as any }
+              prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
             }
           }
         }

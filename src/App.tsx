@@ -1094,7 +1094,7 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `voice-${gen.id}.${gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                      a.download = `VoxNova Text to Speech - ${gen.voice_name || 'AI Voice'}-${gen.id}.${gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
                       a.click();
                       URL.revokeObjectURL(url);
                     }}
@@ -2078,7 +2078,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const outputName = 'processed.mp4';
     
     await ffmpeg.writeFile(inputVideo, await fetchFile(videoFile));
-    await ffmpeg.writeFile(inputAudio, await fetchFile(audioData));
+    
+    // Convert base64 to Uint8Array for FFmpeg
+    const audioUint8 = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
+    await ffmpeg.writeFile(inputAudio, audioUint8);
     
     // Merge audio and video, replacing original audio
     await ffmpeg.exec(['-i', inputVideo, '-i', inputAudio, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-shortest', outputName]);
@@ -2294,7 +2297,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const url = URL.createObjectURL(videoBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `captioned-${captionFile.name}`;
+      a.download = `VoxNova Text to Speech - Captions - ${captionFile.name}`;
       a.click();
       URL.revokeObjectURL(url);
       showToast("Video exported successfully!");
@@ -2949,7 +2952,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement('a');
                               a.href = url;
-                              a.download = `voice-${item.id}.${item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                              a.download = `VoxNova Text to Speech - ${item.voice_name || 'AI Voice'}-${item.id}.${item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
                               a.click();
                               URL.revokeObjectURL(url);
                             }}
@@ -3056,7 +3059,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${fileName}.${audioFormat}`;
+      a.download = `VoxNova Text to Speech - ${selectedVoice.name}-${fileName}.${audioFormat}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -3549,7 +3552,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                 onClick={() => {
                                   const a = document.createElement('a');
                                   a.href = voiceChangingResult.url;
-                                  a.download = `transformed-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
+                                  const voiceName = VOICES.find(v => v.id === selectedVoice.id)?.name || 'AI Voice';
+                                  a.download = `VoxNova Text to Speech - ${voiceName}-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
                                   a.click();
                                 }}
                                 className="p-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all"
@@ -4017,8 +4021,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         </div>
                         <div className="flex gap-2 mb-2">
                           <button 
-                            onClick={() => setSpeed(1.7)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.7 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            onClick={() => setSpeed(1.6)}
+                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.6 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             (U Fast)
                           </button>
@@ -4204,7 +4208,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = 'captions.srt';
+                        a.download = 'VoxNova Text to Speech - captions.srt';
                         a.click();
                         URL.revokeObjectURL(url);
                       }}
@@ -4779,7 +4783,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement('a');
                             a.href = url;
-                            a.download = `captions-${Date.now()}.srt`;
+                            a.download = `VoxNova Text to Speech - Captions - ${Date.now()}.srt`;
                             a.click();
                           }}
                           className="w-full py-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
@@ -4936,7 +4940,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         onClick={() => {
                           const a = document.createElement('a');
                           a.href = voiceChangingResult.url;
-                          a.download = `voice-change-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
+                          const voiceName = VOICES.find(v => v.id === selectedVoice.id)?.name || 'AI Voice';
+                          a.download = `VoxNova Text to Speech - ${voiceName}-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
                           a.click();
                         }}
                         className="p-3 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-all text-zinc-600"
