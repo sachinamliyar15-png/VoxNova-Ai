@@ -142,7 +142,7 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
       ) : (
         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
           {words.map((word, idx) => (
-            <React.Fragment key={`caption-word-fragment-${idx}`}>
+            <React.Fragment key={`caption-word-fragment-${word.word}-${word.start}-${idx}`}>
               <div className="flex flex-col gap-2 bg-zinc-50 p-3 rounded-2xl border border-zinc-100 group transition-all hover:border-emerald-200">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-lg bg-zinc-200 flex items-center justify-center text-[10px] font-bold text-zinc-500 shrink-0">

@@ -693,7 +693,7 @@ const CaptionOverlay = ({
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {visibleWords.map((w, i) => (
             <motion.span 
-              key={`typewriter-${i}-${w.start}`} 
+              key={`typewriter-${w.word}-${w.start}-${i}`} 
               initial={{ opacity: 0, scale: 0.8, y: 5 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               style={getWordStyle(w, i)}
@@ -723,7 +723,7 @@ const CaptionOverlay = ({
             const isActive = currentTime >= w.start && currentTime <= w.end;
             return (
               <span 
-                key={`karaoke-${i}-${w.start}`} 
+                key={`karaoke-${w.word}-${w.start}-${i}`} 
                 className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
                 style={{
                   ...getWordStyle(w, i),
@@ -755,7 +755,7 @@ const CaptionOverlay = ({
             const isActive = currentTime >= w.start && currentTime <= w.end;
             return (
               <motion.span
-                key={`zeemo-${i}-${w.start}-${w.word}`}
+                key={`zeemo-${w.word}-${w.start}-${i}`}
                 initial={{ scale: 1, y: 0 }}
                 animate={{ 
                   scale: isActive ? 1.2 : 1,
@@ -838,7 +838,7 @@ const CaptionOverlay = ({
       <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentWord.word + currentWord.start}
+            key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
             initial={{ scale: 0.5, opacity: 0, y: 20 }}
             animate={{ 
               scale: 1.2, 
@@ -863,7 +863,7 @@ const CaptionOverlay = ({
       <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentWord.word + currentWord.start}
+            key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
             initial={{ opacity: 0, filter: 'blur(10px)' }}
             animate={{ 
               opacity: 1, 
@@ -886,7 +886,7 @@ const CaptionOverlay = ({
     <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
       <AnimatePresence mode="wait">
         <motion.div
-          key={currentWord.word + currentWord.start}
+          key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
           {...getAnimationProps()}
           animate={{
             ...getAnimationProps().animate,
@@ -1034,7 +1034,7 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredHistory.map((gen, idx) => (
-            <div key={`history-view-item-${gen.id}-${idx}`} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
+            <div key={`history-view-item-${gen.id}-${idx}-${gen.created_at || ''}`} className="p-6 bg-white rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3">
                   <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${gen.type === 'caption' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -1068,6 +1068,25 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
                 >
                   <Trash2 size={18} />
                 </button>
+                {gen.audio_data && gen.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" && (
+                  <button 
+                    onClick={() => {
+                      const blob = new Blob([base64ToArrayBuffer(gen.audio_data!)], { 
+                        type: gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `voice-${gen.id}.${gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="p-3 bg-zinc-50 text-zinc-600 rounded-xl hover:bg-zinc-100 transition-all"
+                    title="Download Audio"
+                  >
+                    <Download size={18} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -2748,7 +2767,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </div>
               ) : (
                 filteredHistory.map((item, idx) => (
-                  <div key={`modal-history-item-${item.id}-${idx}-${item.created_at || ''}`} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
+                  <div key={`modal-history-item-${item.id}-${idx}-${item.created_at || ''}-${item.type || ''}`} className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl hover:bg-zinc-100 transition-all group">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="flex-1 space-y-2 min-w-0 w-full">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -2800,6 +2819,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         >
                           <RefreshCw size={16} />
                         </button>
+                        {item.audio_data && item.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" && (
+                          <button 
+                            onClick={() => {
+                              const blob = new Blob([base64ToArrayBuffer(item.audio_data!)], { 
+                                type: item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
+                              });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `voice-${item.id}.${item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="p-2.5 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl transition-all"
+                            title="Download Audio"
+                          >
+                            <Download size={16} />
+                          </button>
+                        )}
                         {item.type === 'caption' ? (
                           <button 
                             onClick={() => {
@@ -3093,37 +3131,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         </div>
                       </div>
 
-                      {/* Action Bar */}
-                      <div className="flex flex-col sm:flex-row items-center gap-4">
-                        <button 
-                          onClick={handleGenerate}
-                          disabled={isGenerating || !text.trim()}
-                          className={`flex-1 w-full sm:w-auto py-5 rounded-3xl font-bold text-xl transition-all shadow-xl flex items-center justify-center gap-3 ${
-                            isGenerating 
-                              ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' 
-                              : 'bg-zinc-900 text-white hover:bg-zinc-800 shadow-zinc-900/20 active:scale-[0.98]'
-                          }`}
-                        >
-                          {isGenerating ? (
-                            <>
-                              <Loader2 className="animate-spin" size={24} />
-                              <span>Generating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play size={24} fill="currentColor" />
-                              <span>Generate Voice</span>
-                            </>
-                          )}
-                        </button>
-                        
-                        {!currentUser && (
-                          <div className="text-center sm:text-left">
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Guest Mode</p>
-                            <p className="text-xs text-zinc-500">Sign up for 5,000 character scripts</p>
-                          </div>
-                        )}
-                      </div>
+                      {/* Action Bar Removed as requested */}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -3185,7 +3193,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                     <div className="max-h-64 overflow-y-auto custom-scrollbar">
                                       {VOICES.slice(0, 8).map((voice, idx) => (
                                         <button
-                                          key={`quick-voice-item-${voice.id}-${idx}`}
+                                          key={`quick-voice-item-${voice.id}-${idx}-${voice.name}`}
                                           onClick={() => {
                                             setSelectedVoice(voice);
                                             setIsFeatureMenuOpen(false);
@@ -3998,28 +4006,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <RefreshCw size={18} />
                     Reset
                   </button>
-                  <button 
-                    id="generate-btn"
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !text.trim()}
-                    className="flex-1 btn-primary h-14"
-                  >
-                    {isGenerating ? (
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="animate-spin" size={18} />
-                          <span className="font-bold">Generating Voice...</span>
-                        </div>
-                        <span className="text-[10px] opacity-70 animate-pulse">{loadingMessages[loadingStep]}</span>
-                      </div>
-                    ) : (
-                      <>
-                        <Sparkles size={20} />
-                        Generate Voice
-                      </>
-                    )}
-                  </button>
-                  
                   {currentAudio && (
                     <div className="flex gap-2">
                       <button 
@@ -4495,7 +4481,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               <p className="text-[10px] text-zinc-400">Cycle through 3 colors every 5 words. Click to change.</p>
                               <div className="flex gap-4">
                                 {[0, 1, 2].map(idx => (
-                                  <div key={idx} className="flex-1 space-y-1.5">
+                                  <div key={`dynamic-color-input-${idx}`} className="flex-1 space-y-1.5">
                                     <span className="text-[8px] text-zinc-400 font-bold uppercase">Color {idx + 1}</span>
                                     <div className="relative">
                                       <input 
@@ -4862,7 +4848,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </div>
                 ) : (
                   history.map((item, idx) => (
-                    <div key={`main-history-item-${item.id}-${idx}-${item.created_at || ''}`} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
+                    <div key={`main-history-item-${item.id}-${idx}-${item.created_at || ''}-${item.type || ''}`} className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center border-zinc-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           {item.type === 'caption' ? (
@@ -5570,108 +5556,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         )}
       </AnimatePresence>
 
-      {/* Floating Task Bar for background processes - Now as a subtle Toast */}
-      <AnimatePresence>
-        {(isGenerating || isCaptioning || isVoiceChanging) && (
-          <motion.div 
-            initial={{ x: 100, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 100, opacity: 0 }}
-            className="fixed top-24 right-4 z-[150] w-[calc(100%-32px)] max-w-sm md:right-8"
-          >
-            <div className="glass-panel p-4 rounded-2xl border-zinc-200 shadow-2xl flex items-center gap-4 bg-white/90 backdrop-blur-xl">
-              <div className="flex-1 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
-                  <Loader2 className="animate-spin" size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="text-xs font-bold text-zinc-900 truncate">
-                      {isGenerating ? "Generating Voice..." : isCaptioning ? "Generating Captions..." : "Changing Voice..."}
-                    </p>
-                    <span className="text-[10px] font-mono font-bold text-emerald-600">
-                      {isGenerating ? generationProgress : isCaptioning ? captionProgress : voiceChangingProgress}%
-                    </span>
-                  </div>
-                  <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${isGenerating ? generationProgress : isCaptioning ? captionProgress : voiceChangingProgress}%` }}
-                      className="h-full bg-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Success Toast for Results */}
-      <AnimatePresence>
-        {(currentAudio || captionResult || voiceChangingResult) && !isGenerating && !isCaptioning && !isVoiceChanging && (
-          <motion.div 
-            initial={{ x: 100, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 100, opacity: 0 }}
-            className="fixed top-24 right-4 z-[150] w-[calc(100%-32px)] max-w-sm md:right-8"
-          >
-            <div className="glass-panel p-3 rounded-2xl border-emerald-100 shadow-2xl flex items-center gap-3 bg-white/95 backdrop-blur-xl border-l-4 border-l-emerald-500">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
-                <Check size={20} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-zinc-900">Success!</p>
-                <p className="text-[10px] text-zinc-500 truncate">Your content is ready.</p>
-              </div>
-              <div className="flex items-center gap-1">
-                {currentAudio && (
-                  <button 
-                    onClick={() => {
-                      if (isPlaying) {
-                        audioRef.current?.pause();
-                        setIsPlaying(false);
-                      } else {
-                        audioRef.current?.play();
-                        setIsPlaying(true);
-                      }
-                    }}
-                    className={`p-2 rounded-lg transition-all ${isPlaying ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                  >
-                    {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                  </button>
-                )}
-                <button 
-                  onClick={() => {
-                    if (currentAudio) downloadAudio(currentAudio, 'voxnova-audio');
-                    if (captionResult) handleExportCaptions();
-                    if (voiceChangingResult) {
-                      const a = document.createElement('a');
-                      a.href = voiceChangingResult.url;
-                      a.download = `transformed-${Date.now()}.wav`;
-                      a.click();
-                    }
-                  }}
-                  className="p-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-all"
-                  title="Download"
-                >
-                  <Download size={16} />
-                </button>
-                <button 
-                  onClick={() => {
-                    setCurrentAudio(null);
-                    setCaptionResult(null);
-                    setVoiceChangingResult(null);
-                  }}
-                  className="p-2 hover:bg-zinc-100 rounded-lg transition-all text-zinc-400 hover:text-zinc-600"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       </main>
 
       {/* Footer / Status */}
