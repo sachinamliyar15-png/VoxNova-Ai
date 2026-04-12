@@ -2,6 +2,30 @@ import { CaptionPreset } from '../types';
 
 export const CAPTION_PRESETS: CaptionPreset[] = [
   {
+    id: 'side-by-side',
+    name: 'Side-by-Side',
+    style: {
+      fontSize: 64,
+      color: '#ffffff',
+      glow: false,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase',
+      wordsPerLine: 2,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 3,
+      fontWeight: '900',
+      isDynamic: true,
+      threeColors: ['#ffffff', '#ffff00'],
+      isSmart: true
+    },
+    animation: 'snappy-pop'
+  },
+  {
     id: 'viral-ai-smart',
     name: 'Viral AI Smart',
     style: {

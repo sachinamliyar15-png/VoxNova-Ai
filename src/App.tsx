@@ -398,7 +398,7 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
   }
 
   // Ensure the first caption starts at 0 if it's very close to the start
-  if (grouped.length > 0 && grouped[0].start < 0.5) {
+  if (grouped.length > 0 && grouped[0].start < 4.0) {
     grouped[0].start = 0;
   }
 
@@ -418,8 +418,8 @@ const CaptionOverlay = ({
   animation: string,
   shadowColor: string
 }) => {
-  // Add a small offset (e.g., 0.4s) to compensate for processing lag and make captions feel snappier
-  const adjustedTime = currentTime + 0.4;
+  // Add a small offset (e.g., 1.0s) to compensate for processing lag and make captions feel snappier
+  const adjustedTime = currentTime + 1.0;
   
   const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine, style.isSmart), [words, style.wordsPerLine, style.isSmart]);
   const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
@@ -441,16 +441,19 @@ const CaptionOverlay = ({
   const getDynamicColor = (index: number, word: CaptionWord) => {
     if (style.isDynamic) {
       const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-      // Use the word's actual index in the original words array for consistent coloring
-      const globalIndex = words.findIndex(w => w.start === word.start && w.word === word.word);
-      const patternIndex = globalIndex === -1 ? index : globalIndex % 15;
       
-      if (patternIndex < 5) return colors[0];
-      if (patternIndex < 10) return colors[1];
-      return colors[2];
+      // Professional Alternating Pattern (Side-by-Side)
+      // We use the word index within the current line for the alternating effect
+      const wordsInLine = word.word.split(' ');
+      if (wordsInLine.length > 1) {
+        // If the word itself contains multiple words (grouped), we can't easily color them differently
+        // unless we split them here. But for now, let's use the global index.
+      }
+      
+      const globalIndex = words.findIndex(w => w.start === word.start && w.word === word.word);
+      return colors[globalIndex % colors.length];
     }
-    const colors = ['#ffffff', '#ffff00', '#00ff00', '#ff00ff', '#00ffff'];
-    return colors[index % colors.length];
+    return style.color || '#ffffff';
   };
 
   const getAnimationProps = () => {
@@ -619,8 +622,8 @@ const CaptionOverlay = ({
     WebkitTextStroke: style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor || '#000000'}` : 'none',
     paintOrder: 'stroke fill markers',
     ['WebkitPaintOrder' as any]: 'stroke fill markers',
-    backgroundColor: style.backgroundColor,
-    padding: style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
+    backgroundColor: style.backgroundColor && style.backgroundColor !== 'transparent' ? style.backgroundColor : 'transparent',
+    padding: style.backgroundColor && style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
     borderRadius: '8px',
     display: 'inline-block',
     whiteSpace: 'pre-wrap',
@@ -675,7 +678,7 @@ const CaptionOverlay = ({
     }
 
     if (style.shadow) {
-      baseStyle.textShadow = `${style.shadowColor || '#000000'} 3px 3px 0px`;
+      baseStyle.textShadow = `2px 2px 0px ${shadowColor}, -2px -2px 0px ${shadowColor}, 2px -2px 0px ${shadowColor}, -2px 2px 0px ${shadowColor}, 0px 4px 10px rgba(0,0,0,0.5)`;
     }
     
     // Highlight logic
@@ -865,9 +868,22 @@ const CaptionOverlay = ({
             }}
             exit={{ scale: 0.8, opacity: 0 }}
             style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
-            className="font-bold text-center px-4"
+            className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
           >
-            {currentWord.word}
+            {style.isDynamic ? (
+              currentWord.word.split(' ').map((w, i) => {
+                const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
+                const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+                const wordColor = colors[globalWordIndex % colors.length];
+                return (
+                  <span key={i} style={{ color: wordColor }}>
+                    {w}
+                  </span>
+                );
+              })
+            ) : (
+              currentWord.word
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -890,9 +906,22 @@ const CaptionOverlay = ({
             }}
             exit={{ opacity: 0, filter: 'blur(10px)' }}
             style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
-            className="font-bold text-center px-4"
+            className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
           >
-            {currentWord.word}
+            {style.isDynamic ? (
+              currentWord.word.split(' ').map((w, i) => {
+                const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
+                const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+                const wordColor = colors[globalWordIndex % colors.length];
+                return (
+                  <span key={i} style={{ color: wordColor }}>
+                    {w}
+                  </span>
+                );
+              })
+            ) : (
+              currentWord.word
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -911,9 +940,22 @@ const CaptionOverlay = ({
             y: style.isSmart ? floatingOffset.y : 0
           }}
           style={getWordStyle(currentWord, words.indexOf(currentWord))}
-          className="font-bold text-center px-4"
+          className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
         >
-          {currentWord.word}
+          {style.isDynamic ? (
+            currentWord.word.split(' ').map((w, i) => {
+              const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
+              const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+              const wordColor = colors[globalWordIndex % colors.length];
+              return (
+                <span key={i} style={{ color: wordColor }}>
+                  {w}
+                </span>
+              );
+            })
+          ) : (
+            currentWord.word
+          )}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -1497,6 +1539,7 @@ function App() {
   const [selectedPresetId, setSelectedPresetId] = useState<string>('hindi-viral-yellow');
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(CAPTION_PRESETS[0].style);
   const [captionAnimation, setCaptionAnimation] = useState<string>(CAPTION_PRESETS[0].animation);
+  const [isSettingsLocked, setIsSettingsLocked] = useState(false);
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [captionOffset, setCaptionOffset] = useState(0);
@@ -1834,24 +1877,53 @@ function App() {
   const [showFAQ, setShowFAQ] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historySearchTerm, setHistorySearchTerm] = useState('');
-  const [showWelcome, setShowWelcome] = useState(() => {
-    // Check if welcome was already shown
-    return !localStorage.getItem('voxnova_welcome_shown');
-  });
+  const [showWelcome, setShowWelcome] = useState(true);
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
-    localStorage.setItem('voxnova_welcome_shown', 'true');
+    // Ensure we start at the top
+    window.scrollTo(0, 0);
   };
 
-  const resetSettings = () => {
-    setSpeed(1.0);
-    setPitch(1.0);
-    setPause(0.5);
-    setAudioFormat('wav');
-    setTargetSampleRate(44100);
-    setStudioClarity(true);
-    setStyle('normal');
+  // Persistent Caption Settings
+  useEffect(() => {
+    const savedStyle = localStorage.getItem('voxnova_caption_style');
+    const savedAnimation = localStorage.getItem('voxnova_caption_animation');
+    const savedPresetId = localStorage.getItem('voxnova_caption_preset_id');
+    const savedOffset = localStorage.getItem('voxnova_caption_offset');
+    
+    if (savedStyle) {
+      try {
+        setCaptionStyle(JSON.parse(savedStyle));
+      } catch (e) {
+        console.error("Failed to parse saved caption style", e);
+      }
+    }
+    if (savedAnimation) setCaptionAnimation(savedAnimation);
+    if (savedPresetId) setSelectedPresetId(savedPresetId);
+    if (savedOffset) setCaptionOffset(parseInt(savedOffset));
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem('voxnova_caption_style', JSON.stringify(captionStyle));
+      localStorage.setItem('voxnova_caption_animation', captionAnimation);
+      localStorage.setItem('voxnova_caption_preset_id', selectedPresetId);
+      localStorage.setItem('voxnova_caption_offset', captionOffset.toString());
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [captionStyle, captionAnimation, selectedPresetId, captionOffset]);
+
+  const resetCaptionSettings = () => {
+    setCaptionStyle(CAPTION_PRESETS[0].style);
+    setCaptionAnimation(CAPTION_PRESETS[0].animation);
+    setSelectedPresetId(CAPTION_PRESETS[0].id);
+    setCaptionOffset(0);
+    localStorage.removeItem('voxnova_caption_style');
+    localStorage.removeItem('voxnova_caption_animation');
+    localStorage.removeItem('voxnova_caption_preset_id');
+    localStorage.removeItem('voxnova_caption_offset');
+    showToast("Caption settings reset to default");
   };
 
   const handlePreviewVoice = async (voice: Voice) => {
@@ -1986,10 +2058,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       
       if (style.isDynamic) {
         const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-        const patternIndex = idx % 15;
-        let color = colors[0];
-        if (patternIndex >= 5 && patternIndex < 10) color = colors[1];
-        else if (patternIndex >= 10) color = colors[2];
+        // Alternating colors for professional look
+        const color = colors[idx % colors.length];
         
         const assWordColor = hexToAss(color);
         text = `{\\c${assWordColor}}${text}`;
@@ -4226,31 +4296,32 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   {/* Video Preview Area */}
                   <div className="glass-panel p-4 rounded-[2.5rem] border-zinc-100 bg-zinc-900 relative overflow-hidden aspect-video flex items-center justify-center">
                     {captionFile ? (
-                      <div ref={videoContainerRef} className="relative w-full h-full group bg-black">
-                        <video 
-                          ref={videoRef}
-                          src={captionResult ? captionResult.videoUrl : URL.createObjectURL(captionFile)} 
-                          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                          controls 
-                          className="w-full h-full object-contain" 
-                        />
-                        {captionWords.length > 0 && (
-                          <CaptionOverlay 
-                            words={captionWords} 
-                            currentTime={currentTime + (captionOffset / 1000)} 
-                            style={captionStyle} 
-                            animation={captionAnimation} 
-                            shadowColor={shadowColor}
+                        <div ref={videoContainerRef} className="relative w-full h-full group bg-black">
+                          <video 
+                            ref={videoRef}
+                            src={captionResult ? captionResult.videoUrl : URL.createObjectURL(captionFile)} 
+                            onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                            controls 
+                            className="w-full h-full object-contain" 
                           />
-                        )}
-                        <button 
-                          onClick={toggleFullScreen}
-                          className="absolute bottom-4 right-12 p-2 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 hover:bg-black/70"
-                          title="Toggle Full Screen (with Captions)"
-                        >
-                          <Maximize size={20} />
-                        </button>
-                      </div>
+                          {captionWords.length > 0 && (
+                            <CaptionOverlay 
+                              words={captionWords} 
+                              currentTime={currentTime + (captionOffset / 1000)} 
+                              style={captionStyle} 
+                              animation={captionAnimation} 
+                              shadowColor={shadowColor}
+                            />
+                          )}
+                          <button 
+                            onClick={toggleFullScreen}
+                            className="absolute bottom-4 right-12 p-3 bg-zinc-900/80 text-white rounded-xl transition-all z-[110] hover:bg-zinc-900 shadow-xl border border-white/10 flex items-center gap-2 font-bold text-xs"
+                            title="Toggle Full Screen (with Captions)"
+                          >
+                            <Maximize size={18} />
+                            Full Screen
+                          </button>
+                        </div>
                     ) : (
                       <div 
                         onClick={() => document.getElementById('video-upload-captions')?.click()}
@@ -4392,386 +4463,287 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                        <Sparkles size={14} className="text-emerald-500" /> Style Presets
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {CAPTION_PRESETS.map(preset => (
-                          <button
-                            key={preset.id}
-                            onClick={() => {
-                              setCaptionStyle(preset.style);
-                              setCaptionAnimation(preset.animation);
-                              setSelectedPresetId(preset.id);
-                            }}
-                            className={`flex flex-col items-center gap-2 p-3 rounded-2xl text-xs font-bold transition-all border ${
-                              selectedPresetId === preset.id 
-                                ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700 ring-2 ring-emerald-500/20' 
-                                : 'bg-white border-zinc-100 text-zinc-600 hover:border-emerald-200 hover:bg-emerald-50/30'
-                            } group`}
-                          >
-                            <div className="w-full aspect-video bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-lg flex items-center justify-center overflow-hidden relative group-hover:from-emerald-900 group-hover:to-zinc-900 transition-all duration-500">
-                               <motion.div 
-                                 animate={{ 
-                                   scale: [1, 1.1, 1],
-                                   rotate: preset.animation === 'rotate' ? [0, 5, -5, 0] : 0,
-                                   y: preset.animation === 'bounce' ? [0, -5, 0] : 0,
-                                   x: preset.animation === 'shake' ? [0, -3, 3, -3, 3, 0] : 0,
-                                   opacity: preset.animation === 'fade' ? [0.5, 1, 0.5] : 1
-                                 }}
-                                 transition={{ 
-                                   duration: 2, 
-                                   repeat: Infinity,
-                                   ease: "easeInOut"
-                                 }}
-                                 className="font-bold text-[10px] text-center px-2 py-1 rounded shadow-lg"
-                                 style={{
-                                   color: preset.style.color,
-                                   fontFamily: preset.style.font,
-                                   textTransform: preset.style.case === 'uppercase' ? 'uppercase' : preset.style.case === 'lowercase' ? 'lowercase' : 'none',
-                                   backgroundColor: preset.style.backgroundColor !== 'transparent' ? preset.style.backgroundColor : 'transparent',
-                                   textShadow: preset.style.shadow 
-                                     ? `${preset.style.shadowColor} 1px 1px 2px` 
-                                     : preset.style.glow 
-                                       ? `0 0 5px ${preset.style.color}` 
-                                       : 'none',
-                                   WebkitTextStroke: preset.style.border !== 'none' ? `${(preset.style.strokeWidth || 1) / 2}px ${preset.style.outlineColor}` : 'none',
-                                   paintOrder: 'stroke fill',
-                                   ['WebkitPaintOrder' as any]: 'stroke fill',
-                                   fontStyle: preset.style.italic ? 'italic' : 'normal',
-                                 }}
-                               >
-                                 {preset.name}
-                               </motion.div>
-                               
-                               {/* Animated background particles for "attractive" look */}
-                               <div className="absolute inset-0 pointer-events-none opacity-20">
-                                 <motion.div 
-                                   animate={{ opacity: [0.2, 0.5, 0.2], scale: [1, 1.2, 1] }}
-                                   transition={{ duration: 3, repeat: Infinity }}
-                                   className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-emerald-500/20"
-                                 />
-                               </div>
-                            </div>
-                            <span className={selectedPresetId === preset.id ? 'text-emerald-700' : 'group-hover:text-emerald-600'}>
-                              {preset.name}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                        <LayoutGrid size={14} /> Animation Style
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: 'none', name: 'Static', icon: <Square size={14} /> },
-                          { id: 'pop', name: 'Pop Up', icon: <Zap size={14} /> },
-                          { id: 'snappy-pop', name: 'Snappy Pop', icon: <Sparkles size={14} /> },
-                          { id: 'fade', name: 'Fade', icon: <Monitor size={14} /> },
-                          { id: 'glow', name: 'Glow', icon: <Sparkles size={14} /> },
-                          { id: 'shake', name: 'Shake', icon: <Activity size={14} /> },
-                          { id: 'bounce', name: 'Bounce', icon: <ArrowUp size={14} /> },
-                          { id: 'slide', name: 'Slide', icon: <ArrowRight size={14} /> },
-                          { id: 'zoom', name: 'Zoom', icon: <Maximize size={14} /> },
-                          { id: 'glitch', name: 'Glitch', icon: <Terminal size={14} /> },
-                          { id: 'rotate', name: 'Rotate', icon: <RotateCcw size={14} /> },
-                          { id: 'flip', name: 'Flip', icon: <RefreshCw size={14} /> },
-                          { id: 'skate', name: 'Skate', icon: <Wind size={14} /> },
-                          { id: 'heartbeat', name: 'Heartbeat', icon: <Heart size={14} /> },
-                          { id: 'float', name: 'Float', icon: <Cloud size={14} /> }
-                        ].map(anim => (
-                          <button
-                            key={anim.id}
-                            onClick={() => setCaptionAnimation(anim.id)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${captionAnimation === anim.id ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'}`}
-                          >
-                            {anim.icon}
-                            {anim.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4 pt-2">
+                    <div className="space-y-6">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                          <Globe size={14} /> Translate to English
-                        </label>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                            <Sparkles size={20} />
+                          </div>
+                          <h3 className="text-xl font-display font-bold text-zinc-900">Caption Studio</h3>
+                        </div>
                         <button 
-                          onClick={() => setTranslateToEnglish(!translateToEnglish)}
-                          className={`w-10 h-5 rounded-full transition-all relative ${translateToEnglish ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                          onClick={resetCaptionSettings}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold hover:bg-red-100 transition-all"
                         >
-                          <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${translateToEnglish ? 'left-6' : 'left-1'}`} />
+                          <RotateCcw size={12} /> Reset
                         </button>
                       </div>
-                      <p className="text-[10px] text-zinc-400 leading-relaxed">
-                        Convert Hindi audio speech into English captions for global reach.
-                      </p>
-                    </div>
 
-                    <div className="space-y-4">
-                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                        <Type size={14} /> Typography
-                      </label>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span>Font Size</span>
-                            <span>{captionStyle.fontSize}px</span>
-                          </div>
-                          <input 
-                            type="range" min="16" max="120" 
-                            value={captionStyle.fontSize} 
-                            onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
-                            className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span>Words Per Line</span>
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={() => setCaptionStyle({...captionStyle, wordsPerLine: 1})}
-                                className={`px-2 py-0.5 rounded text-[8px] font-bold transition-all ${captionStyle.wordsPerLine === 1 ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500'}`}
-                              >
-                                1 Word
-                              </button>
-                              <button 
-                                onClick={() => setCaptionStyle({...captionStyle, wordsPerLine: 2})}
-                                className={`px-2 py-0.5 rounded text-[8px] font-bold transition-all ${captionStyle.wordsPerLine === 2 ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500'}`}
-                              >
-                                2 Words
-                              </button>
-                              <span className="ml-2 font-mono">{captionStyle.wordsPerLine}</span>
+                      <div className="space-y-3">
+                        {/* Presets Folder */}
+                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm" open>
+                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center">
+                                <Sparkles size={16} />
+                              </div>
+                              <span className="text-sm font-bold text-zinc-900">Style Presets</span>
+                            </div>
+                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                          </summary>
+                          <div className="p-4 pt-0">
+                            <div className="grid grid-cols-2 gap-2">
+                              {CAPTION_PRESETS.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  onClick={() => {
+                                    if (isSettingsLocked) {
+                                      setCaptionAnimation(preset.animation);
+                                      setCaptionStyle({
+                                        ...captionStyle,
+                                        isSmart: preset.style.isSmart,
+                                        isDynamic: preset.style.isDynamic,
+                                        threeColors: preset.style.threeColors,
+                                        position: preset.style.position,
+                                        case: preset.style.case,
+                                        wordsPerLine: preset.style.wordsPerLine
+                                      });
+                                    } else {
+                                      setCaptionStyle(preset.style);
+                                      setCaptionAnimation(preset.animation);
+                                    }
+                                    setSelectedPresetId(preset.id);
+                                  }}
+                                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl text-xs font-bold transition-all border ${
+                                    selectedPresetId === preset.id 
+                                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700 ring-2 ring-emerald-500/20' 
+                                      : 'bg-white border-zinc-100 text-zinc-600 hover:border-emerald-200 hover:bg-emerald-50/30'
+                                  } group`}
+                                >
+                                  <div className="w-full aspect-video bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-lg flex items-center justify-center overflow-hidden relative group-hover:from-emerald-900 group-hover:to-zinc-900 transition-all duration-500">
+                                     <motion.div 
+                                       animate={{ 
+                                         scale: [1, 1.1, 1],
+                                         rotate: preset.animation === 'rotate' ? [0, 5, -5, 0] : 0,
+                                         y: preset.animation === 'bounce' ? [0, -5, 0] : 0,
+                                         x: preset.animation === 'shake' ? [0, -3, 3, -3, 3, 0] : 0,
+                                         opacity: preset.animation === 'fade' ? [0.5, 1, 0.5] : 1
+                                       }}
+                                       transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                       className="font-bold text-[10px] text-center px-2 py-1 rounded shadow-lg"
+                                       style={{
+                                         color: preset.style.color,
+                                         fontFamily: preset.style.font,
+                                         textTransform: preset.style.case === 'uppercase' ? 'uppercase' : preset.style.case === 'lowercase' ? 'lowercase' : 'none',
+                                         backgroundColor: preset.style.backgroundColor !== 'transparent' ? preset.style.backgroundColor : 'transparent',
+                                         textShadow: preset.style.shadow 
+                                           ? `${preset.style.shadowColor} 1px 1px 2px` 
+                                           : preset.style.glow 
+                                             ? `0 0 5px ${preset.style.color}` 
+                                             : 'none',
+                                         WebkitTextStroke: preset.style.border !== 'none' ? `${(preset.style.strokeWidth || 1) / 2}px ${preset.style.outlineColor}` : 'none',
+                                         paintOrder: 'stroke fill',
+                                         ['WebkitPaintOrder' as any]: 'stroke fill',
+                                         fontStyle: preset.style.italic ? 'italic' : 'normal',
+                                       }}
+                                     >
+                                       {preset.name}
+                                     </motion.div>
+                                  </div>
+                                  <span className={selectedPresetId === preset.id ? 'text-emerald-700' : 'group-hover:text-emerald-600'}>
+                                    {preset.name}
+                                  </span>
+                                </button>
+                              ))}
                             </div>
                           </div>
-                          <input 
-                            type="range" min="1" max="10" 
-                            value={captionStyle.wordsPerLine} 
-                            onChange={(e) => setCaptionStyle({...captionStyle, wordsPerLine: parseInt(e.target.value)})}
-                            className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
-                          />
-                        </div>
+                        </details>
 
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span>Letter Spacing</span>
-                            <span>{captionStyle.letterSpacing || 'normal'}</span>
-                          </div>
-                          <select 
-                            value={captionStyle.letterSpacing || 'normal'} 
-                            onChange={(e) => setCaptionStyle({...captionStyle, letterSpacing: e.target.value})}
-                            className="w-full bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                          >
-                            <option value="normal">Normal</option>
-                            <option value="0.02em">Tight</option>
-                            <option value="0.05em">Wide</option>
-                            <option value="0.1em">Extra Wide</option>
-                            <option value="0.2em">Ultra Wide</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-3">
-                          <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Color Palette</span>
-                          <div className="grid grid-cols-8 gap-1.5">
-                            {[
-                              '#ffff00', '#ffffff', '#00ff00', '#00ffff', '#ff00ff', '#ff0000', '#0000ff', '#000000',
-                              '#fef08a', '#f8fafc', '#bbf7d0', '#bae6fd', '#f5d0fe', '#fecaca', '#bfdbfe', '#18181b',
-                              '#facc15', '#e2e8f0', '#4ade80', '#38bdf8', '#e879f9', '#f87171', '#60a5fa', '#3f3f46',
-                              '#eab308', '#94a3b8', '#22c55e', '#0ea5e9', '#d946ef', '#ef4444', '#3b82f6', '#71717a',
-                              '#ca8a04', '#64748b', '#16a34a', '#0284c7', '#c026d3', '#dc2626', '#2563eb', '#a1a1aa',
-                              '#a16207', '#475569', '#15803d', '#0369a1', '#a21caf', '#b91c1c', '#1d4ed8', '#d4d4d8'
-                            ].map(color => (
-                              <button
-                                key={color}
-                                onClick={() => setCaptionStyle({...captionStyle, color})}
-                                className={`w-full aspect-square rounded-md border transition-all ${
-                                  captionStyle.color === color ? 'border-emerald-500 ring-2 ring-emerald-500/20 scale-110 z-10' : 'border-zinc-200 hover:scale-105'
-                                }`}
-                                style={{ backgroundColor: color }}
+                        {/* Typography Folder */}
+                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
+                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                                <Type size={16} />
+                              </div>
+                              <span className="text-sm font-bold text-zinc-900">Typography & Layout</span>
+                            </div>
+                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                          </summary>
+                          <div className="p-4 pt-0 space-y-4">
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-[10px] text-zinc-500">
+                                <span className="font-bold uppercase tracking-wider">Font Size</span>
+                                <span className="font-mono text-emerald-600 font-bold">{captionStyle.fontSize}px</span>
+                              </div>
+                              <input 
+                                type="range" min="16" max="120" 
+                                value={captionStyle.fontSize} 
+                                onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
+                                className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
                               />
-                            ))}
-                          </div>
-                        </div>
+                            </div>
 
-                        <div className="space-y-4 pt-4 border-t border-zinc-100">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-2">
-                              <Sparkles size={12} className="text-emerald-500" /> Dynamic 3-Color Mode
-                            </span>
-                            <button 
-                              onClick={() => setCaptionStyle({...captionStyle, isDynamic: !captionStyle.isDynamic})}
-                              className={`w-10 h-5 rounded-full transition-all relative ${captionStyle.isDynamic ? 'bg-emerald-500' : 'bg-zinc-200'}`}
-                            >
-                              <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${captionStyle.isDynamic ? 'left-6' : 'left-1'}`} />
-                            </button>
-                          </div>
-                          
-                          {captionStyle.isDynamic && (
-                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                              <p className="text-[10px] text-zinc-400">Cycle through 3 colors every 5 words. Click to change.</p>
-                              <div className="flex gap-4">
-                                {[0, 1, 2].map(idx => (
-                                  <div key={`dynamic-color-input-${idx}`} className="flex-1 space-y-1.5">
-                                    <span className="text-[8px] text-zinc-400 font-bold uppercase">Color {idx + 1}</span>
-                                    <div className="relative">
-                                      <input 
-                                        type="color"
-                                        value={(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx]}
-                                        onChange={(e) => {
-                                          const newColors = [...(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
-                                          newColors[idx] = e.target.value;
-                                          setCaptionStyle({...captionStyle, threeColors: newColors});
-                                        }}
-                                        className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
-                                      />
-                                      <div 
-                                        className="w-full h-8 rounded-lg border border-zinc-200 shadow-sm"
-                                        style={{ backgroundColor: (captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx] }}
-                                      />
-                                    </div>
-                                  </div>
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-[10px] text-zinc-500">
+                                <span className="font-bold uppercase tracking-wider">Words Per Line</span>
+                                <span className="font-mono text-emerald-600 font-bold">{captionStyle.wordsPerLine}</span>
+                              </div>
+                              <input 
+                                type="range" min="1" max="10" 
+                                value={captionStyle.wordsPerLine} 
+                                onChange={(e) => setCaptionStyle({...captionStyle, wordsPerLine: parseInt(e.target.value)})}
+                                className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Position</span>
+                              <div className="flex gap-1 p-1 bg-white rounded-xl border border-zinc-100">
+                                {(['top', 'middle', 'bottom'] as const).map(pos => (
+                                  <button
+                                    key={pos}
+                                    onClick={() => setCaptionStyle({...captionStyle, position: pos})}
+                                    className={`flex-1 py-2 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.position === pos ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                  >
+                                    {pos}
+                                  </button>
                                 ))}
                               </div>
                             </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-zinc-500 uppercase font-bold">Text Color</span>
-                            <div className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100">
-                              <input 
-                                type="color" 
-                                value={captionStyle.color}
-                                onChange={(e) => setCaptionStyle({...captionStyle, color: e.target.value})}
-                                className="w-8 h-8 rounded-lg cursor-pointer border-none bg-transparent"
-                              />
-                              <span className="text-[10px] font-mono uppercase text-zinc-500">{captionStyle.color}</span>
-                            </div>
                           </div>
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-zinc-500 uppercase font-bold">Stroke Color</span>
-                            <div className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100">
-                              <input 
-                                type="color" 
-                                value={captionStyle.outlineColor || '#000000'}
-                                onChange={(e) => setCaptionStyle({...captionStyle, outlineColor: e.target.value})}
-                                className="w-8 h-8 rounded-lg cursor-pointer border-none bg-transparent"
-                              />
-                              <span className="text-[10px] font-mono uppercase text-zinc-500">{captionStyle.outlineColor || '#000000'}</span>
-                            </div>
-                          </div>
-                        </div>
+                        </details>
 
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-zinc-500 uppercase font-bold">Shadow Color</span>
-                            <div className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100">
-                              <input 
-                                type="color" 
-                                value={captionStyle.shadowColor?.startsWith('#') ? captionStyle.shadowColor : '#000000'}
-                                onChange={(e) => setCaptionStyle({...captionStyle, shadowColor: e.target.value})}
-                                className="w-8 h-8 rounded-lg cursor-pointer border-none bg-transparent"
-                              />
-                              <input 
-                                type="text"
-                                value={captionStyle.shadowColor || ''}
-                                onChange={(e) => setCaptionStyle({...captionStyle, shadowColor: e.target.value})}
-                                className="flex-1 bg-transparent text-[10px] font-mono uppercase text-zinc-500 focus:outline-none"
-                                placeholder="HEX or RGBA"
-                              />
+                        {/* Animation Folder */}
+                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
+                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
+                                <Activity size={16} />
+                              </div>
+                              <span className="text-sm font-bold text-zinc-900">Animations</span>
                             </div>
-                          </div>
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-zinc-500 uppercase font-bold">Stroke Width</span>
-                            <div className="flex items-center gap-2 bg-zinc-50 p-2 rounded-xl border border-zinc-100">
-                              <input 
-                                type="range" min="0" max="10" step="0.5"
-                                value={captionStyle.strokeWidth || 0}
-                                onChange={(e) => setCaptionStyle({...captionStyle, strokeWidth: parseFloat(e.target.value)})}
-                                className="w-full accent-emerald-500 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
-                              />
-                              <span className="text-[10px] font-mono text-zinc-500">{captionStyle.strokeWidth || 0}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                          <button
-                            onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
-                            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                              captionStyle.glow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
-                            }`}
-                          >
-                            <Sparkles size={14} />
-                            Glow
-                          </button>
-                          <button
-                            onClick={() => setCaptionStyle({...captionStyle, shadow: !captionStyle.shadow})}
-                            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                              captionStyle.shadow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
-                            }`}
-                          >
-                            <Monitor size={14} />
-                            Shadow
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Position</span>
-                          <div className="flex gap-1 p-1 bg-zinc-50 rounded-xl border border-zinc-100">
-                            {(['top', 'middle', 'bottom'] as const).map(pos => (
-                              <button
-                                key={pos}
-                                onClick={() => setCaptionStyle({...captionStyle, position: pos})}
-                                className={`flex-1 py-2 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.position === pos ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                          </summary>
+                          <div className="p-4 pt-0 grid grid-cols-1 gap-1.5">
+                            {['pop', 'professional', 'snappy', 'snappy-pop', 'shake', 'bounce', 'slide', 'zoom', 'glitch', 'rotate', 'flip', 'skate', 'heartbeat', 'float', 'fade', 'glow', 'karaoke', 'zeemo', 'kinetic', 'typewriter'].map(anim => (
+                              <button 
+                                key={anim}
+                                onClick={() => setCaptionAnimation(anim)}
+                                className={`px-4 py-2.5 rounded-xl border text-[11px] font-bold transition-all text-left flex items-center justify-between capitalize ${captionAnimation === anim ? 'bg-zinc-900 border-zinc-900 text-white shadow-lg' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}
                               >
-                                {pos}
+                                {anim.replace('-', ' ')}
+                                {captionAnimation === anim && <Check size={12} />}
                               </button>
                             ))}
                           </div>
-                        </div>
+                        </details>
 
-                        <div className="space-y-2">
-                          <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Case Style</span>
-                          <div className="flex gap-1 p-1 bg-zinc-50 rounded-xl border border-zinc-100">
-                            {(['original', 'uppercase', 'lowercase'] as const).map(c => (
+                        {/* Effects Folder */}
+                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
+                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center">
+                                <Palette size={16} />
+                              </div>
+                              <span className="text-sm font-bold text-zinc-900">Colors & Effects</span>
+                            </div>
+                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                          </summary>
+                          <div className="p-4 pt-0 space-y-4">
+                            <div className="space-y-4 pt-4 border-t border-zinc-100">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-2">
+                                  <Sparkles size={12} className="text-emerald-500" /> Alternating Colors
+                                </span>
+                                <button 
+                                  onClick={() => setCaptionStyle({...captionStyle, isDynamic: !captionStyle.isDynamic})}
+                                  className={`w-10 h-5 rounded-full transition-all relative ${captionStyle.isDynamic ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                                >
+                                  <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${captionStyle.isDynamic ? 'left-6' : 'left-1'}`} />
+                                </button>
+                              </div>
+                              
+                              {captionStyle.isDynamic && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                  <p className="text-[10px] text-zinc-400">Alternates colors every word for a professional viral look.</p>
+                                  <div className="flex gap-4">
+                                    {[0, 1].map(idx => (
+                                      <div key={`dynamic-color-input-${idx}`} className="flex-1 space-y-1.5">
+                                        <span className="text-[8px] text-zinc-400 font-bold uppercase">Color {idx + 1}</span>
+                                        <div className="relative">
+                                          <input 
+                                            type="color"
+                                            value={(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx]}
+                                            onChange={(e) => {
+                                              const newColors = [...(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
+                                              newColors[idx] = e.target.value;
+                                              setCaptionStyle({...captionStyle, threeColors: newColors});
+                                            }}
+                                            className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
+                                          />
+                                          <div 
+                                            className="w-full h-8 rounded-lg border border-zinc-200 shadow-sm"
+                                            style={{ backgroundColor: (captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx] }}
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-2">
                               <button
-                                key={c}
-                                onClick={() => setCaptionStyle({...captionStyle, case: c})}
-                                className={`flex-1 py-2 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.case === c ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
+                                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                  captionStyle.glow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
+                                }`}
                               >
-                                {c === 'original' ? 'Aa' : c === 'uppercase' ? 'AA' : 'aa'}
+                                <Sparkles size={14} /> Glow
                               </button>
-                            ))}
+                              <button
+                                onClick={() => setCaptionStyle({...captionStyle, shadow: !captionStyle.shadow})}
+                                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                  captionStyle.shadow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
+                                }`}
+                              >
+                                <Monitor size={14} /> Shadow
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        </details>
 
-                        <div className="space-y-2 pt-2 border-t border-zinc-100">
-                          <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span className="font-bold uppercase tracking-wider flex items-center gap-1">
-                              <Clock size={12} /> Fix Caption Lag
-                            </span>
-                            <span className="font-mono text-emerald-600 font-bold">{(captionOffset / 1000).toFixed(1)}s</span>
+                        {/* Timing Folder */}
+                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
+                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                                <Clock size={16} />
+                              </div>
+                              <span className="text-sm font-bold text-zinc-900">Timing & Sync</span>
+                            </div>
+                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                          </summary>
+                          <div className="p-4 pt-0 space-y-4">
+                            <div className="space-y-3">
+                              <div className="flex justify-between text-[10px] text-zinc-500">
+                                <span className="font-bold uppercase tracking-wider">Caption Offset</span>
+                                <span className="font-mono text-emerald-600 font-bold">{captionOffset}ms</span>
+                              </div>
+                              <input 
+                                type="range" min="-2000" max="2000" step="50"
+                                value={captionOffset} 
+                                onChange={(e) => setCaptionOffset(parseInt(e.target.value))}
+                                className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
+                              />
+                              <p className="text-[9px] text-zinc-400 leading-relaxed">
+                                Adjust if captions are appearing too early or too late. Positive values delay captions, negative values make them appear earlier.
+                              </p>
+                            </div>
                           </div>
-                          <input 
-                            type="range" min="0" max="1500" step="100"
-                            value={captionOffset} 
-                            onChange={(e) => setCaptionOffset(parseInt(e.target.value))}
-                            className="w-full accent-emerald-500 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <div className="flex justify-between text-[8px] text-zinc-400 px-1">
-                            <span>No Fix</span>
-                            <span>1.5s Earlier</span>
-                          </div>
-                          <p className="text-[9px] text-zinc-400 italic text-center mt-1">Pull captions backwards to match audio</p>
-                        </div>
+                        </details>
                       </div>
                     </div>
 
