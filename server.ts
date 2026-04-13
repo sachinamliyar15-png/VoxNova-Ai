@@ -1537,22 +1537,23 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ? (scriptType === 'hinglish' ? "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto'." : "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.")
         : "";
 
-      const prompt = `Transcribe the following video/audio at a word-level with EXTREMELY PRECISE timestamps. 
+      const prompt = `Transcribe the ENTIRE video/audio from start to finish. DO NOT skip any parts, even if the video is long.
       The content is primarily in ${language}.
       ${scriptInstruction}
       ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions. The output 'word' field must be in English." : ""}
       
       Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
-      Example: [{"word": "hello", "start": 0.52, "end": 0.88}, ...]
+      Example: [{"word": "hello", "start": 0.520, "end": 0.880}, ...]
       
-      CRITICAL FOR SYNC: 
-      1. The timestamps MUST be perfectly aligned with the audio. 
-      2. Use exactly 3 decimal places for maximum precision.
-      3. If a word is spoken quickly, ensure the start and end times reflect that.
-      4. DO NOT skip any words.
+      CRITICAL FOR COMPLETENESS & SYNC: 
+      1. Transcribe EVERY SINGLE WORD spoken in the video. Do not summarize or skip any sentences.
+      2. The timestamps MUST be perfectly aligned with the audio. 
+      3. Use exactly 3 decimal places for maximum precision (e.g., 1.234).
+      4. If a word is spoken quickly, ensure the start and end times reflect that.
       5. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the speaker finishes that word.
       6. COMPENSATE FOR ANY AI LATENCY: The timestamps must be absolute relative to the start of the file.
-      7. Only return the JSON array, no other text.`;
+      7. If there are long silences, continue transcribing as soon as speech resumes.
+      8. Only return the JSON array, no other text.`;
 
       const mimeType = videoData.startsWith('data:') 
         ? videoData.split(';')[0].split(':')[1] 

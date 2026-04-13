@@ -418,8 +418,8 @@ const CaptionOverlay = ({
   animation: string,
   shadowColor: string
 }) => {
-  // Add a small offset (e.g., 1.0s) to compensate for processing lag and make captions feel snappier
-  const adjustedTime = currentTime + 1.0;
+  // Use the currentTime directly as it already includes the user-defined captionOffset from the parent
+  const adjustedTime = currentTime;
   
   const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine, style.isSmart), [words, style.wordsPerLine, style.isSmart]);
   const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
