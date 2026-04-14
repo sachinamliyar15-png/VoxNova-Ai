@@ -68,6 +68,7 @@ import {
   AlignLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { GoogleGenAI, Modality } from "@google/genai";
 import { 
   VOICES, 
   Voice, 
@@ -1292,6 +1293,38 @@ const PricingModal = ({ onClose, onSelect }: { onClose: () => void, onSelect: (p
 const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
 const isWhitelisted = (email: string | null | undefined) => email ? WHITELISTED_EMAILS.includes(email) : false;
 
+const INTERNAL_VOICE_MAPPING: Record<string, string> = {
+  'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
+  'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
+  'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Fenrir', 'Marcus': 'Charon',
+  'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
+  'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
+  'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
+  'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr', 'Pankaj': 'Fenrir', 'Original Voice': 'Zephyr',
+  'adam': 'Puck', 'brian': 'Charon', 'daniel': 'Fenrir', 'josh': 'Puck',
+  'liam': 'Charon', 'michael': 'Fenrir', 'ryan': 'Puck', 'matthew': 'Charon',
+  'bill': 'Fenrir', 'callum': 'Puck', 'frank': 'Fenrir', 'marcus': 'Charon',
+  'jessica': 'Kore', 'sarah': 'Zephyr', 'matilda': 'Kore', 'emily': 'Zephyr',
+  'bella': 'Kore', 'rachel': 'Zephyr', 'nicole': 'Kore', 'clara': 'Zephyr',
+  'doc-pro': 'Charon', 'atlas-do': 'Fenrir', 'priyanka': 'Zephyr', 'virat-male': 'Charon',
+  'leo': 'Puck', 'sophia': 'Kore', 'hugo': 'Charon', 'elara': 'Zephyr', 'pankaj': 'Fenrir', 'original': 'Zephyr',
+  'sultan': 'Fenrir', 'vikram': 'Charon', 'bharat': 'Fenrir', 'titan': 'Puck',
+  'shera': 'Fenrir', 'kaal': 'Charon', 'bheem': 'Fenrir', 'sikandar': 'Charon',
+  'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon', 'VIKRAM': 'Charon',
+  'munna-bhai': 'Fenrir', 'sachinboy': 'Fenrir', 'Munna Bhai': 'Fenrir', 'Sachinboy': 'Fenrir',
+  'maharaja': 'Fenrir', 'MAHARAJA': 'Fenrir', 'emperor-pro': 'Fenrir', 'EMPEROR PRO': 'Fenrir',
+  'kabir': 'Charon', 'KABIR': 'Charon', 'aryan': 'Puck', 'ARYAN': 'Puck',
+  'ishani': 'Kore', 'ISHANI': 'Kore', 'zoravar': 'Fenrir', 'ZORAVAR': 'Fenrir',
+  'rudra': 'Fenrir', 'RUDRA': 'Fenrir',
+  'veer': 'Fenrir', 'VEER': 'Fenrir', 'shakti': 'Zephyr', 'SHAKTI': 'Zephyr',
+  'raja': 'Charon', 'RAJA': 'Charon', 'toofan': 'Puck', 'TOOFAN': 'Puck',
+  'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir',
+  'arav-neutral-pro': 'Charon', 'ARAV_NEUTRAL_PRO': 'Charon',
+  'dev-deep-real': 'Fenrir', 'DEV_DEEP_REAL': 'Fenrir',
+  'neel-soft-connect': 'Puck', 'NEEL_SOFT_CONNECT': 'Puck',
+  'raj-classic-narrator': 'Charon', 'RAJ_CLASSIC_NARRATOR': 'Charon'
+};
+
 function Sidebar({ 
   activeTab, 
   setActiveTab, 
@@ -1635,6 +1668,16 @@ function App() {
     }
   };
 
+  const handleResetSettings = () => {
+    setSpeed(1.0);
+    setPitch(1.0);
+    setPause(0.2);
+    setAudioFormat('mp3');
+    setTargetSampleRate(48000);
+    setStyle('normal');
+    setStudioClarity(false);
+  };
+
   useEffect(() => {
     // Safety timeout for auth loading
     const safetyTimer = setTimeout(() => {
@@ -1951,7 +1994,11 @@ function App() {
       const response = await fetch('/api/preview-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice_id: voice.id, voice_name: voice.name })
+        body: JSON.stringify({ 
+          voice_id: voice.id, 
+          voice_name: voice.name,
+          language: language 
+        })
       });
 
       if (!response.ok) {
@@ -1981,19 +2028,26 @@ function App() {
 
   const loadFFmpeg = async () => {
     if (ffmpegRef.current) return;
-    const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-    const { toBlobURL } = await import('@ffmpeg/util');
-    const ffmpeg = new FFmpeg();
-    
-    // Load ffmpeg.wasm from CDN for better performance and reliability
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-    
-    ffmpegRef.current = ffmpeg;
-    setIsFFmpegLoaded(true);
+    try {
+      console.log("Loading FFmpeg...");
+      const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+      const { toBlobURL } = await import('@ffmpeg/util');
+      const ffmpeg = new FFmpeg();
+      
+      // Load ffmpeg.wasm from CDN for better performance and reliability
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      });
+      
+      ffmpegRef.current = ffmpeg;
+      setIsFFmpegLoaded(true);
+      console.log("FFmpeg loaded successfully");
+    } catch (error) {
+      console.error("Failed to load FFmpeg:", error);
+      setError("Failed to load video engine. Please refresh and try again.");
+    }
   };
 
   useEffect(() => {
@@ -2102,8 +2156,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   };
 
   const burnCaptions = async (videoFile: File, words: CaptionWord[], style: CaptionStyle) => {
-    if (!ffmpegRef.current) await loadFFmpeg();
+    console.log("Starting burnCaptions...");
+    if (!ffmpegRef.current) {
+      console.log("FFmpeg not loaded, loading now...");
+      await loadFFmpeg();
+    }
     const ffmpeg = ffmpegRef.current;
+    if (!ffmpeg) throw new Error("Video engine failed to initialize");
     
     const { fetchFile } = await import('@ffmpeg/util');
     const inputName = 'input.mp4';
@@ -2112,10 +2171,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const fontName = 'Inter-Bold.ttf';
     
     setCaptionStep('Loading video engine...');
+    console.log("Writing input file...");
     await ffmpeg.writeFile(inputName, await fetchFile(videoFile));
     
     setCaptionStep('Loading professional font...');
     try {
+      console.log("Fetching font...");
       // Load Inter-Bold for high quality captions
       const fontData = await fetchFile('https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter-Bold.ttf');
       await ffmpeg.writeFile(fontName, fontData);
@@ -2135,7 +2196,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     try {
       await ffmpeg.deleteFile(outputName);
     } catch (e) {}
-
+ 
+    console.log("Executing FFmpeg command...");
     // Run ffmpeg command to burn subtitles
     // We use libx264 and ensure the font path is handled
     try {
@@ -2167,9 +2229,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     // Small delay to ensure file system is synced
     await new Promise(resolve => setTimeout(resolve, 500));
     
+    console.log("Reading output file...");
     const data = await ffmpeg.readFile(outputName);
     if (!data || data.length === 0) throw new Error("Generated video is empty");
     
+    console.log("Burn captions complete");
     return new Blob([data], { type: 'video/mp4' });
   };
 
@@ -2207,53 +2271,126 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     setVoiceChangingStep('Preparing file...');
 
     try {
-      const fileData = await fileToBase64(voiceChangingFile);
+      const base64Data = await fileToBase64(voiceChangingFile);
+      const mimeType = voiceChangingFile.type;
+      
       setVoiceChangingProgress(20);
-      setVoiceChangingStep('Uploading to AI engine...');
+      setVoiceChangingStep('Transcribing audio...');
 
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch('/api/voice-changer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          fileData,
-          voice_id: selectedVoice.id,
-          mode: 'convert'
-        })
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      
+      // Step 1: Transcribe
+      const transcribePrompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
+
+      const transcribeResult = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          { parts: [{ text: transcribePrompt }, { inlineData: { data: base64Data.split(',')[1], mimeType } }] }
+        ]
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to change voice');
+      const transcribedText = transcribeResult.text?.trim();
+      if (!transcribedText) {
+        throw new Error("Could not detect any speech in the uploaded file. Please ensure the audio is clear.");
       }
 
-      setVoiceChangingProgress(60);
-      setVoiceChangingStep('Processing audio...');
+      setVoiceChangingProgress(50);
+      setVoiceChangingStep('Generating target voice...');
 
-      const { audioData } = await response.json();
+      const currentTargetVoice = INTERNAL_VOICE_MAPPING[selectedVoice.name] || INTERNAL_VOICE_MAPPING[selectedVoice.name.toLowerCase()] || 'Puck';
+      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'].includes(selectedVoice.id.toLowerCase());
+
+      const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance. 
       
+      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+      
+      PERFORMANCE GUIDELINES:
+      - Use natural human prosody, complex intonation, and realistic rhythm.
+      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative. Use a slow, deliberate pace with heavy emphasis.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative.'}
+      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
+      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
+      - Avoid any robotic, monotone, or repetitive cadence.
+      - Sound like a real person speaking in a high-end professional studio, not a computer.
+      - 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
+      - Use natural emphasis on key words to convey meaning and emotion.
+      - Ensure smooth transitions between sentences and ideas.
+      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
+      
+      TECHNICAL STANDARDS:
+      - NO background noise, hums, or digital artifacts.
+      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
+      - NO background music, bell-like sounds, or hallucinations in the background.
+      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts.
+      `;
+
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: transcribedText }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          systemInstruction: ttsSystemInstruction,
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
+            }
+          }
+        }
+      });
+
+      const audioBase64 = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!audioBase64) throw new Error("Failed to generate speech in target voice");
+
+      setVoiceChangingProgress(80);
+      setVoiceChangingStep('Finalizing audio...');
+
       if (voiceChangingFile.type.startsWith('video/')) {
         setVoiceChangingStep('Merging with video...');
-        const videoBlob = await mergeAudioWithVideo(voiceChangingFile, audioData);
+        const videoBlob = await mergeAudioWithVideo(voiceChangingFile, audioBase64);
         setVoiceChangingResult({
           url: URL.createObjectURL(videoBlob),
           type: 'video'
         });
       } else {
+        // Convert PCM to WAV for audio-only
+        const pcmBuffer = base64ToArrayBuffer(audioBase64);
+        const wavHeader = createWavHeader(pcmBuffer, 24000);
+        const combinedBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
+        combinedBuffer.set(new Uint8Array(wavHeader), 0);
+        combinedBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+        
+        const finalBlob = new Blob([combinedBuffer], { type: 'audio/wav' });
         setVoiceChangingResult({
-          url: `data:audio/wav;base64,${audioData}`,
+          url: URL.createObjectURL(finalBlob),
           type: 'audio'
         });
+      }
+
+      // Deduct credits and save history in background
+      if (currentUser) {
+        const token = await currentUser.getIdToken();
+        fetch('/api/voice-changer-save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            transcribedText,
+            voice_id: selectedVoice.name,
+            audioData: audioBase64,
+            creditCost: 10
+          })
+        }).then(() => {
+          if (auth.currentUser) fetchUserProfile(auth.currentUser);
+        }).catch(err => console.error("Failed to save voice changer history:", err));
       }
 
       setVoiceChangingProgress(100);
       setVoiceChangingStep('Complete!');
       showToast("Voice changed successfully!");
-      if (auth.currentUser) fetchUserProfile(auth.currentUser);
     } catch (err: any) {
+      console.error("Voice changer error:", err);
       setError(`Voice changer failed: ${err.message}`);
     } finally {
       setIsVoiceChanging(false);
@@ -3919,18 +4056,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </button>
                    </div>
                    <div className="flex items-center gap-2 bg-zinc-100 border border-zinc-200 rounded-xl p-1">
-                      <button 
-                        onClick={() => setLanguage('en')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-all ${language === 'en' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
+                      <select 
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="bg-transparent text-sm px-3 py-1.5 focus:outline-none cursor-pointer text-zinc-600 font-medium"
                       >
-                        English
-                      </button>
-                      <button 
-                        onClick={() => setLanguage('hi')}
-                        className={`px-3 py-1.5 rounded-lg text-sm transition-all ${language === 'hi' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
-                      >
-                        Hindi
-                      </button>
+                        {LANGUAGES.map(lang => (
+                          <option key={lang.code} value={lang.code}>{lang.name}</option>
+                        ))}
+                      </select>
                    </div>
                 </div>
               </div>
@@ -4109,6 +4243,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       <option value="emotional" className="bg-white">Emotional</option>
                       <option value="storytelling" className="bg-white">Storytelling</option>
                       <option value="motivational" className="bg-white">Motivational</option>
+                      <option value="news" className="bg-white">News Broadcast</option>
+                      <option value="conversational" className="bg-white">Conversational</option>
                     </select>
                   </div>
 
@@ -4117,6 +4253,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       <label className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <Settings2 size={14} /> Controls
                       </label>
+                      <button 
+                        onClick={handleResetSettings}
+                        className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 flex items-center gap-1 transition-colors uppercase tracking-wider"
+                      >
+                        <RefreshCw size={10} /> Reset
+                      </button>
                     </div>
                     <div className="space-y-4">
                       <div className="space-y-1">
@@ -4224,9 +4366,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
               <div className="flex flex-col gap-4 pt-6">
                   <button 
+                    onClick={handleResetSettings}
+                    className="w-full py-4 px-6 bg-white border-2 border-zinc-100 text-zinc-500 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-zinc-50 hover:text-zinc-900 transition-all shadow-sm group"
+                  >
+                    <RefreshCw size={20} className="group-hover:rotate-180 transition-transform duration-500" />
+                    <span>Reset</span>
+                  </button>
+
+                  <button 
                     onClick={handleGenerate}
                     disabled={isGenerating || !text || !selectedVoice}
-                    className="w-full py-5 px-6 bg-gradient-to-br from-zinc-800 to-zinc-900 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:from-zinc-700 hover:to-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-zinc-900/40 border border-zinc-700/50"
+                    className="w-full py-5 px-6 bg-zinc-900 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-zinc-900/40"
                   >
                     {isGenerating ? (
                       <div className="flex items-center gap-2">
@@ -4302,10 +4452,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <button 
                       onClick={handleExportCaptions}
                       disabled={isCaptioning}
-                      className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 min-w-[120px] justify-center"
                     >
-                      <Download size={16} />
-                      Export Video
+                      {isCaptioning ? (
+                        <>
+                          <Loader2 className="animate-spin" size={16} />
+                          <span>Exporting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          Export Video
+                        </>
+                      )}
                     </button>
                     <button 
                       onClick={() => {

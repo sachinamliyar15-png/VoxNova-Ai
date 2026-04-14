@@ -55,6 +55,8 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || '',
 });
 
+const WHITELISTED_EMAILS = ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'];
+
 // Initialize Firebase Admin
 let firestore: admin.firestore.Firestore;
 
@@ -668,6 +670,10 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         promptPrefix += `Use a rhythmic, engaging, and warm tone to bring the narrative to life. `;
       } else if (style === 'motivational') {
         promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
+      } else if (style === 'news') {
+        promptPrefix += `Use a professional, clear, and authoritative broadcast-style tone. Fast-paced, objective, and perfectly articulated. `;
+      } else if (style === 'conversational') {
+        promptPrefix += `Use a natural, relaxed, and informal tone. Sounds like a friendly conversation with subtle breaths and realistic rhythm. `;
       }
 
       if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
@@ -916,6 +922,10 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         promptPrefix += `Use a rhythmic, engaging, and warm tone to bring the narrative to life. `;
       } else if (style === 'motivational') {
         promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
+      } else if (style === 'news') {
+        promptPrefix += `Use a professional, clear, and authoritative broadcast-style tone. Fast-paced, objective, and perfectly articulated. `;
+      } else if (style === 'conversational') {
+        promptPrefix += `Use a natural, relaxed, and informal tone. Sounds like a friendly conversation with subtle breaths and realistic rhythm. `;
       }
 
       if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
@@ -1353,14 +1363,15 @@ app.post("/api/preview-voice", async (req: any, res) => {
 
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const hindiPreviews: Record<string, string> = {
+      const languagePreviews: Record<string, string> = {
         'arav-neutral-pro': 'आज हम एक ऐसी चीज़ के बारे में बात करेंगे जो आपकी ज़िंदगी को बेहतर बना सकती है। अगर आप इसे सही तरीके से समझ लें, तो इसका असर लंबे समय तक रहेगा।',
         'dev-deep-real': 'कई बार हम चीज़ों को हल्के में ले लेते हैं। लेकिन सच यह है कि छोटे decisions ही बड़े परिणाम तय करते हैं।',
         'neel-soft-connect': 'देखो, अगर आप थोड़ा सा ध्यान दें, तो ये चीज़ काफी आसान हो सकती है। बस consistency बनाए रखना ज़रूरी है।',
-        'raj-classic-narrator': 'उस दिन जो हुआ, उसने सब कुछ बदल दिया। किसी ने सोचा भी नहीं था कि एक छोटा सा फैसला इतनी बड़ी कहानी बन जाएगा।'
+        'raj-classic-narrator': 'उस दिन जो हुआ, उसने सब कुछ बदल दिया। किसी ने सोचा भी नहीं था कि एक छोटा सा फैसला इतनी बड़ी कहानी बन जाएगा।',
+        'tamil-preview': 'வணக்கம், நான் வோக்ஸ்நோவாவின் தொழில்முறை குரல்களில் ஒருவன். உங்கள் வீடியோக்களுக்கு சிறந்த குரலை வழங்க நான் தயார்.'
       };
 
-      const previewText = hindiPreviews[voice_id] || `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`;
+      const previewText = languagePreviews[voice_id] || (req.body.language === 'ta' ? languagePreviews['tamil-preview'] : `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`);
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
@@ -1436,6 +1447,49 @@ app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
 });
 
 // Save generation to history & Deduct Credits
+app.post("/api/voice-changer-save", authenticate, async (req: any, res) => {
+  const { transcribedText, voice_id, audioData, creditCost } = req.body;
+  const userId = req.user.uid;
+
+  try {
+    if (!firestore) {
+      return res.status(503).json({ error: 'Database service unavailable' });
+    }
+    const userRef = firestore.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    
+    const userEmail = req.user.email;
+    const isWhitelisted = userEmail && WHITELISTED_EMAILS.includes(userEmail);
+
+    if (!userDoc.exists || ((userDoc.data()?.credits || 0) < (creditCost || 0) && !isWhitelisted)) {
+      return res.status(403).json({ error: "Insufficient credits" });
+    }
+
+    // Deduct credits
+    if (!isWhitelisted) {
+      await userRef.update({
+        credits: admin.firestore.FieldValue.increment(-(creditCost || 0))
+      });
+    }
+
+    // Save to History
+    const historyRef = firestore.collection('voice_history');
+    await historyRef.add({
+      userId,
+      text: transcribedText,
+      voice_name: voice_id,
+      audio_data: audioData,
+      mode: 'convert',
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Failed to save voice changer history:", error);
+    res.status(500).json({ error: "Failed to save history" });
+  }
+});
+
 app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
   const { text, voice, style, speed, pitch, audioData, creditCost, type, words } = req.body;
   const userId = req.user.uid;
@@ -1450,24 +1504,29 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
     }
     const userRef = firestore.collection('users').doc(userId);
     const userDoc = await userRef.get();
+    const userData = userDoc.data();
+    const userEmail = req.user.email;
+    const isWhitelisted = userEmail && WHITELISTED_EMAILS.includes(userEmail);
     
-    if (!userDoc.exists || (userDoc.data()?.credits || 0) < (creditCost || 0)) {
+    if (!userDoc.exists || ((userData?.credits || 0) < (creditCost || 0) && !isWhitelisted)) {
       return res.status(403).json({ error: "Insufficient credits" });
     }
 
-    // Deduct credits
+    // Deduct credits if not whitelisted
     const isPremiumVoice = voice && ['Bella', 'Documentary Pro', 'Pankaj', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA'].includes(voice);
-    const isFreePlan = !userDoc.data()?.plan || userDoc.data()?.plan === 'free';
+    const isFreePlan = !userData?.plan || userData?.plan === 'free';
     
-    const updateData: any = {
-      credits: admin.firestore.FieldValue.increment(-(creditCost || 0))
-    };
-
-    if (isPremiumVoice && isFreePlan) {
-      updateData.premium_usage_count = admin.firestore.FieldValue.increment(1);
+    const updateData: any = {};
+    if (!isWhitelisted) {
+      updateData.credits = admin.firestore.FieldValue.increment(-(creditCost || 0));
+      if (isPremiumVoice && isFreePlan) {
+        updateData.premium_usage_count = admin.firestore.FieldValue.increment(1);
+      }
     }
 
-    await userRef.update(updateData);
+    if (Object.keys(updateData).length > 0) {
+      await userRef.update(updateData);
+    }
     
       // Save to Firestore (History)
       const audioToSave = audioData && audioData.length > 1000000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData;
@@ -1569,8 +1628,9 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       4. If a word is spoken quickly, ensure the start and end times reflect that.
       5. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the speaker finishes that word.
       6. COMPENSATE FOR ANY AI LATENCY: The timestamps must be absolute relative to the start of the file.
-      7. If there are long silences, continue transcribing as soon as speech resumes.
-      8. Only return the JSON array, no other text.`;
+      7. FOR HINDI/NON-ENGLISH LANGUAGES: Pay extra attention to the exact start of each word. If you detect a lag, adjust the start times slightly earlier (e.g., -0.1s to -0.2s) to ensure perfect visual sync.
+      8. If there are long silences, continue transcribing as soon as speech resumes.
+      9. Only return the JSON array, no other text.`;
 
       const mimeType = videoData.startsWith('data:') 
         ? videoData.split(';')[0].split(':')[1] 

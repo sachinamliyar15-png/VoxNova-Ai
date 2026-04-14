@@ -154,6 +154,7 @@ export const VOICES: Voice[] = [
 ];
 
 export const LANGUAGES = [
+  { code: 'all', name: 'All Languages' },
   { code: 'en', name: 'English' },
   { code: 'hi', name: 'Hindi' },
   { code: 'bn', name: 'Bengali' },
