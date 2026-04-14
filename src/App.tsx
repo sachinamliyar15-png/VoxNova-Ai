@@ -410,13 +410,15 @@ const CaptionOverlay = ({
   currentTime, 
   style, 
   animation,
-  shadowColor
+  shadowColor,
+  onUpdateStyle
 }: { 
   words: CaptionWord[], 
   currentTime: number, 
   style: CaptionStyle, 
   animation: string,
-  shadowColor: string
+  shadowColor: string,
+  onUpdateStyle?: (style: Partial<CaptionStyle>) => void
 }) => {
   // Use the currentTime directly as it already includes the user-defined captionOffset from the parent
   const adjustedTime = currentTime;
@@ -699,8 +701,17 @@ const CaptionOverlay = ({
   const currentWordPosition = currentWord.position || style.position;
   const positionClass = getPositionClass(currentWordPosition);
 
-  // For typewriter, we show words one by one as they are spoken
-  if (animation === 'typewriter' || animation === 'typing') {
+  // Handle Dragging
+  const handleDragEnd = (_: any, info: any) => {
+    if (onUpdateStyle) {
+      onUpdateStyle({
+        x: (style.x || 0) + info.offset.x,
+        y: (style.y || 0) + info.offset.y
+      });
+    }
+  };
+
+  const renderContent = () => {
     const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
     if (!currentLine) return null;
 
@@ -708,8 +719,9 @@ const CaptionOverlay = ({
     const visibleWords = lineWords.filter(w => currentTime >= w.start);
     const linePosition = lineWords[0]?.position || style.position;
 
-    return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(linePosition)}`}>
+    // Typewriter style
+    if (animation === 'typewriter') {
+      return (
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {visibleWords.map((w, i) => (
             <motion.span 
@@ -723,139 +735,126 @@ const CaptionOverlay = ({
             </motion.span>
           ))}
         </div>
-      </div>
-    );
-  }
+      );
+    }
+    if (animation === 'karaoke') {
+      const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+      if (!currentLine) return null;
 
-  // For karaoke, we need to render all words in the current line and highlight the active one
-  if (animation === 'karaoke') {
-    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
-    if (!currentLine) return null;
-
-    // Find the original words that belong to this line
-    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
-    const linePosition = lineWords[0]?.position || style.position;
-    
-    return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(linePosition)}`}>
+      // Find the original words that belong to this line
+      const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
+      
+      return (
         <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
           {lineWords.map((w, i) => {
-            const isActive = currentTime >= w.start && currentTime <= w.end;
-            return (
-              <span 
-                key={`karaoke-${w.word}-${w.start}-${i}`} 
-                className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
-                style={{
-                  ...getWordStyle(w, i),
-                  color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.5)',
-                  textShadow: isActive ? (style.shadow ? `${shadowColor} 2px 2px 4px` : 'none') : 'none',
-                }}
-              >
-                {w.word}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
+              const isActive = currentTime >= w.start && currentTime <= w.end;
+              return (
+                <span 
+                  key={`karaoke-${w.word}-${w.start}-${i}`} 
+                  className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
+                  style={{
+                    ...getWordStyle(w, i),
+                    color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.5)',
+                    textShadow: isActive ? (style.shadow ? `${shadowColor} 2px 2px 4px` : 'none') : 'none',
+                  }}
+                >
+                  {w.word}
+                </span>
+              );
+            })}
+          </div>
+      );
+    }
 
-  // Zeemo Pro Style
-  if (animation === 'zeemo') {
-    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
-    if (!currentLine) return null;
+    // Zeemo Pro Style
+    if (animation === 'zeemo') {
+      const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+      if (!currentLine) return null;
 
-    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
-    const linePosition = lineWords[0]?.position || style.position;
+      const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
 
-    return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(linePosition)}`}>
+      return (
         <div className="flex flex-wrap justify-center gap-x-4 px-4">
           {lineWords.map((w, i) => {
-            const isActive = currentTime >= w.start && currentTime <= w.end;
-            return (
-              <motion.span
-                key={`zeemo-${w.word}-${w.start}-${i}`}
-                initial={{ scale: 1, y: 0 }}
-                animate={{ 
-                  scale: isActive ? 1.2 : 1,
-                  y: isActive ? -5 : 0,
-                  color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF'
-                }}
-                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                style={{
-                  ...getWordStyle(w, i),
-                  WebkitTextStroke: '2px #000000',
-                  paintOrder: 'stroke fill',
-                  ['WebkitPaintOrder' as any]: 'stroke fill',
-                  textShadow: '3px 3px 0px rgba(0,0,0,0.8)',
-                  color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF',
-                }}
-              >
-                {w.word}
-              </motion.span>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
+              const isActive = currentTime >= w.start && currentTime <= w.end;
+              return (
+                <motion.span
+                  key={`zeemo-${w.word}-${w.start}-${i}`}
+                  initial={{ scale: 1, y: 0 }}
+                  animate={{ 
+                    scale: isActive ? 1.2 : 1,
+                    y: isActive ? -5 : 0,
+                    color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF'
+                  }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  style={{
+                    ...getWordStyle(w, i),
+                    WebkitTextStroke: '2px #000000',
+                    paintOrder: 'stroke fill',
+                    ['WebkitPaintOrder' as any]: 'stroke fill',
+                    textShadow: '3px 3px 0px rgba(0,0,0,0.8)',
+                    color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF',
+                  }}
+                >
+                  {w.word}
+                </motion.span>
+              );
+            })}
+          </div>
+      );
+    }
 
-  // Kinetic Stacking Style
-  if (animation === 'kinetic') {
-    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
-    if (!currentLine) return null;
+    // Kinetic Stacking Style
+    if (animation === 'kinetic') {
+      const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+      if (!currentLine) return null;
 
-    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
-    const linePosition = lineWords[0]?.position || style.position;
+      const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
 
-    // Split words into lines: Line 1 (1st word), Line 2 (rest)
-    const lines = [
-      [lineWords[0]],
-      lineWords.slice(1)
-    ].filter(l => l.length > 0);
+      // Split words into lines: Line 1 (1st word), Line 2 (rest)
+      const lines = [
+        [lineWords[0]],
+        lineWords.slice(1)
+      ].filter(l => l.length > 0);
 
-    return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${getPositionClass(linePosition)}`}>
+      return (
         <div className="flex flex-col items-center gap-2 px-4">
           <AnimatePresence mode="popLayout">
             {lines.map((line, lineIdx) => (
-              <motion.div
-                key={`kinetic-line-${lineIdx}-${line[0]?.start || 0}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                className="flex flex-wrap justify-center gap-x-3"
-              >
-                {line.map((w, i) => {
-                  const isActive = currentTime >= w.start && currentTime <= w.end;
-                  return (
-                    <span
-                      key={`kinetic-word-${w.word}-${w.start}-${i}`}
-                      style={{
-                        ...getWordStyle(w, i),
-                        color: isActive ? '#FFD700' : '#FFFFFF',
-                        fontWeight: '900',
-                        transition: 'color 0.1s ease'
-                      }}
-                    >
-                      {w.word}
-                    </span>
-                  );
-                })}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      </div>
-    );
-  }
+                <motion.div
+                  key={`kinetic-line-${lineIdx}-${line[0]?.start || 0}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                  className="flex flex-wrap justify-center gap-x-3"
+                >
+                  {line.map((w, i) => {
+                    const isActive = currentTime >= w.start && currentTime <= w.end;
+                    return (
+                      <span
+                        key={`kinetic-word-${w.word}-${w.start}-${i}`}
+                        style={{
+                          ...getWordStyle(w, i),
+                          color: isActive ? '#FFD700' : '#FFFFFF',
+                          fontWeight: '900',
+                          transition: 'color 0.1s ease'
+                        }}
+                      >
+                        {w.word}
+                      </span>
+                    );
+                  })}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+      );
+    }
 
-  // Pop Up animation
-  if (animation === 'pop') {
-    return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+    // Pop Up animation
+    if (animation === 'pop') {
+      return (
         <AnimatePresence mode="wait">
           <motion.div
             key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
@@ -886,14 +885,12 @@ const CaptionOverlay = ({
             )}
           </motion.div>
         </AnimatePresence>
-      </div>
-    );
-  }
+      );
+    }
 
-  // Glow animation
-  if (animation === 'glow') {
-    return (
-      <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+    // Glow animation
+    if (animation === 'glow') {
+      return (
         <AnimatePresence mode="wait">
           <motion.div
             key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
@@ -924,12 +921,11 @@ const CaptionOverlay = ({
             )}
           </motion.div>
         </AnimatePresence>
-      </div>
-    );
-  }
+      );
+    }
 
-  return (
-    <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-10 ${positionClass}`}>
+    // Default style
+    return (
       <AnimatePresence mode="wait">
         <motion.div
           key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
@@ -958,6 +954,24 @@ const CaptionOverlay = ({
           )}
         </motion.div>
       </AnimatePresence>
+    );
+  };
+
+  return (
+    <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(currentWordPosition)}`}>
+      <motion.div 
+        drag
+        dragMomentum={false}
+        onDragEnd={handleDragEnd}
+        style={{ 
+          x: style.x || 0, 
+          y: style.y || 0,
+          cursor: 'grab'
+        }}
+        className="pointer-events-auto active:cursor-grabbing"
+      >
+        {renderContent()}
+      </motion.div>
     </div>
   );
 };
@@ -2019,6 +2033,22 @@ function App() {
     const alignment = style.position === 'top' ? 8 : style.position === 'middle' ? 5 : 2;
     const fontName = 'Arial'; // Standard fallback
     
+    // Calculate base position for {\pos(x,y)} if custom x/y is used
+    // We assume a 1280x720 canvas for ASS
+    const basePositions = {
+      top: { x: 640, y: 100 },
+      middle: { x: 640, y: 360 },
+      bottom: { x: 640, y: 620 }
+    };
+    const basePos = basePositions[style.position || 'bottom'];
+    
+    // Normalize offsets. We assume preview container is roughly 640px wide for scaling
+    const scaleX = 1280 / 640; 
+    const scaleY = 720 / 360; // Assuming 16:9 preview
+    const customX = basePos.x + (style.x || 0) * scaleX;
+    const customY = basePos.y + (style.y || 0) * scaleY;
+    const posTag = (style.x !== undefined || style.y !== undefined) ? `{\\pos(${Math.round(customX)},${Math.round(customY)})}` : '';
+
     const hexToAss = (hex: string) => {
       const cleanHex = hex.replace('#', '');
       if (cleanHex.length === 3) {
@@ -2065,7 +2095,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         text = `{\\c${assWordColor}}${text}`;
       }
       
-      ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${text}\n`;
+      ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${posTag}${text}\n`;
     });
 
     return ass;
@@ -2101,6 +2131,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     setCaptionStep('Burning captions (this may take a minute)...');
     setCaptionProgress(50);
     
+    // Clean up old files to prevent issues
+    try {
+      await ffmpeg.deleteFile(outputName);
+    } catch (e) {}
+
     // Run ffmpeg command to burn subtitles
     // We use libx264 and ensure the font path is handled
     try {
@@ -4311,6 +4346,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               style={captionStyle} 
                               animation={captionAnimation} 
                               shadowColor={shadowColor}
+                              onUpdateStyle={(updates) => setCaptionStyle(prev => ({ ...prev, ...updates }))}
                             />
                           )}
                           <button 
@@ -4765,7 +4801,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         </button>
                         <button 
                           onClick={handleExportCaptions}
-                          className="w-full py-4 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20"
+                          disabled={isCaptioning}
+                          className="w-full py-4 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
                         >
                           <Video size={18} />
                           Export Video

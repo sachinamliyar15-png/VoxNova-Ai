@@ -114,6 +114,42 @@ export const VOICES: Voice[] = [
     color: 'from-red-900 to-black',
     description: 'The Intense Narrator. Gritty, serious, and highly authoritative. Best for crime thrillers, horror, and deep investigative content.',
     isPremium: true
+  },
+  {
+    id: 'arav-neutral-pro',
+    name: 'ARAV_NEUTRAL_PRO',
+    gender: 'male',
+    color: 'from-blue-400 via-indigo-500 to-blue-600',
+    description: 'Natural Indian Male (25–35). Calm, confident, and grounded. Perfect for YouTube explanations and educational content.',
+    isPremium: true,
+    tags: ['Hindi', 'Professional', 'Calm']
+  },
+  {
+    id: 'dev-deep-real',
+    name: 'DEV_DEEP_REAL',
+    gender: 'male',
+    color: 'from-zinc-700 via-slate-800 to-zinc-900',
+    description: 'Deep Mature Male (30–45). Stable, trustworthy, and authoritative. Ideal for serious documentaries and narration.',
+    isPremium: true,
+    tags: ['Hindi', 'Deep', 'Serious']
+  },
+  {
+    id: 'neel-soft-connect',
+    name: 'NEEL_SOFT_CONNECT',
+    gender: 'male',
+    color: 'from-emerald-400 via-teal-500 to-cyan-600',
+    description: 'Warm Conversational Male (20–30). Friendly and relatable, like a friend explaining something. Best for vlogs and storytelling.',
+    isPremium: true,
+    tags: ['Hindi', 'Friendly', 'Warm']
+  },
+  {
+    id: 'raj-classic-narrator',
+    name: 'RAJ_CLASSIC_NARRATOR',
+    gender: 'male',
+    color: 'from-amber-700 via-orange-800 to-yellow-900',
+    description: 'Classic Hindi Narrator. Clear, composed, and slightly formal. Perfect for epic storytelling and long-form content.',
+    isPremium: true,
+    tags: ['Hindi', 'Epic', 'Narrator']
   }
 ];
 
@@ -170,7 +206,7 @@ export interface CaptionWord {
 export interface CaptionStyle {
   fontSize: number;
   color: string;
-  glow: boolean;
+  glow?: boolean;
   border: 'none' | 'thin' | 'thick';
   font: string;
   position: 'top' | 'middle' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -189,6 +225,8 @@ export interface CaptionStyle {
   italic?: boolean;
   fontWeight?: string;
   isSmart?: boolean;
+  x?: number;
+  y?: number;
 }
 
 export interface CaptionPreset {

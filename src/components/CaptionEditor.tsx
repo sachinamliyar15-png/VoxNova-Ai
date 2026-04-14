@@ -293,17 +293,31 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
 
       <div className="min-h-[200px]">
         {activeStyleSubTab === 'font' && (
-          <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
-            {FONTS.map(f => (
-              <button
-                key={f}
-                onClick={() => updateStyle({ font: f })}
-                className={`p-2.5 rounded-xl border-2 text-xs font-medium transition-all ${style.font === f ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-zinc-100 bg-white hover:border-zinc-200 text-zinc-600'}`}
-                style={{ fontFamily: f }}
-              >
-                {f}
-              </button>
-            ))}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Font Size</span>
+                <span className="text-xs font-bold text-zinc-900">{style.fontSize}px</span>
+              </div>
+              <input 
+                type="range" min="12" max="120" step="1"
+                value={style.fontSize}
+                onChange={(e) => updateStyle({ fontSize: parseInt(e.target.value) })}
+                className="w-full h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-emerald-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+              {FONTS.map(f => (
+                <button
+                  key={f}
+                  onClick={() => updateStyle({ font: f })}
+                  className={`p-2.5 rounded-xl border-2 text-xs font-medium transition-all ${style.font === f ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-zinc-100 bg-white hover:border-zinc-200 text-zinc-600'}`}
+                  style={{ fontFamily: f }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -491,6 +505,16 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
           onChange={(e) => updateStyle({ wordsPerLine: parseInt(e.target.value) })}
           className="w-full h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-emerald-500"
         />
+      </div>
+
+      <div className="pt-4 border-t border-zinc-100">
+        <button
+          onClick={() => updateStyle({ x: 0, y: 0 })}
+          className="w-full py-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
+        >
+          <X size={14} />
+          Reset Custom Position
+        </button>
       </div>
     </div>
   );

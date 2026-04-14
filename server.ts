@@ -83,7 +83,11 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'rudra': 'Fenrir', 'RUDRA': 'Fenrir',
   'veer': 'Fenrir', 'VEER': 'Fenrir', 'shakti': 'Zephyr', 'SHAKTI': 'Zephyr',
   'raja': 'Charon', 'RAJA': 'Charon', 'toofan': 'Puck', 'TOOFAN': 'Puck',
-  'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir'
+  'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir',
+  'arav-neutral-pro': 'Charon', 'ARAV_NEUTRAL_PRO': 'Charon',
+  'dev-deep-real': 'Fenrir', 'DEV_DEEP_REAL': 'Fenrir',
+  'neel-soft-connect': 'Puck', 'NEEL_SOFT_CONNECT': 'Puck',
+  'raj-classic-narrator': 'Charon', 'RAJ_CLASSIC_NARRATOR': 'Charon'
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -515,7 +519,11 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         'Munna Bhai': 'Zephyr', 'Sachinboy': 'Fenrir', 'MAHARAJA': 'Fenrir',
         'veer': 'Fenrir', 'VEER': 'Fenrir', 'shakti': 'Zephyr', 'SHAKTI': 'Zephyr',
         'raja': 'Charon', 'RAJA': 'Charon', 'toofan': 'Puck', 'TOOFAN': 'Puck',
-        'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir'
+        'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir',
+        'arav-neutral-pro': 'Charon', 'ARAV_NEUTRAL_PRO': 'Charon',
+        'dev-deep-real': 'Fenrir', 'DEV_DEEP_REAL': 'Fenrir',
+        'neel-soft-connect': 'Puck', 'NEEL_SOFT_CONNECT': 'Puck',
+        'raj-classic-narrator': 'Charon', 'RAJ_CLASSIC_NARRATOR': 'Charon'
       };
 
       const targetVoice = voiceMapping[voice_name] || 'Puck';
@@ -1345,9 +1353,18 @@ app.post("/api/preview-voice", async (req: any, res) => {
 
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const hindiPreviews: Record<string, string> = {
+        'arav-neutral-pro': 'आज हम एक ऐसी चीज़ के बारे में बात करेंगे जो आपकी ज़िंदगी को बेहतर बना सकती है। अगर आप इसे सही तरीके से समझ लें, तो इसका असर लंबे समय तक रहेगा।',
+        'dev-deep-real': 'कई बार हम चीज़ों को हल्के में ले लेते हैं। लेकिन सच यह है कि छोटे decisions ही बड़े परिणाम तय करते हैं।',
+        'neel-soft-connect': 'देखो, अगर आप थोड़ा सा ध्यान दें, तो ये चीज़ काफी आसान हो सकती है। बस consistency बनाए रखना ज़रूरी है।',
+        'raj-classic-narrator': 'उस दिन जो हुआ, उसने सब कुछ बदल दिया। किसी ने सोचा भी नहीं था कि एक छोटा सा फैसला इतनी बड़ी कहानी बन जाएगा।'
+      };
+
+      const previewText = hindiPreviews[voice_id] || `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`;
+
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.` }] }],
+        contents: [{ parts: [{ text: previewText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
