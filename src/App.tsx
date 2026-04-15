@@ -65,7 +65,10 @@ import {
   Star,
   Smile,
   Palette,
-  AlignLeft
+  AlignLeft,
+  Clapperboard,
+  Smartphone,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
@@ -1357,8 +1360,8 @@ function Sidebar({
 
       <nav className="flex flex-col gap-2">
         <button 
-          onClick={() => { setActiveTab('tts'); setIsMobileMenuOpen(false); }}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'tts' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+          onClick={() => { setActiveTab('generate'); setIsMobileMenuOpen(false); }}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'generate' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
         >
           <Mic size={20} />
           Text to Speech Voice
@@ -1535,6 +1538,8 @@ function App() {
   const [voiceChangingFile, setVoiceChangingFile] = useState<File | null>(null);
 
   const [showShareToast, setShowShareToast] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [toastMessage, setToastMessage] = useState('');
 
   const showToast = (message: string) => {
@@ -2248,9 +2253,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     
     await ffmpeg.writeFile(inputVideo, await fetchFile(videoFile));
     
-    // Convert base64 to Uint8Array for FFmpeg
-    const audioUint8 = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
-    await ffmpeg.writeFile(inputAudio, audioUint8);
+    // Gemini TTS returns raw PCM (24kHz, 16-bit mono). FFmpeg needs a WAV header to read it correctly as .wav
+    const pcmBuffer = base64ToArrayBuffer(audioData);
+    const wavHeader = createWavHeader(pcmBuffer, 24000);
+    const fullAudioBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
+    fullAudioBuffer.set(new Uint8Array(wavHeader), 0);
+    fullAudioBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+    
+    await ffmpeg.writeFile(inputAudio, fullAudioBuffer);
     
     // Merge audio and video, replacing original audio
     await ffmpeg.exec(['-i', inputVideo, '-i', inputAudio, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-shortest', outputName]);
@@ -2290,14 +2300,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       });
 
       const transcribedText = transcribeResult.text?.trim();
-      if (!transcribedText) {
-        throw new Error("Could not detect any speech in the uploaded file. Please ensure the audio is clear.");
+      if (!transcribedText || transcribedText.length < 2) {
+        throw new Error("Could not detect any clear speech in the uploaded file. Please ensure the audio is clear and contains spoken words.");
       }
 
       setVoiceChangingProgress(50);
       setVoiceChangingStep('Generating target voice...');
 
-      const currentTargetVoice = INTERNAL_VOICE_MAPPING[selectedVoice.name] || INTERNAL_VOICE_MAPPING[selectedVoice.name.toLowerCase()] || 'Puck';
+      // Ensure we only use the 5 supported voices for Gemini TTS
+      const validTTSVoices = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
+      let currentTargetVoice = INTERNAL_VOICE_MAPPING[selectedVoice.name] || INTERNAL_VOICE_MAPPING[selectedVoice.name.toLowerCase()] || 'Puck';
+      
+      if (!validTTSVoices.includes(currentTargetVoice)) {
+        currentTargetVoice = 'Puck';
+      }
       const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'].includes(selectedVoice.id.toLowerCase());
 
       const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance. 
@@ -3391,475 +3407,43 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             selectedVoice={selectedVoice}
           />
 
-          {/* Main Content Area */}
-          <main className="flex-1 h-screen overflow-y-auto relative z-10 pt-4 md:pt-0">
-            <AnimatePresence mode="wait">
-              {activeTab === 'tts' && (
-                <motion.div 
-                  key="tts"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
-                >
-                  <div className="mb-8 md:mb-12">
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                      <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <Sparkles size={12} />
-                          AI Voice Studio
-                        </div>
-                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
-                          Create <span className="text-emerald-500">Magic</span> with Voice
-                        </h2>
-                        <p className="text-zinc-500 text-lg max-w-2xl">
-                          Convert your text into stunningly realistic AI voices in seconds. Perfect for YouTube, Reels, and professional projects.
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-3">
-                        <div className="hidden md:flex flex-col items-end">
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Available Credits</span>
-                          <span className="text-xl font-display font-bold text-zinc-900">
-                            {userProfile?.credits?.toLocaleString() || '20,000'}
-                          </span>
-                        </div>
-                        <button 
-                          onClick={() => setIsPricingModalOpen(true)}
-                          className="p-3 bg-zinc-900 text-white rounded-2xl hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-900/10"
-                        >
-                          <Plus size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-6">
-                      {/* Text Input Area */}
-                      <div className="glass-panel p-6 md:p-8 rounded-[2.5rem] border-zinc-100 relative group">
-                        <div className="absolute top-6 right-8 flex items-center gap-4">
-                          <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-50 rounded-xl border border-zinc-100">
-                            <span className={`text-xs font-bold ${text.length > (currentUser ? 4500 : 180) ? 'text-rose-500' : 'text-zinc-400'}`}>
-                              {text.length.toLocaleString()}
-                            </span>
-                            <span className="text-zinc-300 text-xs">/</span>
-                            <span className="text-zinc-400 text-xs font-bold">
-                              {(currentUser ? 5000 : 200).toLocaleString()}
-                            </span>
-                          </div>
-                          <button 
-                            onClick={() => setText('')}
-                            className="p-2 text-zinc-400 hover:text-rose-500 transition-colors"
-                            title="Clear text"
-                          >
-                            <RefreshCw size={18} />
-                          </button>
-                        </div>
-                        
-                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4 block">
-                          Your Script
-                        </label>
-                        
-                        <textarea 
-                          value={text}
-                          onChange={handleTextChange}
-                          placeholder="Type or paste your script here... (e.g., 'Welcome to VoxNova, the future of AI voice technology.')"
-                          className="w-full h-64 md:h-80 bg-transparent text-zinc-800 text-xl md:text-2xl font-medium placeholder:text-zinc-200 focus:outline-none resize-none leading-relaxed"
-                        />
-                        
-                        <div className="mt-6 flex flex-wrap items-center gap-3">
-                          <button 
-                            onClick={() => {
-                              const examples = [
-                                "In the heart of the ancient forest, a secret awaited those brave enough to seek it.",
-                                "नमस्ते! वॉक्सनोवा में आपका स्वागत है। हम आपके टेक्स्ट को जादुई आवाजों में बदलते हैं।",
-                                "The future isn't something that happens to us. It's something we create, one word at a time.",
-                                "आज की ताजा खबर: तकनीक की दुनिया में एक बड़ा बदलाव आया है।"
-                              ];
-                              setText(examples[Math.floor(Math.random() * examples.length)]);
-                            }}
-                            className="px-4 py-2 bg-zinc-50 text-zinc-500 rounded-xl text-xs font-bold hover:bg-zinc-100 transition-all border border-zinc-100"
-                          >
-                            Try an example
-                          </button>
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.readText().then(clipText => {
-                                const limit = currentUser ? 5000 : 200;
-                                setText(clipText.substring(0, limit));
-                              });
-                            }}
-                            className="px-4 py-2 bg-zinc-50 text-zinc-500 rounded-xl text-xs font-bold hover:bg-zinc-100 transition-all border border-zinc-100"
-                          >
-                            Paste from clipboard
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Action Bar Removed as requested */}
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                      <div className="lg:col-span-2 space-y-6">
-                        {/* Voice Selection Sidebar */}
-                        <div className="glass-panel p-6 md:p-8 rounded-[2.5rem] border-zinc-100 space-y-8">
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                                <Mic size={14} className="text-emerald-500" /> Select Voice
-                              </label>
-                              <div className="flex items-center gap-4">
-                                <button
-                                  onClick={handleClassifyScript}
-                                  disabled={isClassifying || !text}
-                                  className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
-                                >
-                                  {isClassifying ? (
-                                    <RefreshCw size={12} className="animate-spin" />
-                                  ) : (
-                                    <Sparkles size={12} />
-                                  )}
-                                  Magic Suggest
-                                </button>
-                                <button 
-                                  onClick={() => setActiveTab('library')}
-                                  className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider"
-                                >
-                                  View All
-                                </button>
-                              </div>
-                            </div>
-                            
-                            <div className="relative group">
-                              <button 
-                                onClick={() => setIsFeatureMenuOpen(!isFeatureMenuOpen)}
-                                className="w-full p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between hover:bg-white hover:border-emerald-200 transition-all group"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-white shadow-lg shadow-emerald-500/10`}>
-                                    <User size={20} />
-                                  </div>
-                                  <div className="text-left">
-                                    <div className="text-sm font-bold text-zinc-900">{selectedVoice.name}</div>
-                                    <div className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">{selectedVoice.gender} • Realistic</div>
-                                  </div>
-                                </div>
-                                <ChevronDown size={18} className={`text-zinc-300 transition-transform ${isFeatureMenuOpen ? 'rotate-180' : ''}`} />
-                              </button>
-                              
-                              <AnimatePresence>
-                                {isFeatureMenuOpen && (
-                                  <motion.div 
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl border border-zinc-100 shadow-2xl z-50 overflow-hidden p-2"
-                                  >
-                                    <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                                      {VOICES.slice(0, 8).map((voice, idx) => (
-                                        <button
-                                          key={`quick-voice-item-${voice.id}-${idx}-${voice.name}`}
-                                          onClick={() => {
-                                            setSelectedVoice(voice);
-                                            setIsFeatureMenuOpen(false);
-                                          }}
-                                          className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all ${selectedVoice.id === voice.id ? 'bg-emerald-50' : 'hover:bg-zinc-50'}`}
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${voice.color} flex items-center justify-center text-white text-xs`}>
-                                              {voice.name[0]}
-                                            </div>
-                                            <div className="text-left">
-                                              <div className="text-xs font-bold text-zinc-900">{voice.name}</div>
-                                              <div className="text-[9px] text-zinc-400 uppercase tracking-tighter">{voice.gender}</div>
-                                            </div>
-                                          </div>
-                                          {selectedVoice.id === voice.id && <Check size={14} className="text-emerald-500" />}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <button 
-                                      onClick={() => setActiveTab('library')}
-                                      className="w-full p-3 text-center text-[10px] font-bold text-zinc-400 hover:text-zinc-900 transition-colors uppercase tracking-widest border-t border-zinc-50 mt-1"
-                                    >
-                                      Explore 100+ Voices
-                                    </button>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          </div>
-
-                          <div className="space-y-6">
-                            <div className="space-y-4">
-                              <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                                <Settings2 size={14} /> Fine-Tuning
-                              </label>
-                              
-                              <div className="space-y-6">
-                                <div className="space-y-3">
-                                  <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                                    <span>Speed</span>
-                                    <span className="text-emerald-600">{speed}x</span>
-                                  </div>
-                                  <input 
-                                    type="range" min="0.5" max="2.0" step="0.1" 
-                                    value={speed} 
-                                    onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                                    className="w-full accent-zinc-900 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
-                                  />
-                                </div>
-                                
-                                <div className="space-y-3">
-                                  <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                                    <span>Pitch</span>
-                                    <span className="text-emerald-600">{pitch}x</span>
-                                  </div>
-                                  <input 
-                                    type="range" min="0.5" max="1.5" step="0.1" 
-                                    value={pitch} 
-                                    onChange={(e) => setPitch(parseFloat(e.target.value))}
-                                    className="w-full accent-zinc-900 h-1 bg-zinc-100 rounded-lg appearance-none cursor-pointer"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="pt-4 border-t border-zinc-50 space-y-4">
-                              <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-                                <div className="flex items-center gap-2">
-                                  <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                                    <Sparkles size={14} />
-                                  </div>
-                                  <span className="text-xs font-bold text-zinc-700">Studio Clarity</span>
-                                </div>
-                                <button 
-                                  onClick={() => setStudioClarity(!studioClarity)}
-                                  className={`w-10 h-5 rounded-full transition-all relative ${studioClarity ? 'bg-emerald-500' : 'bg-zinc-200'}`}
-                                >
-                                  <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${studioClarity ? 'left-6' : 'left-1'}`} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-                
-                {activeTab === 'library' && (
-                  <VoiceLibrary 
-                    onSelect={(voice) => {
-                      setSelectedVoice(voice);
-                      setActiveTab('tts');
-                    }}
-                    selectedVoiceId={selectedVoice.id}
-                    activeTab={activeTab}
-                  />
-                )}
-                
-
-
-                {activeTab === 'voice-changer' && (
-                  <motion.div 
-                    key="voice-changer"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto"
-                  >
-                    <div className="mb-12">
-                      <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <Mic size={12} />
-                          Voice Changer
-                        </div>
-                        <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-zinc-900">
-                          Transform Your <span className="text-purple-500">Voice</span>
-                        </h2>
-                        <p className="text-zinc-500 text-lg max-w-2xl">
-                          Upload your audio and change the voice to any of our high-quality AI models.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div 
-                      onClick={() => document.getElementById('audio-upload-vc-alt')?.click()}
-                      className={`p-12 rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center text-center space-y-4 cursor-pointer transition-all ${voiceChangingFile ? 'border-purple-500/50 bg-purple-50' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'}`}
-                    >
-                      <input 
-                        type="file" id="audio-upload-vc-alt" hidden accept="audio/*,video/*" 
-                        onChange={(e) => {
-                          setVoiceChangingFile(e.target.files?.[0] || null);
-                          setVoiceChangingResult(null);
-                        }}
-                      />
-                      {voiceChangingFile ? (
-                        <>
-                          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-purple-500">
-                            {voiceChangingFile.type.startsWith('video/') ? <Video size={32} /> : <Mic size={32} />}
-                          </div>
-                          <div>
-                            <p className="text-zinc-900 font-bold">{voiceChangingFile.name}</p>
-                            <p className="text-zinc-500 text-sm">{(voiceChangingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-zinc-400">
-                            <Upload size={32} />
-                          </div>
-                          <div>
-                            <p className="text-zinc-900 font-bold">Upload Audio or Video File</p>
-                            <p className="text-zinc-500 text-sm">Drag and drop or click to browse (MP3, WAV, MP4, etc.)</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-                      <div className="space-y-6">
-                        <div className="space-y-3">
-                          <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Select Target Voice</label>
-                          <div 
-                            onClick={() => setShowVoiceLibrary(true)}
-                            className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-100 transition-all"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-sm font-bold text-white shadow-sm`}>
-                                {selectedVoice.name[0]}
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-zinc-900">{selectedVoice.name}</p>
-                                <p className="text-[10px] text-zinc-400 uppercase tracking-widest">{selectedVoice.gender} • {selectedVoice.tags?.[0]}</p>
-                              </div>
-                            </div>
-                            <ChevronDown size={20} className="text-zinc-400" />
-                          </div>
-                        </div>
-
-                        <button 
-                          onClick={handleVoiceChanger}
-                          disabled={isVoiceChanging || !voiceChangingFile}
-                          className={`w-full py-5 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${isVoiceChanging ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : !voiceChangingFile ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100' : 'bg-purple-500 text-white hover:bg-purple-600 shadow-purple-500/20'}`}
-                        >
-                          {isVoiceChanging ? (
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="flex items-center gap-2">
-                                <Loader2 className="animate-spin" size={24} />
-                                <span className="font-bold">Changing Voice...</span>
-                              </div>
-                              <span className="text-[10px] opacity-70 animate-pulse">{voiceChangingStep}</span>
-                            </div>
-                          ) : (
-                            <>
-                              <RefreshCw size={24} />
-                              {currentUser ? 'Transform Voice (5 Credits)' : 'Try for Free'}
-                            </>
-                          )}
-                        </button>
-
-                        {isVoiceChanging && (
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-[10px] text-zinc-500">
-                              <span>{voiceChangingStep}</span>
-                              <span>{voiceChangingProgress}%</span>
-                            </div>
-                            <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${voiceChangingProgress}%` }}
-                                className="h-full bg-purple-500"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-6">
-                        {voiceChangingResult ? (
-                          <motion.div 
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-zinc-900 rounded-[2.5rem] p-8 space-y-6 shadow-2xl overflow-hidden relative group"
-                          >
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-white font-bold flex items-center gap-2">
-                                <Sparkles className="text-purple-400" /> Result
-                              </h3>
-                              <button 
-                                onClick={() => {
-                                  const a = document.createElement('a');
-                                  a.href = voiceChangingResult.url;
-                                  const voiceName = VOICES.find(v => v.id === selectedVoice.id)?.name || 'AI Voice';
-                                  a.download = `VoxNova Text to Speech - ${voiceName}-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
-                                  a.click();
-                                }}
-                                className="p-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all"
-                              >
-                                <Download size={20} />
-                              </button>
-                            </div>
-
-                            {voiceChangingResult.type === 'video' ? (
-                              <video 
-                                src={voiceChangingResult.url} 
-                                controls 
-                                className="w-full rounded-2xl shadow-lg aspect-video bg-black"
-                              />
-                            ) : (
-                              <audio 
-                                src={voiceChangingResult.url} 
-                                controls 
-                                className="w-full"
-                              />
-                            )}
-                          </motion.div>
-                        ) : (
-                          <div className="h-full min-h-[300px] bg-zinc-50 rounded-[2.5rem] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center text-center p-12 space-y-4">
-                            <div className="w-20 h-20 bg-white rounded-3xl shadow-sm flex items-center justify-center text-zinc-300">
-                              <Play size={40} />
-                            </div>
-                            <div>
-                              <p className="text-zinc-900 font-bold">Preview Area</p>
-                              <p className="text-zinc-500 text-sm">Your transformed audio/video will appear here.</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-
-                {activeTab === 'history' && (
-                  <HistoryView 
-                    history={history} 
-                    onPlay={(gen) => playFromHistory(gen.audio_data!, gen.id)}
-                    onDelete={handleDeleteHistory}
-                    onRestore={handleRestoreScript}
-                  />
-                )}
-              </AnimatePresence>
-            </main>
-
-            {/* Global Modals & Toasts */}
-            <AnimatePresence>
-              {isPricingModalOpen && <PricingModal onClose={() => setIsPricingModalOpen(false)} onSelect={purchaseCredits} />}
-              {showLimitToast && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 50 }}
-                  className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-rose-500 text-white px-6 py-3 rounded-2xl font-bold shadow-2xl flex items-center gap-3"
-                >
-                  <AlertCircle size={20} />
-                  {currentUser ? "Maximum 5,000 characters reached" : "Guest limit: 200 characters. Sign up for more!"}
-                </motion.div>
-              )}
+          {/* Global Modals & Toasts */}
+          <AnimatePresence>
+            {isPricingModalOpen && <PricingModal onClose={() => setIsPricingModalOpen(false)} onSelect={purchaseCredits} />}
+            {showLimitToast && (
+              <motion.div 
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-rose-500 text-white px-6 py-3 rounded-2xl font-bold shadow-2xl flex items-center gap-3"
+              >
+                <AlertCircle size={20} />
+                {currentUser ? "Maximum 5,000 characters reached" : "Guest limit: 200 characters. Sign up for more!"}
+              </motion.div>
+            )}
+            {showSuccessToast && (
+              <motion.div 
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-emerald-500 text-white px-6 py-3 rounded-2xl font-bold shadow-2xl flex items-center gap-3"
+              >
+                <Check size={20} />
+                {successMessage}
+              </motion.div>
+            )}
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-rose-500 text-white px-6 py-3 rounded-2xl font-bold shadow-2xl flex items-center gap-3"
+              >
+                <AlertCircle size={20} />
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
               <AnimatePresence>
                 {error && (
                   <motion.div 
@@ -3916,7 +3500,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 )}
               </AnimatePresence>
               <SettingsModal />
-            </AnimatePresence>
 
             {/* Configuration Error Modal */}
             <AnimatePresence>
@@ -4074,7 +3657,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   <textarea 
                     value={text}
                     onChange={handleTextChange}
-                    placeholder={`Enter your script here... (Paste up to 10,000 characters, will auto-truncate to 5,000)`}
+                    placeholder={`Enter your script here... (Paste up to 5,000 characters)`}
                     className="w-full h-[500px] bg-white border-2 border-zinc-100 rounded-3xl p-8 text-xl md:text-2xl leading-relaxed resize-none focus:outline-none focus:border-emerald-500/30 focus:ring-4 focus:ring-emerald-500/5 transition-all placeholder:text-zinc-300 text-zinc-900 shadow-sm"
                   />
                 </div>
@@ -4362,58 +3945,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
                     </div>
                   </div>
-                </div>
-
-              <div className="flex flex-col gap-4 pt-6">
-                  <button 
-                    onClick={handleResetSettings}
-                    className="w-full py-4 px-6 bg-white border-2 border-zinc-100 text-zinc-500 rounded-3xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-zinc-50 hover:text-zinc-900 transition-all shadow-sm group"
-                  >
-                    <RefreshCw size={20} className="group-hover:rotate-180 transition-transform duration-500" />
-                    <span>Reset</span>
-                  </button>
-
-                  <button 
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !text || !selectedVoice}
-                    className="w-full py-5 px-6 bg-zinc-900 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-zinc-900/40"
-                  >
-                    {isGenerating ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="animate-spin" size={24} />
-                        <span>Generating {generationProgress}%</span>
-                      </div>
-                    ) : (
-                      <>
-                        <Play size={24} fill="currentColor" />
-                        <span>Generate Voice</span>
-                      </>
-                    )}
-                  </button>
-                  {currentAudio && (
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => {
-                          if (isPlaying) {
-                            audioRef.current?.pause();
-                            setIsPlaying(false);
-                          } else {
-                            audioRef.current?.play();
-                            setIsPlaying(true);
-                          }
-                        }}
-                        className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all ${isPlaying ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'glass-panel hover:bg-white/5'}`}
-                      >
-                        {isPlaying ? <Pause size={24} /> : <Play size={24} />}
-                      </button>
-                      <button 
-                        onClick={() => downloadAudio(currentAudio, 'generated-voice')}
-                        className="w-14 h-14 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
-                      >
-                        <Download size={24} />
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {currentAudio && (
@@ -5093,6 +4624,39 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[2.5rem] border-zinc-100 space-y-4">
+                  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                    <Sparkles size={16} className="text-purple-500" />
+                    Pro Tips
+                  </h3>
+                  <ul className="space-y-3 text-xs text-zinc-500">
+                    <li className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1 shrink-0" />
+                      Use high-quality audio files with minimal background noise for the best results.
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1 shrink-0" />
+                      The AI works best with clear speech. Avoid files with multiple people talking at once.
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1 shrink-0" />
+                      You can also upload video files (MP4, etc.) and we will transform the audio while keeping the video.
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[2.5rem] border-zinc-100 space-y-4">
+                  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                    <History size={16} className="text-purple-500" />
+                    Why use Voice Changer?
+                  </h3>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    Our Voice Changer uses advanced neural networks to map your voice's characteristics onto our professional AI models. This allows you to maintain the exact emotion, timing, and emphasis of your original recording while sounding like a completely different person.
+                  </p>
+                </div>
+              </div>
+
               {voiceChangingResult && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -5133,6 +4697,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </motion.div>
               )}
             </motion.div>
+          ) : activeTab === 'library' ? (
+            <VoiceLibrary 
+              onSelect={(voice) => {
+                setSelectedVoice(voice);
+                setActiveTab('generate');
+              }}
+              selectedVoiceId={selectedVoice.id}
+              activeTab={activeTab}
+            />
           ) : (
             <motion.div 
               key="history"
@@ -5249,141 +4822,210 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         </div>
 
         {/* SEO Content Section (The "Boxes") - Moved to Bottom */}
-        <section className="max-w-4xl mx-auto py-16 px-6 space-y-12">
-          {/* Ad Section - Top of SEO */}
-          {/* Removed AdBox */}
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl font-display font-bold text-zinc-900">Why Choose VoxNova Text to Speech?</h2>
-            <p className="text-zinc-500 max-w-2xl mx-auto">VoxNova Text to Speech is the world's most advanced AI voice generation platform, designed for creators, filmmakers, and storytellers who demand cinematic quality.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
-                <Sparkles size={24} />
-              </div>
-              <h3 className="text-xl font-bold text-zinc-900">Ultra-Realistic Voices</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">Our neural networks are trained on thousands of hours of professional studio recordings to capture the subtle nuances of human speech, including breath, rhythm, and emotion.</p>
-            </div>
-
-            <div className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
-                <Globe size={24} />
-              </div>
-              <h3 className="text-xl font-bold text-zinc-900">Multilingual Support</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">Generate high-quality voiceovers in English and Hindi with perfect native accents. Our AI understands cultural nuances and provides localized performances for global audiences.</p>
-            </div>
-
-            <div className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group">
-              <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
-                <Mic size={24} />
-              </div>
-              <h3 className="text-xl font-bold text-zinc-900">Cinematic Narration</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova Text to Speech provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
-            </div>
-          </div>
-
-          <div className="glass-panel p-10 rounded-[3rem] border-zinc-100 bg-zinc-50/50 space-y-6">
-            <h3 className="text-2xl font-bold text-center text-zinc-900">Professional Grade AI Tools</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <h4 className="font-bold text-emerald-600">AI Voice Cloning</h4>
-                <p className="text-sm text-zinc-500">Clone any voice with just a few seconds of audio. Perfect for maintaining consistency across long-running series or dubbing content into multiple languages while keeping the original actor's essence.</p>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-bold text-emerald-600">Advanced Style Modulation</h4>
-                <p className="text-sm text-zinc-500">Go beyond simple pitch and speed. Our AI allows you to control the emotional intensity, gravitas, and storytelling style of every generation, giving you full creative control.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-8">
-            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">How VoxNova Text to Speech Works</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {[
-                { step: '01', title: 'Input Text', desc: 'Paste your script into our advanced editor. We support long-form content up to 10,000 characters.' },
-                { step: '02', title: 'Select Voice', desc: 'Browse our library of 20+ professional AI voices, each with unique traits and characteristics.' },
-                { step: '03', title: 'Fine-Tune', desc: 'Adjust pitch, speed, and emotional style to get the perfect performance for your project.' },
-                { step: '04', title: 'Generate', desc: 'Our neural engines process your request in seconds, delivering studio-quality 48kHz audio.' }
-              ].map((item, i) => (
-                <div key={`step-en-${i}`} className="p-6 space-y-3">
-                  <div className="text-4xl font-display font-bold text-zinc-100">{item.step}</div>
-                  <h4 className="font-bold text-zinc-900">{item.title}</h4>
-                  <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* New Blog/Articles Section for AdSense */}
-          <div className="space-y-12 pt-16 border-t border-zinc-100">
+        <section className="bg-white">
+          <div className="max-w-6xl mx-auto py-24 px-6 space-y-16">
             <div className="text-center space-y-4">
-              <h2 className="text-3xl font-display font-bold text-zinc-900">Latest from our AI Voice Blog</h2>
-              <p className="text-zinc-500 max-w-2xl mx-auto">Explore the latest trends in AI voice technology, text to speech tips, and content creation strategies.</p>
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900 tracking-tight">Why Choose VoxNova Text to Speech?</h2>
+              <p className="text-zinc-500 max-w-2xl mx-auto text-lg">VoxNova is the world's most advanced AI voice generation platform, designed for creators who demand cinematic quality.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-emerald-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-inner">
+                  <Sparkles size={32} />
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold text-zinc-900">Ultra-Realistic Voices</h3>
+                  <p className="text-zinc-500 leading-relaxed">Our neural networks are trained on thousands of hours of professional studio recordings to capture the subtle nuances of human speech, including breath, rhythm, and emotion.</p>
+                </div>
+              </div>
+
+              <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-blue-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
+                <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-inner">
+                  <Globe size={32} />
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold text-zinc-900">Multilingual Support</h3>
+                  <p className="text-zinc-500 leading-relaxed">Generate high-quality voiceovers in English and Hindi with perfect native accents. Our AI understands cultural nuances and provides localized performances for global audiences.</p>
+                </div>
+              </div>
+
+              <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-purple-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
+                <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300 shadow-inner">
+                  <Clapperboard size={32} />
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold text-zinc-900">Cinematic Narration</h3>
+                  <p className="text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-zinc-50/80 py-24">
+          <div className="max-w-6xl mx-auto px-4 md:px-6 space-y-16">
+            <div className="glass-panel p-6 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border-zinc-100 bg-white shadow-sm space-y-10">
+              <div className="text-center space-y-2">
+                <h3 className="text-3xl font-bold text-zinc-900">Professional Grade AI Tools</h3>
+                <p className="text-zinc-500">Everything you need to create world-class audio content.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div className="flex gap-6">
+                  <div className="w-12 h-12 shrink-0 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <Mic size={24} />
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="text-xl font-bold text-zinc-900">AI Voice Cloning</h4>
+                    <p className="text-zinc-500 leading-relaxed">Clone any voice with just a few seconds of audio. Perfect for maintaining consistency across long-running series or dubbing content while keeping the original actor's essence.</p>
+                  </div>
+                </div>
+                <div className="flex gap-6">
+                  <div className="w-12 h-12 shrink-0 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                    <Layers size={24} />
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="text-xl font-bold text-zinc-900">Advanced Style Modulation</h4>
+                    <p className="text-zinc-500 leading-relaxed">Go beyond simple pitch and speed. Our AI allows you to control the emotional intensity, gravitas, and storytelling style of every generation, giving you full creative control.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-16">
+              <div className="text-center space-y-4">
+                <h3 className="text-4xl font-display font-bold text-zinc-900">How VoxNova Text to Speech Works</h3>
+                <p className="text-zinc-500 max-w-xl mx-auto">Four simple steps to transform your text into professional audio.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                {[
+                  { step: '01', title: 'Input Text', desc: 'Paste your script into our advanced editor. We support long-form content up to 5,000 characters.', img: 'https://picsum.photos/seed/editor/400/300' },
+                  { step: '02', title: 'Select Voice', desc: 'Browse our library of 50+ professional AI voices, each with unique traits and characteristics.', img: 'https://picsum.photos/seed/voices/400/300' },
+                  { step: '03', title: 'Fine-Tune', desc: 'Adjust pitch, speed, and emotional style to get the perfect performance for your project.', img: 'https://picsum.photos/seed/settings/400/300' },
+                  { step: '04', title: 'Generate', desc: 'Our neural engines process your request in seconds, delivering studio-quality 48kHz audio.', img: 'https://picsum.photos/seed/audio/400/300' }
+                ].map((item, i) => (
+                  <div key={`step-en-${i}`} className="space-y-6 group">
+                    <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-zinc-100 border border-zinc-200 shadow-sm group-hover:shadow-md transition-all duration-300">
+                      <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" referrerPolicy="no-referrer" />
+                      <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-xl font-display font-bold text-zinc-900 shadow-sm">
+                        {item.step}
+                      </div>
+                    </div>
+                    <div className="space-y-2 px-2">
+                      <h4 className="text-xl font-bold text-zinc-900">{item.title}</h4>
+                      <p className="text-sm text-zinc-500 leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white py-24">
+          <div className="max-w-6xl mx-auto px-6 space-y-16">
+            <div className="text-center space-y-4">
+              <h2 className="text-4xl font-display font-bold text-zinc-900">Latest from our AI Voice Blog</h2>
+              <p className="text-zinc-500 max-w-2xl mx-auto text-lg">Explore the latest trends in AI voice technology, text to speech tips, and content creation strategies.</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-10">
               {[
                 {
                   title: "How AI Voice Generators are Changing Content Creation",
                   excerpt: "AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable. VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion...",
-                  date: "March 28, 2026"
+                  date: "March 28, 2026",
+                  img: "https://picsum.photos/seed/ai-voice/800/450"
                 },
                 {
                   title: "Best Hindi AI Voices for YouTube Shorts and Reels",
                   excerpt: "Hindi content is booming on social media. To stand out, you need high-quality voiceovers. VoxNova offers voices like 'Pankaj' and 'Sultan' which are perfect for motivational videos, news, and storytelling in Hindi...",
-                  date: "March 25, 2026"
+                  date: "March 25, 2026",
+                  img: "https://picsum.photos/seed/hindi/800/450"
                 },
                 {
                   title: "The Future of Text to Speech Technology in 2026",
                   excerpt: "As we move further into 2026, AI voices are becoming indistinguishable from real humans. VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing...",
-                  date: "March 22, 2026"
+                  date: "March 22, 2026",
+                  img: "https://picsum.photos/seed/future/800/450"
                 },
                 {
                   title: "How to Create Professional Voiceovers with VoxNova",
                   excerpt: "Creating a professional voiceover used to require expensive equipment and a recording studio. Now, with VoxNova Text to Speech, you can generate studio-quality audio in seconds. Learn how to fine-tune your scripts for the best results...",
-                  date: "March 18, 2026"
+                  date: "March 18, 2026",
+                  img: "https://picsum.photos/seed/studio/800/450"
                 }
               ].map((article, i) => (
-                <div key={`article-${i}`} className="glass-panel p-8 rounded-3xl space-y-4 border-zinc-100 hover:border-emerald-500/20 transition-all group cursor-pointer" onClick={() => { setSelectedArticle(i); setShowBlog(true); }}>
-                  <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{article.date}</div>
-                  <h3 className="text-xl font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors">{article.title}</h3>
-                  <p className="text-sm text-zinc-500 leading-relaxed line-clamp-3">{article.excerpt}</p>
-                  <div className="flex items-center gap-2 text-zinc-900 font-bold text-sm">
-                    Read More <ArrowRight size={16} />
+                <div 
+                  key={`article-${i}`} 
+                  className="group cursor-pointer space-y-6" 
+                  onClick={() => { setSelectedArticle(i); setShowBlog(true); }}
+                >
+                  <div className="aspect-video rounded-[2rem] overflow-hidden border border-zinc-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-500">
+                    <img src={article.img} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="space-y-3 px-2">
+                    <div className="flex items-center gap-3">
+                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider">{article.date}</span>
+                      <span className="text-zinc-300">•</span>
+                      <span className="text-zinc-400 text-[10px] font-bold uppercase tracking-wider">AI Technology</span>
+                    </div>
+                    <h3 className="text-2xl font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors leading-tight">{article.title}</h3>
+                    <p className="text-zinc-500 leading-relaxed line-clamp-2">{article.excerpt}</p>
+                    <div className="pt-2 flex items-center gap-2 text-emerald-600 font-bold text-sm group-hover:gap-3 transition-all">
+                      Read Article <ArrowRight size={18} />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+        </section>
 
-          {/* Hindi Content Section for AdSense */}
-          <div className="glass-panel p-10 rounded-[3rem] border-zinc-100 bg-emerald-50/30 space-y-8">
-            <div className="text-center space-y-4">
-              <h2 className="text-3xl font-display font-bold text-zinc-900">VoxNova Text to Speech: हिंदी में प्रोफेशनल वॉइसओवर कैसे बनाएं?</h2>
-              <p className="text-zinc-600 max-w-2xl mx-auto">VoxNova एक बेहतरीन AI वॉइस जनरेटर है जो आपको हिंदी में उच्च गुणवत्ता वाले वॉइसओवर बनाने की सुविधा देता है।</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              <div className="space-y-4">
-                <h4 className="text-xl font-bold text-emerald-700">यूट्यूब और रील्स के लिए बेस्ट आवाज़ें</h4>
-                <p className="text-sm text-zinc-600 leading-relaxed">
-                  चाहे आप यूट्यूब वीडियो बना रहे हों या इंस्टाग्राम रील्स, हमारी आवाज़ें आपके कंटेंट को और भी आकर्षक बनाएंगी। 'Pankaj' और 'Sultan' जैसी आवाज़ें मोटिवेशनल और न्यूज़ वीडियो के लिए एकदम सही हैं।
-                </p>
+        <section className="bg-emerald-50/50 py-24">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="glass-panel p-12 md:p-20 rounded-[4rem] border-zinc-100 bg-white shadow-xl shadow-emerald-900/5 space-y-12 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+              <div className="text-center space-y-4 relative z-10">
+                <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900">VoxNova Text to Speech: हिंदी में प्रोफेशनल वॉइसओवर</h2>
+                <p className="text-zinc-600 max-w-2xl mx-auto text-lg">VoxNova एक बेहतरीन AI वॉइस जनरेटर है जो आपको हिंदी में उच्च गुणवत्ता वाले वॉइसओवर बनाने की सुविधा देता है।</p>
               </div>
-              <div className="space-y-4">
-                <h4 className="text-xl font-bold text-emerald-700">आसान और तेज़ वॉइस जनरेशन</h4>
-                <p className="text-sm text-zinc-600 leading-relaxed">
-                  बस अपना टेक्स्ट टाइप करें, अपनी पसंदीदा आवाज़ चुनें, और 'Generate' पर क्लिक करें। कुछ ही सेकंड में आपका प्रोफेशनल वॉइसओवर तैयार हो जाएगा। आप पिच और स्पीड को भी अपनी ज़रूरत के अनुसार बदल सकते हैं।
-                </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-16 relative z-10">
+                <div className="space-y-6">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                    <Video size={28} />
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="text-2xl font-bold text-zinc-900">यूट्यूब और रील्स के लिए बेस्ट आवाज़ें</h4>
+                    <p className="text-zinc-600 leading-relaxed text-lg">
+                      चाहे आप यूट्यूब वीडियो बना रहे हों या इंस्टाग्राम रील्स, हमारी आवाज़ें आपके कंटेंट को और भी आकर्षक बनाएंगी। 'Pankaj' और 'Sultan' जैसी आवाज़ें मोटिवेशनल और न्यूज़ वीडियो के लिए एकदम सही हैं।
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                    <Zap size={28} />
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="text-2xl font-bold text-zinc-900">आसान और तेज़ वॉइस जनरेशन</h4>
+                    <p className="text-zinc-600 leading-relaxed text-lg">
+                      बस अपना टेक्स्ट टाइप करें, अपनी पसंदीदा आवाज़ चुनें, और 'Generate' पर क्लिक करें। कुछ ही सेकंड में आपका प्रोफेशनल वॉइसओवर तैयार हो जाएगा। आप पिच और स्पीड को भी अपनी ज़रूरत के अनुसार बदल सकते हैं।
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        </section>
 
-          {/* FAQ Section for AdSense */}
-          <div className="space-y-8 pt-16 border-t border-zinc-100">
-            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">Frequently Asked Questions</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="bg-white py-24">
+          <div className="max-w-6xl mx-auto px-6 space-y-16">
+            <div className="text-center space-y-4">
+              <h3 className="text-4xl font-display font-bold text-zinc-900">Frequently Asked Questions</h3>
+              <p className="text-zinc-500">Everything you need to know about VoxNova.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {[
                 { q: "What is VoxNova Text to Speech?", a: "VoxNova is an advanced AI voice generation platform that converts text into realistic, human-like speech using neural networks." },
                 { q: "Is VoxNova free to use?", a: "We offer both free and premium plans. Free users get a daily credit limit, while premium users enjoy unlimited generations and high-fidelity voices." },
@@ -5392,37 +5034,45 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 { q: "How do I get the best quality AI voice?", a: "For the best results, use proper punctuation in your scripts and adjust the 'Style' and 'Pitch' settings to match your content's mood." },
                 { q: "Does VoxNova support voice cloning?", a: "Yes, our premium plan includes AI voice cloning technology that allows you to create a digital version of any voice from a short sample." }
               ].map((faq, i) => (
-                <div key={`faq-${i}`} className="p-6 bg-zinc-50 rounded-2xl space-y-2">
-                  <h4 className="font-bold text-zinc-900">{faq.q}</h4>
-                  <p className="text-sm text-zinc-500 leading-relaxed">{faq.a}</p>
+                <div key={`faq-${i}`} className="p-8 bg-zinc-50/50 rounded-[2rem] border border-zinc-100 space-y-3 hover:bg-white hover:shadow-lg transition-all duration-300">
+                  <h4 className="text-lg font-bold text-zinc-900 flex items-center gap-3">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    {faq.q}
+                  </h4>
+                  <p className="text-zinc-500 leading-relaxed pl-5">{faq.a}</p>
                 </div>
               ))}
             </div>
           </div>
+        </section>
 
-          {/* Hindi How it works Section for AdSense */}
-          <div className="space-y-8 pt-16 border-t border-zinc-100">
-            <h3 className="text-3xl font-display font-bold text-center text-zinc-900">VoxNova कैसे काम करता है?</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+        <section className="bg-zinc-50 py-24">
+          <div className="max-w-6xl mx-auto px-6 space-y-16">
+            <div className="text-center space-y-4">
+              <h3 className="text-4xl font-display font-bold text-zinc-900">VoxNova कैसे काम करता है?</h3>
+              <p className="text-zinc-500">चार आसान चरणों में अपनी आवाज़ तैयार करें।</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {[
-                { step: '01', title: 'टेक्स्ट दर्ज करें', desc: 'अपना स्क्रिप्ट हमारे एडिटर में पेस्ट करें। हम 10,000 अक्षरों तक के लंबे कंटेंट का समर्थन करते हैं।' },
-                { step: '02', title: 'आवाज़ चुनें', desc: 'हमारी 20+ प्रोफेशनल AI आवाज़ों की लाइब्रेरी से अपनी पसंद की आवाज़ चुनें।' },
-                { step: '03', title: 'सेटिंग्स बदलें', desc: 'अपनी आवाज़ को बेहतर बनाने के लिए पिच, स्पीड और इमोशनल स्टाइल को एडजस्ट करें।' },
-                { step: '04', title: 'वॉइस जनरेट करें', desc: 'हमारा AI इंजन कुछ ही सेकंड में आपके लिए स्टूडियो-क्वालिटी ऑडियो तैयार कर देगा।' }
+                { step: '01', title: 'टेक्स्ट दर्ज करें', desc: 'अपना स्क्रिप्ट हमारे एडिटर में पेस्ट करें। हम 5,000 अक्षरों तक के लंबे कंटेंट का समर्थन करते हैं।', img: 'https://picsum.photos/seed/hi-step1/400/300' },
+                { step: '02', title: 'आवाज़ चुनें', desc: 'हमारी 50+ प्रोफेशनल AI आवाज़ों की लाइब्रेरी से अपनी पसंद की आवाज़ चुनें।', img: 'https://picsum.photos/seed/hi-step2/400/300' },
+                { step: '03', title: 'सेटिंग्स बदलें', desc: 'अपनी आवाज़ को बेहतर बनाने के लिए पिच, स्पीड और इमोशनल स्टाइल को एडजस्ट करें।', img: 'https://picsum.photos/seed/hi-step3/400/300' },
+                { step: '04', title: 'वॉइस जनरेट करें', desc: 'हमारा AI इंजन कुछ ही सेकंड में आपके लिए स्टूडियो-क्वालिटी ऑडियो तैयार कर देगा।', img: 'https://picsum.photos/seed/hi-step4/400/300' }
               ].map((item, i) => (
-                <div key={`step-hi-${i}`} className="p-6 space-y-3">
-                  <div className="text-4xl font-display font-bold text-emerald-100">{item.step}</div>
-                  <h4 className="font-bold text-zinc-900">{item.title}</h4>
-                  <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
+                <div key={`step-hi-${i}`} className="space-y-6 group">
+                  <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-white border border-zinc-200 shadow-sm group-hover:shadow-md transition-all duration-300">
+                    <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" referrerPolicy="no-referrer" />
+                    <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-xl font-display font-bold text-white shadow-lg shadow-emerald-200">
+                      {item.step}
+                    </div>
+                  </div>
+                  <div className="space-y-2 px-2">
+                    <h4 className="text-xl font-bold text-zinc-900">{item.title}</h4>
+                    <p className="text-sm text-zinc-500 leading-relaxed">{item.desc}</p>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Bottom Ad Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
-            {/* Removed AdBox */}
-            {/* Removed AdBox */}
           </div>
         </section>
 
@@ -5885,9 +5535,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           />
         )}
       </AnimatePresence>
-    </div>
-  )}
-</AnimatePresence>
+      </div>
+    )}
+  </AnimatePresence>
 </ErrorBoundary>
 );
 };
