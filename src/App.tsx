@@ -84,6 +84,7 @@ import {
 import { CAPTION_PRESETS } from './constants/captionPresets';
 import { FONTS } from './constants/fonts';
 import CaptionEditor from './components/CaptionEditor';
+import VoiceClone from './components/VoiceClone/VoiceClone';
 import emailjs from 'emailjs-com';
 import Markdown from 'react-markdown';
 import { 
@@ -1374,6 +1375,13 @@ function Sidebar({
           Voice Changer
         </button>
         <button 
+          onClick={() => { setActiveTab('voice-clone'); setIsMobileMenuOpen(false); }}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'voice-clone' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
+        >
+          <Sparkles size={20} />
+          Voice Clone
+        </button>
+        <button 
           onClick={() => { setActiveTab('captions'); setIsMobileMenuOpen(false); }}
           className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'captions' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'}`}
         >
@@ -1526,7 +1534,7 @@ function App() {
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
   const [showLimitToast, setShowLimitToast] = useState(false);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts' | 'voice-clone'>('generate');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState('English');
@@ -4697,6 +4705,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </motion.div>
               )}
             </motion.div>
+          ) : activeTab === 'voice-clone' ? (
+            <VoiceClone onCloneCreated={(voice) => {
+              console.log("New clone created:", voice);
+              setSuccessMessage(`Voice "${voice.name}" cloned successfully!`);
+              setShowSuccessToast(true);
+              setTimeout(() => setShowSuccessToast(false), 3000);
+            }} />
           ) : activeTab === 'library' ? (
             <VoiceLibrary 
               onSelect={(voice) => {
