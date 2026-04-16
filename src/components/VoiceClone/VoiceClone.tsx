@@ -12,27 +12,46 @@ import {
   Music,
   Save,
   ChevronRight,
-  Volume2
+  Volume2,
+  Video,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth, googleProvider } from '../../firebase';
+import { User, signInWithPopup } from 'firebase/auth';
 
 interface ClonedVoice {
   id: string;
   name: string;
   sampleUrl: string;
   fingerprint: string;
-  createdAt: number;
+  createdAt: any;
 }
 
-const VoiceClone = ({ onCloneCreated }: { onCloneCreated: (voice: ClonedVoice) => void }) => {
+const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneCreated: (voice: any) => void, currentUser: User | null, onNavigateToTTS: () => void }) => {
   const [file, setFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [clonedVoiceName, setClonedVoiceName] = useState('');
   const [step, setStep] = useState<'upload' | 'analyze' | 'naming' | 'success'>('upload');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login failed:", error);
+      alert("Login failed. Please try again.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -62,19 +81,35 @@ const VoiceClone = ({ onCloneCreated }: { onCloneCreated: (voice: ClonedVoice) =
     }, 400);
   };
 
-  const handleSaveClone = () => {
-    if (!clonedVoiceName.trim()) return;
+  const handleSaveClone = async () => {
+    if (!clonedVoiceName.trim() || !currentUser) return;
     
-    const newClone: ClonedVoice = {
-      id: `clone-${Date.now()}`,
-      name: clonedVoiceName,
-      sampleUrl: previewUrl || '',
-      fingerprint: 'vocal-fingerprint-data-hash',
-      createdAt: Date.now()
-    };
-    
-    onCloneCreated(newClone);
-    setStep('success');
+    setIsSaving(true);
+    try {
+      const voiceData = {
+        uid: currentUser.uid,
+        name: clonedVoiceName,
+        gender: 'male' as const,
+        color: 'from-emerald-500 to-teal-600',
+        description: `Custom cloned voice: ${clonedVoiceName}`,
+        fingerprint: 'vocal-fingerprint-data-hash',
+        isCloned: true,
+        createdAt: serverTimestamp()
+      };
+      
+      const docRef = await addDoc(collection(db, 'cloned_voices'), voiceData);
+      
+      onCloneCreated({
+        id: docRef.id,
+        ...voiceData
+      });
+      setStep('success');
+    } catch (error) {
+      console.error("Error saving cloned voice:", error);
+      alert("Failed to save cloned voice. Please check your connection.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const togglePlayback = () => {
@@ -110,42 +145,62 @@ const VoiceClone = ({ onCloneCreated }: { onCloneCreated: (voice: ClonedVoice) =
               <div className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-200 rounded-[2.5rem] p-12 hover:border-emerald-500/30 transition-all group bg-zinc-50/50">
                 <input 
                   type="file" 
-                  accept="audio/*" 
+                  accept="audio/*,video/*" 
                   className="hidden" 
                   id="voice-sample-upload" 
                   onChange={handleFileChange}
                 />
                 <label 
                   htmlFor="voice-sample-upload"
-                  className="flex flex-col items-center gap-4 cursor-pointer"
+                  className="flex flex-col items-center gap-4 cursor-pointer w-full h-full"
                 >
-                  <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-zinc-400 group-hover:text-emerald-50 group-hover:scale-110 transition-all shadow-sm border border-zinc-100">
-                    <Upload size={32} />
+                  <div className="flex gap-4">
+                    <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-zinc-400 group-hover:text-emerald-500 group-hover:scale-110 transition-all shadow-sm border border-zinc-100">
+                      <Upload size={32} />
+                    </div>
+                    <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-zinc-400 group-hover:text-blue-500 group-hover:scale-110 transition-all shadow-sm border border-zinc-100">
+                      <Video size={32} />
+                    </div>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-bold text-zinc-900">Upload Voice Sample</p>
-                    <p className="text-sm text-zinc-500">WAV, MP3, or M4A (Min 10 seconds recommended)</p>
+                    <p className="text-sm text-zinc-500">WAV, MP3, M4A, or MP4 Video</p>
+                    <p className="text-[10px] text-zinc-400 mt-2 uppercase tracking-widest font-bold">Click anywhere in this box to upload</p>
                   </div>
                 </label>
               </div>
 
               {file && (
-                <div className="flex items-center justify-between p-6 bg-zinc-900 rounded-3xl text-white">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                      <Music size={20} className="text-emerald-400" />
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-6 bg-zinc-900 rounded-[2rem] text-white">
+                  <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
+                      {file.type.startsWith('video') ? (
+                        <Video size={20} className="text-blue-400" />
+                      ) : (
+                        <Music size={20} className="text-emerald-400" />
+                      )}
                     </div>
-                    <div>
-                      <p className="font-bold text-sm truncate max-w-[200px]">{file.name}</p>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-widest">Ready for analysis</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-sm truncate">{file.name}</p>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-widest">
+                        {file.type.startsWith('video') ? 'Video' : 'Audio'} Source Detected
+                      </p>
                     </div>
                   </div>
-                  <button 
-                    onClick={startAnalysis}
-                    className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-                  >
-                    Start Analysis <ChevronRight size={18} />
-                  </button>
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button 
+                      onClick={() => { setFile(null); setPreviewUrl(null); }}
+                      className="flex-1 md:flex-none p-3 bg-white/5 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all flex items-center justify-center"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                    <button 
+                      onClick={startAnalysis}
+                      className="flex-[3] md:flex-none px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                    >
+                      Start Analysis <ChevronRight size={18} />
+                    </button>
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -185,13 +240,15 @@ const VoiceClone = ({ onCloneCreated }: { onCloneCreated: (voice: ClonedVoice) =
 
               <div className="grid grid-cols-2 gap-4 w-full max-w-md">
                 {[
-                  { label: 'Prosody & Intonation', active: analysisProgress > 20 },
-                  { label: 'Micro-Expressions', active: analysisProgress > 45 },
-                  { label: 'Emotional Resonance', active: analysisProgress > 70 },
-                  { label: 'Accent Preservation', active: analysisProgress > 90 }
+                  { label: 'Prosody & Intonation', active: analysisProgress > 15 },
+                  { label: 'Neural Mapping', active: analysisProgress > 35 },
+                  { label: 'Micro-Expressions', active: analysisProgress > 55 },
+                  { label: 'Emotional Resonance', active: analysisProgress > 75 },
+                  { label: 'Acoustic Fingerprint', active: analysisProgress > 90 },
+                  { label: 'Elite Synthesis Ready', active: analysisProgress >= 100 }
                 ].map((item, i) => (
                   <div key={i} className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${item.active ? 'text-emerald-600' : 'text-zinc-300'}`}>
-                    <Check size={12} /> {item.label}
+                    <Check size={12} className={item.active ? 'animate-bounce' : ''} /> {item.label}
                   </div>
                 ))}
               </div>
@@ -205,42 +262,59 @@ const VoiceClone = ({ onCloneCreated }: { onCloneCreated: (voice: ClonedVoice) =
               animate={{ opacity: 1, x: 0 }}
               className="space-y-8"
             >
-              <div className="flex items-center gap-6 p-8 bg-zinc-50 rounded-[2.5rem] border border-zinc-100">
-                <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+              <div className="flex flex-col md:flex-row items-center gap-6 p-6 md:p-8 bg-zinc-50 rounded-[2.5rem] border border-zinc-100">
+                <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
                   <Sparkles size={32} />
                 </div>
-                <div className="flex-1 space-y-1">
-                  <h3 className="text-2xl font-bold text-zinc-900">Cloning Successful!</h3>
-                  <p className="text-sm text-zinc-500">The vocal fingerprint has been extracted with 99.8% accuracy.</p>
+                <div className="flex-1 space-y-1 text-center md:text-left">
+                  <h3 className="text-2xl font-bold text-zinc-900">Elite Synthesis Complete!</h3>
+                  <p className="text-sm text-zinc-500">Your realistic digital twin is ready. We've mapped every emotional nuance and micro-expression.</p>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <label className="text-sm font-bold text-zinc-900 ml-2">Name Your Cloned Voice</label>
+                <label className="text-sm font-bold text-zinc-900 ml-2">Name Your Realistic Clone</label>
                 <input 
                   type="text" 
                   value={clonedVoiceName}
                   onChange={(e) => setClonedVoiceName(e.target.value)}
-                  placeholder="e.g. My Personal Voice, CEO Voice..."
+                  placeholder="e.g. My Realistic Voice, CEO Master..."
                   className="w-full p-6 bg-white border-2 border-zinc-100 rounded-3xl text-xl focus:outline-none focus:border-emerald-500 transition-all shadow-sm"
                 />
-                <p className="text-xs text-zinc-400 ml-2">This name is private and only visible to you.</p>
+                <p className="text-xs text-zinc-400 ml-2">This voice will be added to your private library for Text to Speech.</p>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
                 <button 
                   onClick={() => setStep('upload')}
-                  className="flex-1 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
+                  className="w-full md:flex-1 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
                 >
                   Discard
                 </button>
-                <button 
-                  onClick={handleSaveClone}
-                  disabled={!clonedVoiceName.trim()}
-                  className="flex-[2] py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
-                >
-                  <Save size={20} /> Save Cloned Voice
-                </button>
+                
+                {!currentUser ? (
+                  <button 
+                    onClick={handleLogin}
+                    disabled={isLoggingIn}
+                    className="w-full md:flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
+                  >
+                    {isLoggingIn ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+                    {isLoggingIn ? 'Logging in...' : 'Login to Save Clone'}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleSaveClone}
+                    disabled={!clonedVoiceName.trim() || isSaving}
+                    className="w-full md:flex-[2] py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <Save size={20} />
+                    )}
+                    {isSaving ? 'Synthesizing...' : 'Save Realistic Clone'}
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -262,7 +336,7 @@ const VoiceClone = ({ onCloneCreated }: { onCloneCreated: (voice: ClonedVoice) =
                 </p>
               </div>
               <button 
-                onClick={() => window.location.reload()} // Simplified for now
+                onClick={onNavigateToTTS}
                 className="px-12 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20"
               >
                 Go to Text to Speech

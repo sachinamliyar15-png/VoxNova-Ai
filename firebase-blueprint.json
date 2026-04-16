@@ -16,6 +16,21 @@
       },
       "required": ["uid", "email", "credits", "plan", "lastResetDate"]
     },
+    "ClonedVoice": {
+      "title": "Cloned Voice",
+      "description": "Stores metadata for a user's cloned voice.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner's UID" },
+        "name": { "type": "string", "description": "Custom name for the voice" },
+        "gender": { "type": "string", "enum": ["male", "female"] },
+        "color": { "type": "string" },
+        "description": { "type": "string" },
+        "fingerprint": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "fingerprint", "createdAt"]
+    },
     "VoiceHistory": {
       "title": "Voice History",
       "description": "Stores history of generated voice clips",
@@ -55,6 +70,10 @@
     "/caption_history/{historyId}": {
       "schema": "CaptionHistory",
       "description": "Caption generation history"
+    },
+    "/cloned_voices/{voiceId}": {
+      "schema": "ClonedVoice",
+      "description": "User's private cloned voices"
     }
   }
 }

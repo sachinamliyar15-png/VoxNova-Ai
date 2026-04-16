@@ -981,10 +981,10 @@ const CaptionOverlay = ({
   );
 };
 
-const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab }: { onSelect: (voice: Voice) => void, selectedVoiceId: string, activeTab?: string }) => {
+const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab, voices }: { onSelect: (voice: Voice) => void, selectedVoiceId: string, activeTab?: string, voices: Voice[] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
-  const filteredVoices = VOICES.filter(v => {
+  const filteredVoices = voices.filter(v => {
     const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       v.tags?.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
     
@@ -1044,6 +1044,11 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab }: { onSelect: (voi
               {voice.isPremium && (
                 <div className="p-1.5 bg-amber-50 text-amber-500 rounded-lg">
                   <Crown size={14} />
+                </div>
+              )}
+              {voice.isCloned && (
+                <div className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase">
+                  Cloned
                 </div>
               )}
             </div>
@@ -1511,6 +1516,10 @@ function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [history, setHistory] = useState<Generation[]>([]);
   const [currentAudio, setCurrentAudio] = useState<string | null>(null);
+  const [clonedVoices, setClonedVoices] = useState<Voice[]>([]);
+
+  // Combined voices list
+  const allVoices = React.useMemo(() => [...VOICES, ...clonedVoices], [clonedVoices]);
 
   // Load guest history from sessionStorage on mount
   useEffect(() => {
@@ -1525,12 +1534,36 @@ function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    return () => {
-      if (currentAudio && currentAudio.startsWith('blob:')) {
-        URL.revokeObjectURL(currentAudio);
-      }
-    };
-  }, [currentAudio]);
+    if (!currentUser) {
+      setClonedVoices([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'cloned_voices'),
+      where('uid', '==', currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const voices = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Voice[];
+      
+      // Sort in memory by createdAt
+      voices.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.seconds || 0;
+        const timeB = b.createdAt?.seconds || 0;
+        return timeB - timeA;
+      });
+      
+      setClonedVoices(voices);
+    }, (error) => {
+      console.error("Error fetching cloned voices:", error);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
   const [showVoiceLibrary, setShowVoiceLibrary] = useState(false);
   const [showLimitToast, setShowLimitToast] = useState(false);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
@@ -1649,7 +1682,7 @@ function App() {
       });
       if (!response.ok) throw new Error("Classification failed");
       const { suggestedVoiceId, category } = await response.json();
-      const voice = VOICES.find(v => v.id === suggestedVoiceId);
+      const voice = allVoices.find(v => v.id === suggestedVoiceId);
       if (voice) {
         setSelectedVoice(voice);
         showToast(`Magic Suggest: Selected ${voice.name} for your ${category} script!`);
@@ -2974,7 +3007,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleRestoreScript = (item: Generation) => {
     if (item.text) setText(item.text);
-    const voice = VOICES.find(v => v.name === item.voice_name);
+    const voice = allVoices.find(v => v.name === item.voice_name);
     if (voice) setSelectedVoice(voice);
     setSpeed(item.speed || 1);
     setPitch(item.pitch || 1);
@@ -3732,62 +3765,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     </>
                   )}
                 </button>
-                </div>
-
-                {isGenerating && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-zinc-500">
-                      <span>{loadingMessages[loadingStep]}</span>
-                      <span>{generationProgress}%</span>
-                    </div>
-                    <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${generationProgress}%` }}
-                        className="h-full bg-white"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-4 rounded-xl text-sm flex flex-col gap-3 ${
-                      errorType === 'rate-limit' 
-                        ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' 
-                        : 'bg-red-500/10 border border-red-500/20 text-red-400'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {errorType === 'rate-limit' ? (
-                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                      ) : (
-                        <X size={18} className="shrink-0 mt-0.5" />
-                      )}
-                      <div className="flex-1 space-y-2">
-                        <p className="font-bold leading-tight">
-                          {errorType === 'rate-limit' ? 'Server Busy (Rate Limit)' : 'Generation Error'}
-                        </p>
-                        <p className="leading-relaxed opacity-90">{error}</p>
-                        
-                        {errorType === 'rate-limit' && (
-                          <div className="pt-2 mt-2 border-t border-amber-500/10 flex items-start gap-2 text-[11px] italic opacity-70">
-                            <HelpCircle size={12} className="shrink-0 mt-0.5" />
-                            <p>Rate limiting occurs when many users generate voices simultaneously. Our AI models have a maximum capacity to ensure high quality for everyone. Trying again in a few minutes usually resolves this.</p>
-                          </div>
-                        )}
-                      </div>
-                      <button 
-                        onClick={() => { setError(null); setErrorType(null); }}
-                        className="p-1 hover:bg-white/5 rounded-full transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="glass-panel p-4 rounded-2xl space-y-3">
@@ -3955,6 +3932,81 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </div>
                 </div>
 
+                <div className="pt-4">
+                  <button 
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !text || !selectedVoice}
+                    className="w-full py-5 px-6 bg-black text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-black/20"
+                  >
+                    {isGenerating ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="animate-spin" size={24} />
+                        <span>Generating {generationProgress}%</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Play size={24} fill="currentColor" />
+                        <span>Generate Voice</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {isGenerating && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-zinc-500">
+                      <span>{loadingMessages[loadingStep]}</span>
+                      <span>{generationProgress}%</span>
+                    </div>
+                    <div className="w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${generationProgress}%` }}
+                        className="h-full bg-emerald-500"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`p-4 rounded-xl text-sm flex flex-col gap-3 ${
+                      errorType === 'rate-limit' 
+                        ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' 
+                        : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {errorType === 'rate-limit' ? (
+                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                      ) : (
+                        <X size={18} className="shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 space-y-2">
+                        <p className="font-bold leading-tight">
+                          {errorType === 'rate-limit' ? 'Server Busy (Rate Limit)' : 'Generation Error'}
+                        </p>
+                        <p className="leading-relaxed opacity-90">{error}</p>
+                        
+                        {errorType === 'rate-limit' && (
+                          <div className="pt-2 mt-2 border-t border-amber-500/10 flex items-start gap-2 text-[11px] italic opacity-70">
+                            <HelpCircle size={12} className="shrink-0 mt-0.5" />
+                            <p>Rate limiting occurs when many users generate voices simultaneously. Our AI models have a maximum capacity to ensure high quality for everyone. Trying again in a few minutes usually resolves this.</p>
+                          </div>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => { setError(null); setErrorType(null); }}
+                        className="p-1 hover:bg-white/5 rounded-full transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
                 {currentAudio && (
                   <audio 
                     ref={audioRef} 
@@ -3965,6 +4017,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     onEnded={() => setIsPlaying(false)}
                   />
                 )}
+              </div>
             </motion.div>
           ) : activeTab === 'captions' ? (
             <motion.div 
@@ -4680,7 +4733,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         onClick={() => {
                           const a = document.createElement('a');
                           a.href = voiceChangingResult.url;
-                          const voiceName = VOICES.find(v => v.id === selectedVoice.id)?.name || 'AI Voice';
+                          const voiceName = allVoices.find(v => v.id === selectedVoice.id)?.name || 'AI Voice';
                           a.download = `VoxNova Text to Speech - ${voiceName}-${Date.now()}.${voiceChangingResult.type === 'video' ? 'mp4' : 'wav'}`;
                           a.click();
                         }}
@@ -4706,14 +4759,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               )}
             </motion.div>
           ) : activeTab === 'voice-clone' ? (
-            <VoiceClone onCloneCreated={(voice) => {
-              console.log("New clone created:", voice);
-              setSuccessMessage(`Voice "${voice.name}" cloned successfully!`);
-              setShowSuccessToast(true);
-              setTimeout(() => setShowSuccessToast(false), 3000);
-            }} />
+            <VoiceClone 
+              currentUser={currentUser}
+              onCloneCreated={(voice) => {
+                setSuccessMessage(`Elite Neural Model "${voice.name}" synthesized successfully! It's now available in your library.`);
+                setShowSuccessToast(true);
+                setTimeout(() => setShowSuccessToast(false), 3000);
+              }} 
+              onNavigateToTTS={() => setActiveTab('generate')}
+            />
           ) : activeTab === 'library' ? (
             <VoiceLibrary 
+              voices={allVoices}
               onSelect={(voice) => {
                 setSelectedVoice(voice);
                 setActiveTab('generate');
@@ -4921,7 +4978,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 ].map((item, i) => (
                   <div key={`step-en-${i}`} className="space-y-6 group">
                     <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-zinc-100 border border-zinc-200 shadow-sm group-hover:shadow-md transition-all duration-300">
-                      <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" referrerPolicy="no-referrer" />
+                      <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-emerald-500/0 group-hover:bg-emerald-500/5 transition-colors duration-500" />
                       <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-xl font-display font-bold text-zinc-900 shadow-sm">
                         {item.step}
                       </div>
@@ -4976,8 +5034,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   className="group cursor-pointer space-y-6" 
                   onClick={() => { setSelectedArticle(i); setShowBlog(true); }}
                 >
-                  <div className="aspect-video rounded-[2rem] overflow-hidden border border-zinc-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-500">
-                    <img src={article.img} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" referrerPolicy="no-referrer" />
+                  <div className="aspect-video rounded-[2rem] overflow-hidden border border-zinc-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-500 relative">
+                    <img src={article.img} alt={article.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500 flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-zinc-900 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-500 shadow-xl">
+                        <Play size={32} fill="currentColor" className="ml-1" />
+                      </div>
+                    </div>
+                    <div className="absolute bottom-4 left-4 right-4 h-1 bg-white/20 rounded-full overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                      <motion.div 
+                        className="h-full bg-emerald-500"
+                        initial={{ width: 0 }}
+                        whileInView={{ width: "100%" }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-3 px-2">
                     <div className="flex items-center gap-3">
@@ -5415,7 +5486,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {VOICES.filter(v => {
+                {allVoices.filter(v => {
                   const matchesSearch = v.name.toLowerCase().includes(voiceSearchTerm.toLowerCase());
                   if (v.id === 'original') return false;
                   return matchesSearch;

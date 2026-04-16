@@ -5,6 +5,7 @@ export interface Voice {
   previewUrl?: string;
   description: string;
   isPremium?: boolean;
+  isCloned?: boolean;
   color: string;
   tags?: string[];
 }
