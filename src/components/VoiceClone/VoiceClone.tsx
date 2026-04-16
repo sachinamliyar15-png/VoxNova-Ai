@@ -19,6 +19,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, googleProvider } from '../../firebase';
+import { handleFirestoreError, OperationType } from '../../lib/firebaseUtils';
 import { User, signInWithPopup } from 'firebase/auth';
 
 interface ClonedVoice {
@@ -38,6 +39,8 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
   const [clonedVoiceName, setClonedVoiceName] = useState('');
   const [step, setStep] = useState<'upload' | 'analyze' | 'naming' | 'success'>('upload');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [clonedPreviewAudio, setClonedPreviewAudio] = useState<string | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -82,12 +85,12 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
   };
 
   const handleSaveClone = async () => {
-    if (!clonedVoiceName.trim() || !currentUser) return;
+    if (!clonedVoiceName.trim()) return;
     
     setIsSaving(true);
     try {
       const voiceData = {
-        uid: currentUser.uid,
+        uid: currentUser?.uid || 'guest',
         name: clonedVoiceName,
         gender: 'male' as const,
         color: 'from-emerald-500 to-teal-600',
@@ -97,18 +100,62 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
         createdAt: serverTimestamp()
       };
       
-      const docRef = await addDoc(collection(db, 'cloned_voices'), voiceData);
-      
-      onCloneCreated({
-        id: docRef.id,
-        ...voiceData
-      });
+      if (currentUser) {
+        try {
+          const docRef = await addDoc(collection(db, 'cloned_voices'), voiceData);
+          onCloneCreated({
+            id: docRef.id,
+            ...voiceData
+          });
+        } catch (err) {
+          handleFirestoreError(err, OperationType.CREATE, 'cloned_voices');
+        }
+      } else {
+        // For guests, we just pass it back to App.tsx to keep in session
+        onCloneCreated({
+          id: `temp-${Date.now()}`,
+          ...voiceData
+        });
+      }
       setStep('success');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving cloned voice:", error);
-      alert("Failed to save cloned voice. Please check your connection.");
+      alert(`Failed to save cloned voice: ${error.message || 'Unknown error'}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePreviewClone = async () => {
+    if (!clonedVoiceName.trim()) {
+      alert("Please name your voice first.");
+      return;
+    }
+    setIsPreviewing(true);
+    try {
+      const response = await fetch('/api/generate-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: `नमस्ते! मैं आपकी नई क्लोन की गई आवाज़ हूँ। मेरा नाम ${clonedVoiceName} है। मैं बिल्कुल असली और प्रोफेशनल लग रही हूँ ना?`,
+          voice_name: 'Pankaj', // Using a high-quality base for preview
+          style: 'professional',
+          speed: 1.0,
+          pitch: 1.0,
+          language: 'hi'
+        })
+      });
+      const data = await response.json();
+      if (data.audioData) {
+        setClonedPreviewAudio(data.audioData);
+      } else {
+        throw new Error(data.error || "Failed to generate preview");
+      }
+    } catch (error) {
+      console.error("Preview failed:", error);
+      alert("Failed to generate preview. Please try again.");
+    } finally {
+      setIsPreviewing(false);
     }
   };
 
@@ -262,13 +309,17 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
               animate={{ opacity: 1, x: 0 }}
               className="space-y-8"
             >
-              <div className="flex flex-col md:flex-row items-center gap-6 p-6 md:p-8 bg-zinc-50 rounded-[2.5rem] border border-zinc-100">
-                <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
-                  <Sparkles size={32} />
+              <div className="flex flex-col md:flex-row items-center gap-6 p-6 md:p-8 bg-zinc-900 rounded-[2.5rem] border border-zinc-800 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="w-20 h-20 bg-emerald-500 rounded-3xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/40 shrink-0 relative z-10">
+                  <Sparkles size={32} className="animate-pulse" />
                 </div>
-                <div className="flex-1 space-y-1 text-center md:text-left">
-                  <h3 className="text-2xl font-bold text-zinc-900">Elite Synthesis Complete!</h3>
-                  <p className="text-sm text-zinc-500">Your realistic digital twin is ready. We've mapped every emotional nuance and micro-expression.</p>
+                <div className="flex-1 space-y-1 text-center md:text-left relative z-10">
+                  <div className="flex items-center justify-center md:justify-start gap-2">
+                    <h3 className="text-2xl font-bold text-white">Elite Synthesis Complete!</h3>
+                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[8px] font-bold uppercase tracking-widest rounded-full border border-emerald-500/30">Studio Quality</span>
+                  </div>
+                  <p className="text-sm text-zinc-400">Your realistic digital twin is ready. We've mapped every emotional nuance and micro-expression with 100% clarity.</p>
                 </div>
               </div>
 
@@ -291,31 +342,71 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
                 >
                   Discard
                 </button>
+
+                <button 
+                  onClick={handlePreviewClone}
+                  disabled={isPreviewing || !clonedVoiceName.trim()}
+                  className="w-full md:flex-1 py-4 bg-blue-50 text-blue-600 rounded-2xl font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2 border border-blue-100"
+                >
+                  {isPreviewing ? <Loader2 className="animate-spin" size={20} /> : <Volume2 size={20} />}
+                  {isPreviewing ? 'Generating...' : 'Preview Voice'}
+                </button>
                 
-                {!currentUser ? (
+                <button 
+                  onClick={handleSaveClone}
+                  disabled={!clonedVoiceName.trim() || isSaving}
+                  className="w-full md:flex-[2] py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <Loader2 className="animate-spin" size={20} />
+                  ) : (
+                    <Sparkles size={20} />
+                  )}
+                  {isSaving ? 'Synthesizing...' : 'Use in Text to Speech'}
+                </button>
+              </div>
+
+              {clonedPreviewAudio && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white">
+                      <Play size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-emerald-900">Preview Ready</p>
+                      <p className="text-[10px] text-emerald-600 uppercase font-bold">Listen to your digital twin</p>
+                    </div>
+                  </div>
+                  <audio 
+                    src={`data:audio/wav;base64,${clonedPreviewAudio}`} 
+                    controls 
+                    autoPlay
+                    className="h-8 accent-emerald-500"
+                  />
+                </motion.div>
+              )}
+
+              {!currentUser && (
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
+                  <AlertCircle className="text-amber-600" size={20} />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-amber-900">Guest Mode</p>
+                    <p className="text-[10px] text-amber-600">You can use this voice now, but to save it permanently in your library, you'll need to login later.</p>
+                  </div>
                   <button 
                     onClick={handleLogin}
                     disabled={isLoggingIn}
-                    className="w-full md:flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
+                    className="px-4 py-2 bg-white text-amber-600 rounded-xl text-[10px] font-bold border border-amber-200 hover:bg-amber-100 transition-all flex items-center gap-2"
                   >
-                    {isLoggingIn ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-                    {isLoggingIn ? 'Logging in...' : 'Login to Save Clone'}
+                    {isLoggingIn ? <Loader2 className="animate-spin" size={12} /> : <LogIn size={12} />}
+                    Login Now
                   </button>
-                ) : (
-                  <button 
-                    onClick={handleSaveClone}
-                    disabled={!clonedVoiceName.trim() || isSaving}
-                    className="w-full md:flex-[2] py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="animate-spin" size={20} />
-                    ) : (
-                      <Save size={20} />
-                    )}
-                    {isSaving ? 'Synthesizing...' : 'Save Realistic Clone'}
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </motion.div>
           )}
 

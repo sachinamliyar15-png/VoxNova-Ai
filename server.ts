@@ -635,7 +635,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       if (style === 'professional-auto') {
         try {
           const analysisResponse = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             contents: [{ parts: [{ text: `Analyze the following script and determine its category (e.g., Documentary, Fitness, Motivation, Story, News, Corporate) and the ideal vocal tone, pace, and emotional weight. Provide a brief professional instruction for a voice actor to perform this script perfectly.
             
             SCRIPT:
@@ -712,10 +712,10 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: currentPrompt }] }],
-        config: {
+      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const response = await model.generateContent({
+        contents: [{ parts: [{ text: `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}` }] }],
+        generationConfig: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
@@ -725,7 +725,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         },
       });
 
-      const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const audioData = response.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (audioData) {
         return res.json({ audioData });
       } else {
@@ -887,7 +887,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       if (style === 'professional-auto') {
         try {
           const analysisResponse = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             contents: [{ parts: [{ text: `Analyze the following script and determine its category (e.g., Documentary, Fitness, Motivation, Story, News, Corporate) and the ideal vocal tone, pace, and emotional weight. Provide a brief professional instruction for a voice actor to perform this script perfectly.
             
             SCRIPT:
@@ -992,10 +992,10 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
             ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
             : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunk}`;
 
-          const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: currentPrompt }] }],
-            config: {
+          const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+          const response = await model.generateContent({
+            contents: [{ parts: [{ text: `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}` }] }],
+            generationConfig: {
               responseModalities: [Modality.AUDIO],
               speechConfig: {
                 voiceConfig: {
@@ -1005,7 +1005,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
             },
           });
 
-          const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          const base64 = response.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
           if (base64) return Buffer.from(base64, 'base64');
           return null;
         });
@@ -1131,14 +1131,14 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Step 1: Transcribe
       const prompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
 
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const transModel = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await transModel.generateContent({
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
       });
 
-      const transcribedText = result.text?.trim();
+      const transcribedText = result.response.text()?.trim();
       if (!transcribedText) {
         console.log("[Voice Changer] No text transcribed or transcription failed.");
         return res.status(400).json({ error: "Could not detect any speech in the uploaded file. Please ensure the audio is clear." });
@@ -1180,12 +1180,11 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts.
       `;
 
-      const ttsResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: transcribedText }] }],
-        config: {
+      const ttsModel = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const ttsResponse = await ttsModel.generateContent({
+        contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
+        generationConfig: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: ttsSystemInstruction,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
@@ -1194,7 +1193,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         }
       });
 
-      const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const audioData = ttsResponse.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!audioData) throw new Error("Failed to generate speech in target voice");
 
       // Convert PCM to WAV
@@ -1374,7 +1373,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
       const previewText = languagePreviews[voice_id] || (req.body.language === 'ta' ? languagePreviews['tamil-preview'] : `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`);
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
+        model: "gemini-1.5-flash",
         contents: [{ parts: [{ text: previewText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1425,12 +1424,12 @@ app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
     Script: "${text}"
     Return ONLY the category name.`;
 
-    const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
-    const category = result.text.trim();
+    const category = result.response.text().trim();
     
     // Map category to voice ID
     let suggestedVoiceId = 'leo';
@@ -1636,8 +1635,8 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ? videoData.split(';')[0].split(':')[1] 
         : "video/mp4";
 
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent({
         contents: [
           {
             role: "user",
@@ -1654,7 +1653,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ]
       });
 
-      const responseText = result.text;
+      const responseText = result.response.text();
       const jsonMatch = responseText.match(/\[.*\]/s);
       if (!jsonMatch) {
         throw new Error("Failed to parse word-level timestamps from AI response");

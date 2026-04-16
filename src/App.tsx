@@ -101,6 +101,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db, auth, googleProvider, analytics, logEvent } from './firebase';
+import { testFirestoreConnection } from './lib/firebaseUtils';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -119,25 +120,57 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
   render() {
     if (this.state.hasError) {
+      let isFirestoreError = false;
+      let fsErrorData: any = null;
+      try {
+        if (this.state.error?.message) {
+          fsErrorData = JSON.parse(this.state.error.message);
+          if (fsErrorData.operationType && fsErrorData.authInfo) {
+            isFirestoreError = true;
+          }
+        }
+      } catch (e) {
+        // Not a JSON error
+      }
+
       return (
         <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
           <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mb-6">
             <AlertCircle size={32} />
           </div>
-          <h1 className="text-2xl font-bold text-zinc-900 mb-2">Something went wrong</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 mb-2">
+            {isFirestoreError ? 'Database Access Error' : 'Something went wrong'}
+          </h1>
           <p className="text-zinc-500 mb-8 max-w-md">
-            The application encountered an unexpected error. Please try refreshing the page.
+            {isFirestoreError 
+              ? `We encountered a permission issue while trying to ${fsErrorData.operationType} data at ${fsErrorData.path}. Please ensure you are logged in and have the correct permissions.` 
+              : 'The application encountered an unexpected error. Please try refreshing the page.'}
           </p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all"
-          >
-            Refresh Page
-          </button>
-          <div className="mt-8 p-4 bg-zinc-50 rounded-lg text-left text-xs text-red-600 overflow-auto max-w-full">
-            <p className="font-bold mb-2">Error Details:</p>
-            <pre>{this.state.error?.toString()}</pre>
-            <pre className="mt-2 opacity-50">{this.state.error?.stack}</pre>
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-4 justify-center">
+              <button 
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all"
+              >
+                Refresh Page
+              </button>
+              {isFirestoreError && (
+                <button 
+                  onClick={() => {
+                    this.setState({ hasError: false, error: null });
+                    window.location.href = '/';
+                  }}
+                  className="px-6 py-3 bg-white border border-zinc-200 text-zinc-900 rounded-xl font-bold hover:bg-zinc-50 transition-all"
+                >
+                  Go to Home
+                </button>
+              )}
+            </div>
+            <div className="mt-8 p-4 bg-zinc-50 rounded-lg text-left text-xs text-red-600 overflow-auto max-w-full">
+              <p className="font-bold mb-2">Error Details:</p>
+              <pre className="whitespace-pre-wrap">{this.state.error?.toString()}</pre>
+              <pre className="mt-2 opacity-50 whitespace-pre-wrap">{this.state.error?.stack}</pre>
+            </div>
           </div>
         </div>
       );
@@ -1491,6 +1524,10 @@ function Sidebar({
 
 function App() {
   console.log("VoxNova: App component initializing...");
+  
+  useEffect(() => {
+    testFirestoreConnection();
+  }, []);
   const [text, setText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState<Voice>(VOICES[1]);
   const [style, setStyle] = useState('normal');
@@ -1516,6 +1553,9 @@ function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [history, setHistory] = useState<Generation[]>([]);
   const [currentAudio, setCurrentAudio] = useState<string | null>(null);
+  const [lastGeneration, setLastGeneration] = useState<Generation | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   const [clonedVoices, setClonedVoices] = useState<Voice[]>([]);
 
   // Combined voices list
@@ -2087,6 +2127,16 @@ function App() {
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
       
+      // Monitor progress for better UI feedback
+      ffmpeg.on('progress', ({ progress }) => {
+        // Map 0-1 progress to 90%-100% of the overall voice changer progress
+        setVoiceChangingProgress(Math.floor(90 + (progress * 10)));
+      });
+
+      ffmpeg.on('log', ({ message }) => {
+        console.log("FFmpeg Log:", message);
+      });
+      
       ffmpegRef.current = ffmpeg;
       setIsFFmpegLoaded(true);
       console.log("FFmpeg loaded successfully");
@@ -2287,13 +2337,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if (!ffmpegRef.current) await loadFFmpeg();
     const ffmpeg = ffmpegRef.current;
     
-    const { fetchFile } = await import('@ffmpeg/util');
+    const fetchFile = (await import('@ffmpeg/util')).fetchFile;
     const inputVideo = 'video.mp4';
     const inputAudio = 'audio.wav';
     const outputName = 'processed.mp4';
     
-    await ffmpeg.writeFile(inputVideo, await fetchFile(videoFile));
+    // Clear any previous files to prevent disk usage issues
+    try {
+      await ffmpeg.deleteFile(inputVideo);
+      await ffmpeg.deleteFile(inputAudio);
+      await ffmpeg.deleteFile(outputName);
+    } catch (e) {
+      // Ignore errors if files don't exist
+    }
     
+    setVoiceChangingStep('Writing video track...');
+    await ffmpeg.writeFile(inputVideo, await fetchFile(videoFile));
+    setVoiceChangingProgress(85);
+    
+    setVoiceChangingStep('Preparing audio track...');
     // Gemini TTS returns raw PCM (24kHz, 16-bit mono). FFmpeg needs a WAV header to read it correctly as .wav
     const pcmBuffer = base64ToArrayBuffer(audioData);
     const wavHeader = createWavHeader(pcmBuffer, 24000);
@@ -2302,11 +2364,38 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     fullAudioBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
     
     await ffmpeg.writeFile(inputAudio, fullAudioBuffer);
+    setVoiceChangingProgress(90);
     
+    setVoiceChangingStep('Merging audio and video...');
     // Merge audio and video, replacing original audio
-    await ffmpeg.exec(['-i', inputVideo, '-i', inputAudio, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-shortest', outputName]);
+    // Use -c:a aac for better compatibility and to ensure output plays everywhere
+    // Add -preset ultrafast for faster processing in the browser
+    await ffmpeg.exec([
+      '-i', inputVideo, 
+      '-i', inputAudio, 
+      '-c:v', 'copy', 
+      '-c:a', 'aac', 
+      '-b:a', '128k',
+      '-map', '0:v:0', 
+      '-map', '1:a:0', 
+      '-shortest',
+      '-preset', 'ultrafast',
+      outputName
+    ]);
     
+    setVoiceChangingProgress(98);
+    setVoiceChangingStep('Finalizing file...');
     const data = await ffmpeg.readFile(outputName);
+    
+    // Cleanup
+    try {
+      await ffmpeg.deleteFile(inputVideo);
+      await ffmpeg.deleteFile(inputAudio);
+      await ffmpeg.deleteFile(outputName);
+    } catch (e) {
+      // Ignore
+    }
+    
     return new Blob([data], { type: 'video/mp4' });
   };
 
@@ -2326,15 +2415,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const mimeType = voiceChangingFile.type;
       
       setVoiceChangingProgress(20);
-      setVoiceChangingStep('Transcribing audio...');
-
+      setVoiceChangingStep('Analyzing vocal fingerprint...');
+      
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
       
       // Step 1: Transcribe
+      setVoiceChangingStep('Transcribing audio with AI...');
       const transcribePrompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
 
       const transcribeResult = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-1.5-flash",
         contents: [
           { parts: [{ text: transcribePrompt }, { inlineData: { data: base64Data.split(',')[1], mimeType } }] }
         ]
@@ -2346,7 +2436,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       }
 
       setVoiceChangingProgress(50);
-      setVoiceChangingStep('Generating target voice...');
+      setVoiceChangingStep('Synthesizing neural audio...');
 
       // Ensure we only use the 5 supported voices for Gemini TTS
       const validTTSVoices = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
@@ -2382,11 +2472,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       `;
 
       const ttsResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: transcribedText }] }],
+        model: "gemini-1.5-flash",
+        contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: ttsSystemInstruction,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
@@ -2607,6 +2696,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleGenerate = async () => {
     if (!text.trim()) return;
 
@@ -2793,6 +2888,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       
       const audioUrl = URL.createObjectURL(finalBlob);
       setCurrentAudio(audioUrl);
+      setAudioCurrentTime(0);
+      setAudioDuration(0);
       
       // Create local generation object for immediate UI update
       const newGen: Generation = {
@@ -2807,6 +2904,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         created_at: new Date().toISOString(),
         timestamp: { _seconds: Math.floor(Date.now() / 1000) }
       };
+
+      setLastGeneration({ ...newGen, audio_url: audioUrl });
 
       // Update local history state immediately
       setHistory(prev => [newGen, ...prev]);
@@ -3751,7 +3850,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 <button 
                   onClick={handleGenerate}
                   disabled={isGenerating || !text || !selectedVoice}
-                  className="w-full py-5 px-6 bg-emerald-500 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20"
+                  className="w-full py-5 px-6 bg-emerald-500 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20 group"
                 >
                   {isGenerating ? (
                     <div className="flex items-center gap-2">
@@ -3760,7 +3859,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     </div>
                   ) : (
                     <>
-                      <Play size={24} fill="currentColor" />
+                      <Sparkles size={24} className="group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" />
                       <span>Generate Voice</span>
                     </>
                   )}
@@ -3936,8 +4035,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   <button 
                     onClick={handleGenerate}
                     disabled={isGenerating || !text || !selectedVoice}
-                    className="w-full py-5 px-6 bg-black text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-black/20"
+                    className="w-full py-5 px-6 bg-black text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-black/20 group relative overflow-hidden"
                   >
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                     {isGenerating ? (
                       <div className="flex items-center gap-2">
                         <Loader2 className="animate-spin" size={24} />
@@ -3945,12 +4045,110 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
                     ) : (
                       <>
-                        <Play size={24} fill="currentColor" />
+                        <Sparkles size={24} className="group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" />
                         <span>Generate Voice</span>
                       </>
                     )}
                   </button>
                 </div>
+
+                {lastGeneration && currentAudio && !isGenerating && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mt-8 p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-4 shadow-xl shadow-zinc-200/50"
+                  >
+                    {/* Play/Pause icon with toggle color */}
+                    <button 
+                      onClick={() => {
+                        if (audioRef.current) {
+                          if (isPlaying) {
+                            audioRef.current.pause();
+                          } else {
+                            audioRef.current.play();
+                          }
+                        }
+                      }}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 shadow-lg ${isPlaying ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-black hover:bg-zinc-800'}`}
+                    >
+                      {isPlaying ? (
+                        <Pause size={24} className="text-white fill-white" />
+                      ) : (
+                        <Play size={24} className="text-white ml-1 fill-white" />
+                      )}
+                    </button>
+
+                    <div className="flex-1 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 tracking-wider">
+                        <div className="flex items-center gap-2">
+                           <span className="text-zinc-900 font-display">{lastGeneration.voice_name}</span>
+                           <span className="w-1 h-1 rounded-full bg-zinc-200" />
+                           <span className="italic">{lastGeneration.style}</span>
+                        </div>
+                        <div className="flex items-center gap-1 font-mono text-zinc-500">
+                          <span className="text-zinc-900">{formatTime(audioCurrentTime)}</span>
+                          <span>/</span>
+                          <span>{formatTime(audioDuration)}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Seekbar - Premium Thickened Line */}
+                      <div className="relative h-4 flex items-center group/seekbar">
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max={audioDuration || 0} 
+                          step="0.01"
+                          value={audioCurrentTime}
+                          onChange={(e) => {
+                            const time = parseFloat(e.target.value);
+                            setAudioCurrentTime(time);
+                            if (audioRef.current) {
+                              audioRef.current.currentTime = time;
+                            }
+                          }}
+                          className="w-full h-2 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-transparent z-10"
+                        />
+                        {/* Background track */}
+                        <div className="absolute inset-x-0 h-2 bg-zinc-100 rounded-full" />
+                        {/* Active progress */}
+                        <motion.div 
+                          className="absolute left-0 h-2 bg-emerald-500 rounded-full"
+                          style={{ width: `${(audioCurrentTime / (audioDuration || 1)) * 100}%` }}
+                        />
+                        {/* Premium Handle/Thumb indicator */}
+                        <motion.div 
+                          className="absolute w-4 h-4 bg-white border-2 border-emerald-500 rounded-full shadow-md z-20 pointer-events-none"
+                          style={{ left: `calc(${(audioCurrentTime / (audioDuration || 1)) * 100}% - 8px)` }}
+                          animate={{ scale: isPlaying ? 1.2 : 1 }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 p-2 border-l border-zinc-100 shrink-0">
+                      <button 
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = currentAudio;
+                          a.download = `VoxNova-${lastGeneration.voice_name}-${Date.now()}.wav`;
+                          a.click();
+                        }}
+                        className="flex flex-col items-center gap-1 py-2 px-4 bg-zinc-50 border border-zinc-100 rounded-xl text-zinc-600 hover:bg-zinc-900 hover:text-white hover:border-zinc-900 transition-all group/dl shadow-sm"
+                        title="Download Audio"
+                      >
+                        <Download size={20} className="group-hover/dl:scale-110 transition-transform" />
+                        <span className="text-[9px] font-bold uppercase">Download</span>
+                      </button>
+                      <button 
+                        onClick={() => setLastGeneration(null)}
+                        className="p-2 text-zinc-300 hover:text-red-400 transition-all rounded-full hover:bg-red-50"
+                        title="Close player"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
 
                 {isGenerating && (
                   <div className="space-y-2">
@@ -4012,6 +4210,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     ref={audioRef} 
                     src={currentAudio} 
                     className="hidden" 
+                    onTimeUpdate={(e) => setAudioCurrentTime(e.currentTarget.currentTime)}
+                    onLoadedMetadata={(e) => setAudioDuration(e.currentTarget.duration)}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
                     onEnded={() => setIsPlaying(false)}
@@ -4762,9 +4962,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             <VoiceClone 
               currentUser={currentUser}
               onCloneCreated={(voice) => {
-                setSuccessMessage(`Elite Neural Model "${voice.name}" synthesized successfully! It's now available in your library.`);
+                setClonedVoices(prev => [voice, ...prev]);
+                setSelectedVoice(voice);
+                setSuccessMessage(`Elite Neural Model "${voice.name}" synthesized successfully! It's now active in your dashboard.`);
                 setShowSuccessToast(true);
                 setTimeout(() => setShowSuccessToast(false), 3000);
+                setActiveTab('generate');
               }} 
               onNavigateToTTS={() => setActiveTab('generate')}
             />
@@ -5035,7 +5238,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   onClick={() => { setSelectedArticle(i); setShowBlog(true); }}
                 >
                   <div className="aspect-video rounded-[2rem] overflow-hidden border border-zinc-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-500 relative">
-                    <img src={article.img} alt={article.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+                    <motion.div
+                      className="w-full h-full"
+                      animate={{ 
+                        scale: [1, 1.02, 1],
+                        filter: ["brightness(1)", "brightness(1.1)", "brightness(1)"]
+                      }}
+                      transition={{ 
+                        duration: 4, 
+                        repeat: Infinity, 
+                        ease: "easeInOut" 
+                      }}
+                    >
+                      <img src={article.img} alt={article.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+                    </motion.div>
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500 flex items-center justify-center">
                       <div className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-zinc-900 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-500 shadow-xl">
                         <Play size={32} fill="currentColor" className="ml-1" />

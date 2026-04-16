@@ -192,6 +192,7 @@ export interface Generation {
   language?: string;
   timestamp?: any;
   created_at?: string;
+  audio_url?: string;
 }
 
 export interface CaptionWord {
