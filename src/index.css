@@ -69,3 +69,23 @@
 .markdown-body blockquote {
   @apply border-l-4 border-zinc-200 pl-4 italic text-zinc-600 my-4;
 }
+
+@keyframes gemini-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gemini-shimmer {
+  background: linear-gradient(-45deg, rgba(66, 133, 244, 0.2), rgba(155, 114, 203, 0.2), rgba(217, 101, 112, 0.2), rgba(66, 133, 244, 0.2));
+  background-size: 400% 400%;
+  animation: gemini-gradient 8s ease infinite;
+}
+
+.seekbar-container:hover .seekbar-thumb {
+  opacity: 1;
+}
+
+.seekbar-thumb {
+  @apply opacity-0 transition-opacity duration-200;
+}

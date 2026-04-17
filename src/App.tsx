@@ -1533,7 +1533,7 @@ function App() {
   const [style, setStyle] = useState('normal');
   const [speed, setSpeed] = useState(1);
   const [pitch, setPitch] = useState(1);
-  const [pause, setPause] = useState(0.5);
+  const [pause, setPause] = useState(1.0);
   const [audioFormat, setAudioFormat] = useState<'wav' | 'mp3'>('wav');
   const [targetSampleRate, setTargetSampleRate] = useState<24000 | 44100 | 48000>(44100);
   const [studioClarity, setStudioClarity] = useState(true);
@@ -1757,7 +1757,7 @@ function App() {
   const handleResetSettings = () => {
     setSpeed(1.0);
     setPitch(1.0);
-    setPause(0.2);
+    setPause(0.8);
     setAudioFormat('mp3');
     setTargetSampleRate(48000);
     setStyle('normal');
@@ -1964,11 +1964,18 @@ function App() {
   useEffect(() => {
     fetchHistory();
     checkApiKey();
-    // Debug connectivity
-    fetch('/api/health')
-      .then(r => r.json())
-      .then(d => console.log('Server Health:', d))
-      .catch(e => console.error('Server Health Check Failed:', e));
+    // Debug connectivity - small delay to let server warm up
+    setTimeout(() => {
+      fetch('/api/health')
+        .then(r => r.json())
+        .then(d => console.log('Server Health:', d))
+        .catch(e => {
+          // Only log if it's not a temporary fetch error during startup
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Server Health Check (Harmless if server is still starting):', e.message);
+          }
+        });
+    }, 2000);
   }, []);
 
   const checkApiKey = async () => {
@@ -2417,14 +2424,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       setVoiceChangingProgress(20);
       setVoiceChangingStep('Analyzing vocal fingerprint...');
       
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (!geminiApiKey) {
+        throw new Error("Gemini API key is not configured. Please check your settings.");
+      }
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
       
       // Step 1: Transcribe
       setVoiceChangingStep('Transcribing audio with AI...');
       const transcribePrompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
 
       const transcribeResult = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: [
           { parts: [{ text: transcribePrompt }, { inlineData: { data: base64Data.split(',')[1], mimeType } }] }
         ]
@@ -2436,59 +2447,32 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       }
 
       setVoiceChangingProgress(50);
-      setVoiceChangingStep('Synthesizing neural audio...');
+      setVoiceChangingStep('Neural voice transfer in progress...');
 
-      // Ensure we only use the 5 supported voices for Gemini TTS
-      const validTTSVoices = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
-      let currentTargetVoice = INTERNAL_VOICE_MAPPING[selectedVoice.name] || INTERNAL_VOICE_MAPPING[selectedVoice.name.toLowerCase()] || 'Puck';
+      const targetMapping = INTERNAL_VOICE_MAPPING[selectedVoice.name] || 'Puck';
       
-      if (!validTTSVoices.includes(currentTargetVoice)) {
-        currentTargetVoice = 'Puck';
-      }
-      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'].includes(selectedVoice.id.toLowerCase());
-
-      const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance. 
-      
-      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
-      
-      PERFORMANCE GUIDELINES:
-      - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative. Use a slow, deliberate pace with heavy emphasis.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative.'}
-      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
-      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
-      - Avoid any robotic, monotone, or repetitive cadence.
-      - Sound like a real person speaking in a high-end professional studio, not a computer.
-      - 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-      - Use natural emphasis on key words to convey meaning and emotion.
-      - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
-      
-      TECHNICAL STANDARDS:
-      - NO background noise, hums, or digital artifacts.
-      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-      - NO background music, bell-like sounds, or hallucinations in the background.
-      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts.
-      `;
-
-      const ttsResponse = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
-            }
-          }
-        }
+      const response = await fetch('/api/voice-changer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioData: base64Data.split(',')[1],
+          mimeType: voiceChangingFile.type,
+          targetVoiceName: selectedVoice.name,
+          targetVoiceTraits: selectedVoice.description + ((selectedVoice as any).fingerprint ? `\nFingerprint: ${(selectedVoice as any).fingerprint}` : ''),
+          targetVoiceMapping: targetMapping
+        })
       });
 
-      const audioBase64 = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!audioBase64) throw new Error("Failed to generate speech in target voice");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Voice conversion failed");
+      }
 
+      const data = await response.json();
+      const audioBase64 = data.audioData;
+      
       setVoiceChangingProgress(80);
-      setVoiceChangingStep('Finalizing audio...');
+      setVoiceChangingStep('Finalizing audio stream...');
 
       if (voiceChangingFile.type.startsWith('video/')) {
         setVoiceChangingStep('Merging with video...');
@@ -2498,14 +2482,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           type: 'video'
         });
       } else {
-        // Convert PCM to WAV for audio-only
+        // Convert to WAV for audio-only, detecting if already a WAV file
         const pcmBuffer = base64ToArrayBuffer(audioBase64);
-        const wavHeader = createWavHeader(pcmBuffer, 24000);
-        const combinedBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
-        combinedBuffer.set(new Uint8Array(wavHeader), 0);
-        combinedBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+        const firstFour = new Uint8Array(pcmBuffer.slice(0, 4));
+        const isAlreadyWav = String.fromCharCode(firstFour[0], firstFour[1], firstFour[2], firstFour[3]) === 'RIFF';
         
-        const finalBlob = new Blob([combinedBuffer], { type: 'audio/wav' });
+        let finalBlob;
+        if (isAlreadyWav) {
+          finalBlob = new Blob([pcmBuffer], { type: 'audio/wav' });
+        } else {
+          const wavHeader = createWavHeader(pcmBuffer, 24000);
+          const combinedBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
+          combinedBuffer.set(new Uint8Array(wavHeader), 0);
+          combinedBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+          finalBlob = new Blob([combinedBuffer], { type: 'audio/wav' });
+        }
+        
         setVoiceChangingResult({
           url: URL.createObjectURL(finalBlob),
           type: 'audio'
@@ -2585,13 +2577,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         })
       });
 
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.code === 'AUTH_CONFIG_MISSING') {
-          setShowConfigError(true);
-          return;
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          if (errorData.code === 'AUTH_CONFIG_MISSING') {
+            setShowConfigError(true);
+            return;
+          }
+          throw new Error(errorData.error || 'Failed to generate captions');
+        } else {
+          const text = await response.text();
+          console.error('[Captions] Non-JSON error response:', text.substring(0, 200));
+          throw new Error(`The AI caption engine returned an unexpected response (${response.status}). It might be restarting or overloaded.`);
         }
-        throw new Error(errorData.error || 'Failed to generate captions');
+      }
+
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error("Server did not return a valid JSON response for captions.");
       }
 
       setCaptionProgress(70);
@@ -2696,6 +2699,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
   };
 
+  const handleDownload = () => {
+    if (!currentAudio || !lastGeneration) return;
+    const a = document.createElement('a');
+    a.href = currentAudio;
+    a.download = `VoxNova-${lastGeneration.voice_name || 'voice'}-${Date.now()}.${audioFormat}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -2763,13 +2776,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           pitch,
           language,
           studioClarity,
-          pause
+          pause,
+          cloned_voice_traits: (selectedVoice as any).fingerprint || null
         })
       });
 
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate speech via backend");
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Server error: ${response.status}`);
+        } else {
+          const text = await response.text();
+          console.error('Non-JSON error response:', text.substring(0, 200));
+          throw new Error(`Server returned an unexpected response (${response.status}). The backend might be restarting or experiencing an issue.`);
+        }
+      }
+
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error("Server did not return a valid JSON response. Please check server logs.");
       }
 
       const data = await response.json();
@@ -2839,14 +2864,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
       setGenerationProgress(100);
 
-      // 2. Merge all PCM buffers efficiently
-      const totalPcmLength = allPcmBuffers.reduce((acc, buf) => acc + (buf ? buf.byteLength : 0), 0);
+      // 2. Merge all PCM buffers efficiently with pause gaps
+      const silenceBytes = Math.floor(pause * 24000) * 2; // pause is in seconds, samples are 24kHz, 2 bytes each
+      const totalPcmLength = allPcmBuffers.reduce((acc, buf, idx) => {
+        let len = acc + (buf ? buf.byteLength : 0);
+        if (idx < allPcmBuffers.length - 1) len += silenceBytes;
+        return len;
+      }, 0);
+      
       const mergedPcm = new Uint8Array(totalPcmLength);
       let offset = 0;
-      for (const buf of allPcmBuffers) {
+      for (let i = 0; i < allPcmBuffers.length; i++) {
+        const buf = allPcmBuffers[i];
         if (buf) {
           mergedPcm.set(new Uint8Array(buf), offset);
           offset += buf.byteLength;
+        }
+        if (i < allPcmBuffers.length - 1) {
+          offset += silenceBytes; // Values are already zeroed by new Uint8Array
         }
       }
 
@@ -2897,6 +2932,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         type: 'voice',
         text: processedText,
         voice_name: selectedVoice.name,
+        voice_color: selectedVoice.color,
         style: style,
         speed: speed,
         pitch: pitch,
@@ -3050,31 +3086,38 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
   };
 
-  const playFromHistory = (audioData: string | null | undefined, id: string | number) => {
+  const playFromHistory = (item: Generation) => {
     try {
-      if (playingId === id) {
+      if (playingId === item.id) {
         if (audioRef.current) {
-          audioRef.current.pause();
-          setPlayingId(null);
+          if (isPlaying) {
+            audioRef.current.pause();
+            setIsPlaying(false);
+          } else {
+            audioRef.current.play();
+            setIsPlaying(true);
+          }
         }
         return;
       }
 
-      if (!audioData || audioData === "null" || audioData === "undefined") {
+      const audioData = item.audio_data;
+      if (!audioData || audioData === "null" || audioData === "undefined" || audioData === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
         setError("This audio was too large to be stored in history. You can only play audio generated within the last few minutes.");
         return;
       }
 
-      if (audioData === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
-        setError("This audio was too large to be stored in history.");
-        return;
-      }
-
-      // Fix: History audio is already a WAV/MP3 base64, don't re-process as PCM
+      // Fix: History audio is already a WAV/MP3 base64
       const blob = new Blob([base64ToArrayBuffer(audioData)], { 
         type: audioData.startsWith('//') || audioData.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
       });
       const audioUrl = URL.createObjectURL(blob);
+      
+      setCurrentAudio(audioUrl);
+      setLastGeneration({
+        ...item,
+        audio_url: audioUrl
+      });
       
       if (audioRef.current) {
         audioRef.current.pause();
@@ -3082,13 +3125,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
-      setPlayingId(id);
+      setPlayingId(item.id);
       setIsPlaying(true);
       
+      audio.onloadedmetadata = () => {
+        setAudioDuration(audio.duration);
+      };
+
+      audio.ontimeupdate = () => {
+        setAudioCurrentTime(audio.currentTime);
+      };
+
       audio.onended = () => {
         setPlayingId(null);
         setIsPlaying(false);
-        URL.revokeObjectURL(audioUrl);
       };
 
       audio.play().catch(e => {
@@ -3326,7 +3376,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               setActiveTab('captions');
                               setShowHistoryModal(false);
                             } else {
-                              playFromHistory(item.audio_data, item.id);
+                              setShowHistoryModal(false);
+                              playFromHistory(item);
                             }
                           }}
                           className={`p-2.5 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white' : 'bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600'}`}
@@ -3972,13 +4023,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] text-zinc-500">
-                          <span>Pause Gap</span>
-                          <span>{pause}s</span>
+                          <span>Pause Gap (Natural Pacing)</span>
+                          <span className="font-bold text-emerald-600">{pause}s</span>
                         </div>
                         <input 
-                          type="range" min="0.1" max="2" step="0.1" 
+                          type="range" min="0.1" max="2.0" step="0.1" 
                           value={pause} onChange={(e) => setPause(parseFloat(e.target.value))}
-                          className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
+                          className="w-full accent-emerald-500 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
                         />
                       </div>
 
@@ -4037,115 +4088,117 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     disabled={isGenerating || !text || !selectedVoice}
                     className="w-full py-5 px-6 bg-black text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-black/20 group relative overflow-hidden"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                    <div className="absolute inset-0 gemini-shimmer opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
                     {isGenerating ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 relative z-10">
                         <Loader2 className="animate-spin" size={24} />
                         <span>Generating {generationProgress}%</span>
                       </div>
                     ) : (
-                      <>
-                        <Sparkles size={24} className="group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" />
+                      <div className="flex items-center gap-3 relative z-10">
+                        <div className="relative group/icon">
+                          <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur opacity-40 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
+                          <Sparkles size={24} className="relative text-white transition-transform duration-500 group-hover:scale-110 group-hover:rotate-12" />
+                        </div>
                         <span>Generate Voice</span>
-                      </>
+                      </div>
                     )}
                   </button>
                 </div>
 
                 {lastGeneration && currentAudio && !isGenerating && (
                   <motion.div 
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="mt-8 p-4 bg-white border border-zinc-100 rounded-2xl flex items-center gap-4 shadow-xl shadow-zinc-200/50"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-8 overflow-hidden bg-white border border-zinc-100 rounded-3xl shadow-2xl shadow-zinc-200/50"
                   >
-                    {/* Play/Pause icon with toggle color */}
-                    <button 
-                      onClick={() => {
-                        if (audioRef.current) {
-                          if (isPlaying) {
-                            audioRef.current.pause();
-                          } else {
-                            audioRef.current.play();
-                          }
-                        }
-                      }}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 shadow-lg ${isPlaying ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-black hover:bg-zinc-800'}`}
-                    >
-                      {isPlaying ? (
-                        <Pause size={24} className="text-white fill-white" />
-                      ) : (
-                        <Play size={24} className="text-white ml-1 fill-white" />
-                      )}
-                    </button>
-
-                    <div className="flex-1 flex flex-col gap-2">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 tracking-wider">
-                        <div className="flex items-center gap-2">
-                           <span className="text-zinc-900 font-display">{lastGeneration.voice_name}</span>
-                           <span className="w-1 h-1 rounded-full bg-zinc-200" />
-                           <span className="italic">{lastGeneration.style}</span>
+                    {/* Header Info */}
+                    <div className="px-6 py-3 border-b border-zinc-50 flex items-center justify-between bg-zinc-50/50">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${lastGeneration.voice_color || 'from-zinc-500 to-zinc-700'} flex items-center justify-center text-[10px] font-bold text-white shadow-sm shrink-0`}>
+                          {lastGeneration.voice_name?.[0] || 'V'}
                         </div>
-                        <div className="flex items-center gap-1 font-mono text-zinc-500">
-                          <span className="text-zinc-900">{formatTime(audioCurrentTime)}</span>
-                          <span>/</span>
-                          <span>{formatTime(audioDuration)}</span>
+                        <div>
+                          <div className="text-[10px] text-zinc-400 uppercase tracking-tighter font-bold">{lastGeneration.style || 'Standard'} Mode</div>
+                          <div className="text-sm font-bold text-zinc-900 leading-tight">{lastGeneration.voice_name || 'Generated Voice'}</div>
                         </div>
                       </div>
-                      
-                      {/* Seekbar - Premium Thickened Line */}
-                      <div className="relative h-4 flex items-center group/seekbar">
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max={audioDuration || 0} 
-                          step="0.01"
-                          value={audioCurrentTime}
-                          onChange={(e) => {
-                            const time = parseFloat(e.target.value);
-                            setAudioCurrentTime(time);
-                            if (audioRef.current) {
-                              audioRef.current.currentTime = time;
-                            }
-                          }}
-                          className="w-full h-2 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-transparent z-10"
-                        />
-                        {/* Background track */}
-                        <div className="absolute inset-x-0 h-2 bg-zinc-100 rounded-full" />
-                        {/* Active progress */}
-                        <motion.div 
-                          className="absolute left-0 h-2 bg-emerald-500 rounded-full"
-                          style={{ width: `${(audioCurrentTime / (audioDuration || 1)) * 100}%` }}
-                        />
-                        {/* Premium Handle/Thumb indicator */}
-                        <motion.div 
-                          className="absolute w-4 h-4 bg-white border-2 border-emerald-500 rounded-full shadow-md z-20 pointer-events-none"
-                          style={{ left: `calc(${(audioCurrentTime / (audioDuration || 1)) * 100}% - 8px)` }}
-                          animate={{ scale: isPlaying ? 1.2 : 1 }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 p-2 border-l border-zinc-100 shrink-0">
                       <button 
-                        onClick={() => {
-                          const a = document.createElement('a');
-                          a.href = currentAudio;
-                          a.download = `VoxNova-${lastGeneration.voice_name}-${Date.now()}.wav`;
-                          a.click();
-                        }}
-                        className="flex flex-col items-center gap-1 py-2 px-4 bg-zinc-50 border border-zinc-100 rounded-xl text-zinc-600 hover:bg-zinc-900 hover:text-white hover:border-zinc-900 transition-all group/dl shadow-sm"
-                        title="Download Audio"
-                      >
-                        <Download size={20} className="group-hover/dl:scale-110 transition-transform" />
-                        <span className="text-[9px] font-bold uppercase">Download</span>
-                      </button>
-                      <button 
-                        onClick={() => setLastGeneration(null)}
-                        className="p-2 text-zinc-300 hover:text-red-400 transition-all rounded-full hover:bg-red-50"
-                        title="Close player"
+                         onClick={() => {
+                           setCurrentAudio(null);
+                           setLastGeneration(null);
+                         }}
+                         className="p-2 hover:bg-zinc-200/50 rounded-full transition-colors text-zinc-400"
                       >
                         <X size={16} />
                       </button>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                      <div className="flex items-center gap-5">
+                        {/* Play/Pause Button */}
+                        <button 
+                          onClick={() => {
+                            if (audioRef.current) {
+                              if (isPlaying) {
+                                audioRef.current.pause();
+                              } else {
+                                audioRef.current.play();
+                              }
+                            }
+                          }}
+                          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 shadow-lg ${isPlaying ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-black hover:bg-zinc-800'}`}
+                        >
+                          {isPlaying ? (
+                            <Pause size={24} className="text-white fill-white" />
+                          ) : (
+                            <Play size={24} className="text-white ml-1 fill-white" />
+                          )}
+                        </button>
+
+                        <div className="flex-1 space-y-2">
+                          {/* Time & Duration */}
+                          <div className="flex justify-between items-end mb-1">
+                            <span className="text-[11px] font-mono font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                              {formatTime(audioCurrentTime)}
+                            </span>
+                            <span className="text-[11px] font-mono font-medium text-zinc-400">
+                              {formatTime(audioDuration)}
+                            </span>
+                          </div>
+
+                          {/* Seekbar */}
+                          <div className="relative group seekbar-container">
+                            <input 
+                              type="range"
+                              min="0"
+                              max={audioDuration || 100}
+                              value={audioCurrentTime}
+                              onChange={(e) => {
+                                const time = parseFloat(e.target.value);
+                                setAudioCurrentTime(time);
+                                if (audioRef.current) audioRef.current.currentTime = time;
+                              }}
+                              className="w-full h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-emerald-500 transition-all group-hover:h-2"
+                              style={{
+                                background: `linear-gradient(to right, #10b981 ${(audioCurrentTime / (audioDuration || 1)) * 100}%, #f4f4f5 ${(audioCurrentTime / (audioDuration || 1)) * 100}%)`
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Download Button */}
+                        <div className="flex items-center gap-2 pl-2">
+                          <div className="w-[1px] h-10 bg-zinc-100" />
+                          <button 
+                            onClick={handleDownload}
+                            className="w-12 h-12 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 transition-all group shadow-sm"
+                            title="Download Audio"
+                          >
+                            <Download size={20} className="group-hover:scale-110 group-hover:text-emerald-500 transition-all" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -4559,6 +4612,51 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           </summary>
                           <div className="p-4 pt-0 space-y-4">
                             <div className="space-y-2">
+                              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Font Family</span>
+                              <select 
+                                value={captionStyle.font}
+                                onChange={(e) => setCaptionStyle({...captionStyle, font: e.target.value})}
+                                className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                              >
+                                {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                              </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Case</span>
+                                <div className="flex gap-1 p-1 bg-white rounded-xl border border-zinc-100">
+                                  {(['original', 'uppercase'] as const).map(c => (
+                                    <button
+                                      key={c}
+                                      onClick={() => setCaptionStyle({...captionStyle, case: c})}
+                                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.case === c ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                    >
+                                      {c}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Style</span>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => setCaptionStyle({...captionStyle, fontWeight: captionStyle.fontWeight === '900' ? '400' : '900'})}
+                                    className={`flex-1 py-1.5 rounded-xl border text-[10px] font-bold transition-all ${captionStyle.fontWeight === '900' ? 'bg-zinc-900 border-zinc-900 text-white shadow-sm' : 'bg-white border-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
+                                  >
+                                    Bold
+                                  </button>
+                                  <button
+                                    onClick={() => setCaptionStyle({...captionStyle, italic: !captionStyle.italic})}
+                                    className={`flex-1 py-1.5 rounded-xl border text-[10px] font-bold transition-all ${captionStyle.italic ? 'bg-zinc-900 border-zinc-900 text-white shadow-sm' : 'bg-white border-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
+                                  >
+                                    Italic
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
                               <div className="flex justify-between text-[10px] text-zinc-500">
                                 <span className="font-bold uppercase tracking-wider">Font Size</span>
                                 <span className="font-mono text-emerald-600 font-bold">{captionStyle.fontSize}px</span>
@@ -4638,7 +4736,99 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
                           </summary>
                           <div className="p-4 pt-0 space-y-4">
+                            {!captionStyle.isDynamic && (
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Text Color</span>
+                                  <div className="relative">
+                                    <input 
+                                      type="color"
+                                      value={captionStyle.color}
+                                      onChange={(e) => setCaptionStyle({...captionStyle, color: e.target.value})}
+                                      className="w-full h-10 rounded-xl cursor-pointer opacity-0 absolute inset-0 z-10"
+                                    />
+                                    <div 
+                                      className="w-full h-10 rounded-xl border-2 border-white shadow-md"
+                                      style={{ backgroundColor: captionStyle.color }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Background</span>
+                                  <div className="relative">
+                                    <input 
+                                      type="color"
+                                      value={captionStyle.backgroundColor === 'transparent' ? '#000000' : captionStyle.backgroundColor}
+                                      onChange={(e) => setCaptionStyle({...captionStyle, backgroundColor: e.target.value})}
+                                      className="w-full h-10 rounded-xl cursor-pointer opacity-0 absolute inset-0 z-10"
+                                    />
+                                    <div 
+                                      className={`w-full h-10 rounded-xl border-2 border-white shadow-md flex items-center justify-center ${captionStyle.backgroundColor === 'transparent' ? 'bg-zinc-100' : ''}`}
+                                      style={{ backgroundColor: captionStyle.backgroundColor }}
+                                    >
+                                      {captionStyle.backgroundColor === 'transparent' && <span className="text-[8px] text-zinc-400 font-bold">NONE</span>}
+                                    </div>
+                                    <button 
+                                      onClick={() => setCaptionStyle({...captionStyle, backgroundColor: 'transparent'})}
+                                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center z-20 hover:bg-red-600"
+                                    >
+                                      <X size={8} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="space-y-4 pt-4 border-t border-zinc-100">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-2"> Stroke & Outline </span>
+                                <div className="flex gap-1 p-1 bg-white rounded-xl border border-zinc-100">
+                                  {(['none', 'thin', 'thick'] as const).map(b => (
+                                    <button
+                                      key={b}
+                                      onClick={() => setCaptionStyle({...captionStyle, border: b})}
+                                      className={`px-3 py-1 rounded-lg text-[8px] font-bold capitalize transition-all ${captionStyle.border === b ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                    >
+                                      {b}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              {captionStyle.border !== 'none' && (
+                                <div className="space-y-3 p-3 bg-white rounded-2xl border border-zinc-100 animate-in fade-in slide-in-from-top-2">
+                                  <div className="flex gap-4">
+                                    <div className="flex-1 space-y-1.5">
+                                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Outline Color</span>
+                                      <div className="relative">
+                                        <input 
+                                          type="color"
+                                          value={captionStyle.outlineColor || '#000000'}
+                                          onChange={(e) => setCaptionStyle({...captionStyle, outlineColor: e.target.value})}
+                                          className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
+                                        />
+                                        <div 
+                                          className="w-full h-8 rounded-lg border border-zinc-100 shadow-sm"
+                                          style={{ backgroundColor: captionStyle.outlineColor || '#000000' }}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex-[2] space-y-1.5">
+                                      <div className="flex justify-between text-[10px] text-zinc-400 font-bold uppercase">
+                                        <span>Thickness</span>
+                                        <span>{captionStyle.strokeWidth || 0}px</span>
+                                      </div>
+                                      <input 
+                                        type="range" min="0" max="10" step="0.5"
+                                        value={captionStyle.strokeWidth || 0} 
+                                        onChange={(e) => setCaptionStyle({...captionStyle, strokeWidth: parseFloat(e.target.value)})}
+                                        className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="flex items-center justify-between">
                                 <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-2">
                                   <Sparkles size={12} className="text-emerald-500" /> Alternating Colors
@@ -4682,23 +4872,45 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 pt-2">
-                              <button
-                                onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
-                                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                                  captionStyle.glow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
-                                }`}
-                              >
-                                <Sparkles size={14} /> Glow
-                              </button>
-                              <button
-                                onClick={() => setCaptionStyle({...captionStyle, shadow: !captionStyle.shadow})}
-                                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                                  captionStyle.shadow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
-                                }`}
-                              >
-                                <Monitor size={14} /> Shadow
-                              </button>
+                              <div className="space-y-3">
+                                <button
+                                  onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
+                                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
+                                    captionStyle.glow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
+                                  }`}
+                                >
+                                  <Sparkles size={14} /> Glow
+                                </button>
+                              </div>
+                              <div className="space-y-3">
+                                <button
+                                  onClick={() => setCaptionStyle({...captionStyle, shadow: !captionStyle.shadow})}
+                                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
+                                    captionStyle.shadow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
+                                  }`}
+                                >
+                                  <Monitor size={14} /> Shadow
+                                </button>
+                              </div>
                             </div>
+                            
+                            {captionStyle.shadow && (
+                              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Shadow Color</span>
+                                <div className="relative">
+                                  <input 
+                                    type="color"
+                                    value={captionStyle.shadowColor || '#000000'}
+                                    onChange={(e) => setCaptionStyle({...captionStyle, shadowColor: e.target.value})}
+                                    className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
+                                  />
+                                  <div 
+                                    className="w-full h-8 rounded-lg border border-zinc-100 shadow-sm"
+                                    style={{ backgroundColor: captionStyle.shadowColor || '#000000' }}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </details>
 
@@ -5044,7 +5256,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         ) : (
                           <>
                             <button 
-                              onClick={() => playFromHistory(item.audio_data!, item.id)}
+                              onClick={() => playFromHistory(item)}
                               className={`p-3 rounded-xl transition-all ${playingId === item.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600'}`}
                               title={playingId === item.id ? "Pause" : "Play"}
                             >

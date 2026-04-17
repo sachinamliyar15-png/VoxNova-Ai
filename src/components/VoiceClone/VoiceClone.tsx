@@ -64,25 +64,55 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
     }
   };
 
-  const startAnalysis = () => {
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const startAnalysis = async () => {
+    if (!file) return;
     setIsAnalyzing(true);
+    setAnalysisProgress(0);
     setStep('analyze');
     
-    // Simulate high-resolution vocal fingerprint extraction
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
+    try {
+      // Real high-resolution vocal fingerprint extraction
+      const base64 = await fileToBase64(file);
+      const audioData = base64.split(',')[1];
+      
+      setAnalysisProgress(20);
+      const response = await fetch('/api/analyze-voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioData, mimeType: file.type })
+      });
+      
+      setAnalysisProgress(60);
+      const data = await response.json();
+      
+      if (data.fingerprint) {
+        setVocalFingerprint(data.fingerprint);
+        setAnalysisProgress(100);
         setTimeout(() => {
           setIsAnalyzing(false);
           setStep('naming');
         }, 500);
+      } else {
+        throw new Error(data.error || "Analysis failed");
       }
-      setAnalysisProgress(progress);
-    }, 400);
+    } catch (err: any) {
+      console.error("Analysis failed:", err);
+      alert("Failed to extract vocal fingerprint. Please ensure the audio is clear.");
+      setStep('upload');
+      setIsAnalyzing(false);
+    }
   };
+
+  const [vocalFingerprint, setVocalFingerprint] = useState('');
 
   const handleSaveClone = async () => {
     if (!clonedVoiceName.trim()) return;
@@ -94,8 +124,8 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
         name: clonedVoiceName,
         gender: 'male' as const,
         color: 'from-emerald-500 to-teal-600',
-        description: `Custom cloned voice: ${clonedVoiceName}`,
-        fingerprint: 'vocal-fingerprint-data-hash',
+        description: `Custom cloned voice: ${clonedVoiceName}. Elite neural mapping with 100% realism.`,
+        fingerprint: vocalFingerprint,
         isCloned: true,
         createdAt: serverTimestamp()
       };
@@ -139,6 +169,7 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
         body: JSON.stringify({
           text: `नमस्ते! मैं आपकी नई क्लोन की गई आवाज़ हूँ। मेरा नाम ${clonedVoiceName} है। मैं बिल्कुल असली और प्रोफेशनल लग रही हूँ ना?`,
           voice_name: 'Pankaj', // Using a high-quality base for preview
+          cloned_voice_traits: vocalFingerprint,
           style: 'professional',
           speed: 1.0,
           pitch: 1.0,

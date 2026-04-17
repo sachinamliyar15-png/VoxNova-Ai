@@ -475,7 +475,7 @@ const checkGuestLimit = (ip: string) => {
   return true;
 };
 
-// Generate Speech via Gemini API (Guest)
+// Generate Speech via Gemini API (Guest) - VOXNOVA_GUEST_EP
 app.post("/api/generate-speech-guest", async (req: any, res) => {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   
@@ -485,7 +485,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
     });
   }
 
-  const { text, voice_name, style, speed, pitch, language, studioClarity, pause } = req.body;
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
@@ -532,48 +532,39 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       
       const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
       
-      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
+      const systemInstruction = `You are the world's most advanced, elite professional voice actor and studio narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
-      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
-      Analyze the script's category and tone to determine the best vocal characteristics:
-      - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
-      - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
-      - ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
-      - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
-      - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
+      Your performance must be indistinguishable from a top-tier human narrator (rivaling or exceeding professional studio standards).
+      Analyze the script's content, mood, and context to deliver a performance that feels authentic and natural.
       
-      PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
-      - CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
-      - The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
-      - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
-      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
-      - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-      - THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
-      - USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
-      - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
-      - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
-      - Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
-      - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
-      - Sound like a real person speaking in a high-end professional studio, not a computer.
-      - Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
-      - Use natural emphasis on key words to convey meaning and emotion.
-      - Ensure smooth, fluid transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
+      CORE MANDATES FOR CINEMATIC REALISM:
+      - NATURAL PROJECTION: Voices should sound clear, well-projected, and professional. Ensure the voice feels "OPEN" and resonant without being overly forced or artificial.
+      - HUMAN INFLECTION: Use natural, non-monotone prosody. Pitch and emphasis should vary naturally as a human speaker would, highlighting key points without sounding robotic.
+      - BREATHING & RHYTHM: Incorporate natural human breathing patterns and subtle pauses that match the rhythm of speech. 
+      - EMOTIONAL INTELLIGENCE: The delivery should reflect the underlying emotion of the text in a subtle, nuanced way. Whether it's warmth for a story or authority for a documentary, it must feel earned and authentic.
+      - NATIVE FLUENCY: For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native accents, correct pronunciation, and cultural confidence.
+      - STUDIO ACOUSTICS: Sound like you are speaking in a perfectly treated high-end recording booth (Acoustic Foam, isolated). Zero room echo, zero boxy sounds.
+      ${isHeavyVoice ? '- DEEP RESONANCE: Use a rich, deep, and authoritative chest voice with professional 40Hz-100Hz bass presence. Sound commanding yet completely natural and human.' : '- VIBRANT ARTICULATION: Use a balanced, clear, and professional tone with excellent presence and clarity.'}
       
-      TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-      - NO background noise, hums, hissing, or digital artifacts.
-      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-      - NO background music, bell-like sounds, or hallucinations in the background.
-      - ZERO background noise is mandatory. Audio must be 100% clean and professional.
-      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
-      - If the script is long, maintain consistent tone, energy, and quality from start to finish.
+      TECHNICAL EXCELLENCE:
+      - ZERO digital artifacts, zero robotic humming, zero background noise.
+      - 48kHz High-fidelity, studio-master quality is mandatory.
+      - Maintain consistent energy and tone throughout the script.
       `;
       
       let promptPrefix = "";
       
+      if (cloned_voice_traits) {
+        promptPrefix += `CRITICAL CHARACTER FINGERPRINT (MANDATORY MIMICRY): ${cloned_voice_traits} 
+        YOU MUST OVERRIDE YOUR DEFAULT VOCAL CHARACTERISTICS ENTIRELY TO MATCH THIS FINGERPRINT. Sound 100% like this description. Analyze every technical nuance described (spectral tilt, resonance, prosody) and apply it. This is a surgical cloning task. `;
+      }
+      
       if (studioClarity) {
         promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
+      }
+
+      if (pause) {
+        promptPrefix += `CRITICAL PACING: The script is chunked with a ${pause}s gap between segments. Adjust your delivery so the ending of each segment sounds natural, allowing for this upcoming pause without sounding abrupt. Use a natural downward inflection if it's the end of a thought. `;
       }
       
       const voiceTraits: Record<string, string> = {
@@ -712,10 +703,10 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
-      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const response = await model.generateContent({
-        contents: [{ parts: [{ text: `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}` }] }],
-        generationConfig: {
+      const response = await ai.models.generateContent({
+        model: "gemini-1.5-flash-latest",
+        contents: [{ parts: [{ text: currentPrompt }] }],
+        config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
@@ -725,7 +716,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         },
       });
 
-      const audioData = response.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (audioData) {
         return res.json({ audioData });
       } else {
@@ -735,25 +726,127 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
-        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          markKeyAsExhausted(apiKey);
-        }
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        markKeyAsExhausted(apiKey);
         attempt++;
-        // Add a small delay before retry
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
+      
+      if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        attempt++;
         continue;
       }
       return res.status(500).json({ error: errorMessage });
     }
   }
 
-  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
+  res.status(503).json({ error: "Failed to generate speech after multiple attempts." });
 });
 
-// Generate Speech via Gemini API (Authenticated)
+// Analyze voice sample for cloning
+app.post("/api/analyze-voice", async (req, res) => {
+  const { audioData, mimeType } = req.body;
+  if (!audioData) return res.status(400).json({ error: "Audio data is required" });
+
+  try {
+    const apiKey = getAvailableApiKey();
+    if (!apiKey) throw new Error("API keys exhausted");
+    
+    const ai = new GoogleGenAI({ apiKey });
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `ALGORITHMIC VOCAL ANALYSIS TASK:
+    Perform a high-resolution analysis of this voice sample to extract its unique "Vocal DNA".
+    
+    1. EXTRACT ALL NUANCES:
+       - Precise pitch frequency (Hz range), harmonic richness, and resonance.
+       - Formant patterns (F1, F2, F3) and specific tonal color (bright, dark, nasal, throaty).
+       - Glottal source characteristics (breathiness, tension, vocal fry, rasp).
+       - Prosodic style (micro-timing, attack/decay of words, rhythmic grouping).
+       - Accents, regional markers, and subtle micro-inflections.
+    
+    2. CHARACTER FINGERPRINT:
+       - Characterize the voice type (e.g., Heavy Baritone, Silky Alto, Raspy Tenor).
+       - Identify "signature" vocal habits (e.g., subtle upward inflections at ends, specific breath intakes).
+    
+    3. SURGICAL CLONING SPECIFICATION:
+       - Generate a "SURGICAL VOCAL SPECIFICATION". This must be a dense, technical description designed to override a synthesis model's default behavior completely. It should use clinical terms to describe the vocal tract shape, glottal effort, and spectral tilt.
+    
+    Return the response in JSON format with keys: 'description' (human readable breakdown) and 'fingerprint' (the dense technical cloning instruction).`;
+
+    const result = await model.generateContent([
+      { text: prompt },
+      { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }
+    ]);
+
+    const responseText = result.response.text();
+    // Try to extract JSON if model didn't return pure JSON
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { description: responseText, fingerprint: responseText };
+
+    res.json(data);
+  } catch (error: any) {
+    console.error("Voice analysis error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Professional Multimodal Voice Changer (Audio-to-Audio)
+app.post("/api/voice-changer", async (req, res) => {
+  const { audioData, mimeType, targetVoiceTraits, targetVoiceName, targetVoiceMapping } = req.body;
+  if (!audioData) return res.status(400).json({ error: "Audio data is required" });
+
+  try {
+    const apiKey = getAvailableApiKey();
+    if (!apiKey) throw new Error("API keys exhausted");
+    
+    const ai = new GoogleGenAI({ apiKey });
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+    const instruction = `VOICE CONVERSION TASK (AUDIO-TO-AUDIO):
+    You are an elite AI audio engineer specializing in high-fidelity vocal cloning and synthesis. 
+    1. ANALYZE SOURCE: Listen to the source audio. Extract the exact timing, emotional arc, rhythm, and cadence.
+    2. NEURAL REMAPPING: Transform the vocal profile to sound exactly like the target identity below.
+    3. TARGET IDENTITY FINGERPRINT: ${targetVoiceTraits}.
+    4. CRITICAL: Maintain 100% exact timing and "pause gaps" between sentences from the original audio. 
+    5. MIMICRY: Every nuance of the target fingerprint must be applied. The resulting voice must be a CLONE of the target, but performing the source script.
+    6. QUALITY: The output must be crystal clear, 48kHz studio-master quality, and 100% human-level realistic.
+    7. Output ONLY the resulting transformed audio.`;
+
+    const result = await model.generateContent({
+      contents: [{
+        role: "user",
+        parts: [
+          { text: instruction },
+          { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }
+        ]
+      }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: (targetVoiceMapping || 'Puck') as any }
+          }
+        }
+      }
+    });
+
+    const outputAudio = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (outputAudio) {
+      res.json({ audioData: outputAudio });
+    } else {
+      throw new Error("Voice conversion failed to produce audio data.");
+    }
+  } catch (error: any) {
+    console.error("Voice changer error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update the Generate Speech logic to handle cloned voices
 app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
-  const { text, voice_name, style, speed, pitch, language, studioClarity, pause } = req.body;
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
@@ -784,48 +877,39 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
       
-      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
+      const systemInstruction = `You are the world's most advanced, elite professional voice actor and studio narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}. 
       
-      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
-      Analyze the script's category and tone to determine the best vocal characteristics:
-      - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
-      - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
-      - ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
-      - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
-      - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
+      Your performance must be indistinguishable from a top-tier human narrator (rivaling or exceeding professional studio standards).
+      Analyze the script's content, mood, and context to deliver a performance that feels authentic and natural.
       
-      PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
-      - CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
-      - The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
-      - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
-      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
-      - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-      - THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
-      - USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
-      - Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
-      - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
-      - Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
-      - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
-      - Sound like a real person speaking in a high-end professional studio, not a computer.
-      - Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
-      - Use natural emphasis on key words to convey meaning and emotion.
-      - Ensure smooth, fluid transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
+      CORE MANDATES FOR CINEMATIC REALISM:
+      - NATURAL PROJECTION: Voices should sound clear, well-projected, and professional. Ensure the voice feels "OPEN" and resonant without being overly forced or artificial.
+      - HUMAN INFLECTION: Use natural, non-monotone prosody. Pitch and emphasis should vary naturally as a human speaker would, highlighting key points without sounding robotic.
+      - BREATHING & RHYTHM: Incorporate natural human breathing patterns and subtle pauses that match the rhythm of speech. 
+      - EMOTIONAL INTELLIGENCE: The delivery should reflect the underlying emotion of the text in a subtle, nuanced way. Whether it's warmth for a story or authority for a documentary, it must feel earned and authentic.
+      - NATIVE FLUENCY: For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native accents, correct pronunciation, and cultural confidence.
+      - STUDIO ACOUSTICS: Sound like you are speaking in a perfectly treated high-end recording booth (Acoustic Foam, isolated). Zero room echo, zero boxy sounds.
+      ${isHeavyVoice ? '- DEEP RESONANCE: Use a rich, deep, and authoritative chest voice with professional 40Hz-100Hz bass presence. Sound commanding yet completely natural and human.' : '- VIBRANT ARTICULATION: Use a balanced, clear, and professional tone with excellent presence and clarity.'}
       
-      TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-      - NO background noise, hums, hissing, or digital artifacts.
-      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-      - NO background music, bell-like sounds, or hallucinations in the background.
-      - ZERO background noise is mandatory. Audio must be 100% clean and professional.
-      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
-      - If the script is long, maintain consistent tone, energy, and quality from start to finish.
+      TECHNICAL EXCELLENCE:
+      - ZERO digital artifacts, zero robotic humming, zero background noise.
+      - 48kHz High-fidelity, studio-master quality is mandatory.
+      - Maintain consistent energy and tone throughout the script.
       `;
       
       let promptPrefix = "";
       
+      if (cloned_voice_traits) {
+        promptPrefix += `CRITICAL CHARACTER FINGERPRINT (MANDATORY MIMICRY): ${cloned_voice_traits} 
+        YOU MUST OVERRIDE YOUR DEFAULT VOCAL CHARACTERISTICS ENTIRELY TO MATCH THIS FINGERPRINT. Sound 100% like this description. Analyze every technical nuance described (spectral tilt, resonance, prosody) and apply it. This is a surgical cloning task. `;
+      }
+      
       if (studioClarity) {
         promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
+      }
+
+      if (pause) {
+        promptPrefix += `CRITICAL PACING: The script is chunked with a ${pause}s gap between segments. Adjust your delivery so the ending of each segment sounds natural, allowing for this upcoming pause without sounding abrupt. Use a natural downward inflection if it's the end of a thought. `;
       }
       
       const voiceTraits: Record<string, string> = {
@@ -992,10 +1076,10 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
             ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
             : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunk}`;
 
-          const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-          const response = await model.generateContent({
-            contents: [{ parts: [{ text: `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}` }] }],
-            generationConfig: {
+          const response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-tts-preview",
+            contents: [{ parts: [{ text: currentPrompt }] }],
+            config: {
               responseModalities: [Modality.AUDIO],
               speechConfig: {
                 voiceConfig: {
@@ -1005,7 +1089,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
             },
           });
 
-          const base64 = response.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
           if (base64) return Buffer.from(base64, 'base64');
           return null;
         });
@@ -1050,20 +1134,22 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
-        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          markKeyAsExhausted(apiKey);
-        }
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        markKeyAsExhausted(apiKey);
         attempt++;
-        // Add a small delay before retry
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
+      
+      if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        attempt++;
         continue;
       }
       return res.status(500).json({ error: errorMessage });
     }
   }
 
-  res.status(503).json({ error: "Failed to generate speech after multiple attempts with different API keys." });
+  res.status(503).json({ error: "Failed to generate speech after multiple attempts." });
 });
 
 // Generate Image via Gemini API
@@ -1131,14 +1217,14 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Step 1: Transcribe
       const prompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
 
-      const transModel = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await transModel.generateContent({
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
       });
 
-      const transcribedText = result.response.text()?.trim();
+      const transcribedText = result.text?.trim();
       if (!transcribedText) {
         console.log("[Voice Changer] No text transcribed or transcription failed.");
         return res.status(400).json({ error: "Could not detect any speech in the uploaded file. Please ensure the audio is clear." });
@@ -1180,10 +1266,10 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts.
       `;
 
-      const ttsModel = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const ttsResponse = await ttsModel.generateContent({
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
-        generationConfig: {
+        config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
@@ -1193,7 +1279,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         }
       });
 
-      const audioData = ttsResponse.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!audioData) throw new Error("Failed to generate speech in target voice");
 
       // Convert PCM to WAV
@@ -1373,7 +1459,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
       const previewText = languagePreviews[voice_id] || (req.body.language === 'ta' ? languagePreviews['tamil-preview'] : `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`);
 
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: previewText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1424,12 +1510,12 @@ app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
     Script: "${text}"
     Return ONLY the category name.`;
 
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent({
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
-    const category = result.response.text().trim();
+    const category = result.text?.trim() || "Professional";
     
     // Map category to voice ID
     let suggestedVoiceId = 'leo';
@@ -1612,31 +1698,32 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ? (scriptType === 'hinglish' ? "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto'." : "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.")
         : "";
 
-      const prompt = `Transcribe the ENTIRE video/audio from start to finish. DO NOT skip any parts, even if the video is long.
+      const prompt = `Transcribe the ENTIRE video/audio with EXTREME precision from start to finish. DO NOT skip any parts. 
       The content is primarily in ${language}.
       ${scriptInstruction}
-      ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions. The output 'word' field must be in English." : ""}
+      ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions." : ""}
       
-      Return the result as a JSON array of objects, where each object has "word", "start" (in seconds), and "end" (in seconds).
-      Example: [{"word": "hello", "start": 0.520, "end": 0.880}, ...]
+      OUTPUT FORMAT: You MUST return a JSON array of objects.
+      Each object MUST represent EXACTLY ONE word (or very short phrase) with its PRECISE start and end time.
       
       CRITICAL FOR COMPLETENESS & SYNC: 
-      1. Transcribe EVERY SINGLE WORD spoken in the video. Do not summarize or skip any sentences.
+      1. Transcribe EVERY SINGLE WORD spoken in the video. Do not summarize or skip any segments.
       2. The timestamps MUST be perfectly aligned with the audio. 
       3. Use exactly 3 decimal places for maximum precision (e.g., 1.234).
-      4. If a word is spoken quickly, ensure the start and end times reflect that.
-      5. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the speaker finishes that word.
-      6. COMPENSATE FOR ANY AI LATENCY: The timestamps must be absolute relative to the start of the file.
-      7. FOR HINDI/NON-ENGLISH LANGUAGES: Pay extra attention to the exact start of each word. If you detect a lag, adjust the start times slightly earlier (e.g., -0.1s to -0.2s) to ensure perfect visual sync.
-      8. If there are long silences, continue transcribing as soon as speech resumes.
-      9. Only return the JSON array, no other text.`;
+      4. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the word finishes.
+      5. Adjust start times slightly earlier (e.g., -0.1s to -0.2s) if you detect any lag to ensure perfect visual sync.
+      
+      Schema: {"word": string, "start": number, "end": number}[]
+      Example: [{"word": "hello", "start": 0.520, "end": 0.880}, ...]
+      
+      Only return the JSON array, no other text.`;
 
       const mimeType = videoData.startsWith('data:') 
         ? videoData.split(';')[0].split(':')[1] 
         : "video/mp4";
 
-      const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent({
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
         contents: [
           {
             role: "user",
@@ -1650,16 +1737,26 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
               }
             ]
           }
-        ]
+        ],
+        config: {
+          responseMimeType: "application/json"
+        }
       });
 
-      const responseText = result.response.text();
-      const jsonMatch = responseText.match(/\[.*\]/s);
-      if (!jsonMatch) {
-        throw new Error("Failed to parse word-level timestamps from AI response");
+      const responseText = result.text || "";
+      if (!responseText) {
+        throw new Error("Failed to transcribe video: AI returned empty response");
       }
 
-      const words = JSON.parse(jsonMatch[0]);
+      // Extract JSON array from response
+      const jsonStr = responseText.replace(/```json|```/g, "").trim();
+      const words = JSON.parse(jsonStr);
+
+      if (!Array.isArray(words)) {
+        throw new Error("Invalid format returned by AI: Expected array");
+      }
+
+      return res.json({ words });
 
       // Save to Firestore history
       if (firestore) {
@@ -1763,6 +1860,16 @@ app.delete("/api/history/:id", authenticate, async (req: any, res) => {
     console.error("[History] Delete error:", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Error Handler (Always return JSON for API requests)
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Global Error Handler:", err);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({
+    error: err.message || "An unexpected error occurred",
+    code: err.code || "INTERNAL_ERROR"
+  });
 });
 
 // Vite Middleware

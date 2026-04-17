@@ -6,6 +6,7 @@ export interface Voice {
   description: string;
   isPremium?: boolean;
   isCloned?: boolean;
+  fingerprint?: string;
   color: string;
   tags?: string[];
 }
@@ -193,6 +194,7 @@ export interface Generation {
   timestamp?: any;
   created_at?: string;
   audio_url?: string;
+  voice_color?: string;
 }
 
 export interface CaptionWord {
