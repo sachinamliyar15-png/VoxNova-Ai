@@ -724,7 +724,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: currentPrompt }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1066,7 +1066,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
             : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunk}`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
+            model: "gemini-3.1-flash-tts-preview",
             contents: [{ parts: [{ text: currentPrompt }] }],
             config: {
               responseModalities: [Modality.AUDIO],
@@ -1273,7 +1273,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       `;
 
       const ttsResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: transcribedText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
