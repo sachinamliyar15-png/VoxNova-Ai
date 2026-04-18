@@ -159,11 +159,7 @@ try {
     }
     
     firestore = admin.firestore();
-    if (databaseId) {
-      console.log(`Firestore initialized. Note: Using default database for admin SDK (databaseId ${databaseId} was provided but admin.firestore() currently uses default).`);
-    } else {
-      console.log("Firestore initialized with default database.");
-    }
+    console.log("Firestore initialized with default database (databaseId ignored for Admin compatibility).");
   } else {
     console.warn("Firebase Admin not initialized. Firestore features will be disabled.");
   }
@@ -753,9 +749,6 @@ app.post("/api/analyze-voice", async (req, res) => {
     const apiKey = getAvailableApiKey();
     if (!apiKey) throw new Error("API keys exhausted");
     
-    const ai = new GoogleGenAI({ apiKey });
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const prompt = `ALGORITHMIC VOCAL ANALYSIS TASK:
     Perform a high-resolution analysis of this voice sample to extract its unique "Vocal DNA".
     
@@ -775,12 +768,16 @@ app.post("/api/analyze-voice", async (req, res) => {
     
     Return the response in JSON format with keys: 'description' (human readable breakdown) and 'fingerprint' (the dense technical cloning instruction).`;
 
-    const result = await model.generateContent([
-      { text: prompt },
-      { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }
-    ]);
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        { text: prompt },
+        { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }
+      ]
+    });
 
-    const responseText = result.response.text();
+    const responseText = response.text;
     // Try to extract JSON if model didn't return pure JSON
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { description: responseText, fingerprint: responseText };
@@ -800,9 +797,6 @@ app.post("/api/voice-changer", async (req, res) => {
   try {
     const apiKey = getAvailableApiKey();
     if (!apiKey) throw new Error("API keys exhausted");
-    
-    const ai = new GoogleGenAI({ apiKey });
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
     const instruction = `VOICE CONVERSION TASK (AUDIO-TO-AUDIO):
     You are an elite AI audio engineer specializing in high-fidelity vocal cloning and synthesis. 
@@ -813,8 +807,10 @@ app.post("/api/voice-changer", async (req, res) => {
     5. MIMICRY: Every nuance of the target fingerprint must be applied. The resulting voice must be a CLONE of the target, but performing the source script.
     6. QUALITY: The output must be crystal clear, 48kHz studio-master quality, and 100% human-level realistic.
     7. Output ONLY the resulting transformed audio.`;
-
-    const result = await model.generateContent({
+    
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-live-preview",
       contents: [{
         role: "user",
         parts: [
@@ -832,7 +828,7 @@ app.post("/api/voice-changer", async (req, res) => {
       }
     });
 
-    const outputAudio = result.response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const outputAudio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (outputAudio) {
       res.json({ audioData: outputAudio });
     } else {

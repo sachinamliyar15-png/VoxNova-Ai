@@ -4,38 +4,21 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics, logEvent } from "firebase/analytics";
 
 // Import the Firebase configuration
-let firebaseConfig: any = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
+import firebaseConfig from "../firebase-applet-config.json";
 
-// Initialize Firebase SDK with a fallback to prevent blank screen
-// If you see a blank screen, please accept Firebase terms in the settings.
-const isConfigValid = firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "pl-key" && firebaseConfig.apiKey !== "";
-
-const app = initializeApp(isConfigValid ? firebaseConfig : {
-  apiKey: "pl-key",
-  authDomain: "pl-domain",
-  projectId: "pl-id",
-  storageBucket: "pl-bucket",
-  messagingSenderId: "pl-sender",
-  appId: "pl-app-id"
-});
+// Initialize Firebase SDK
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 const googleProvider = new GoogleAuthProvider();
 
-// Analytics is only supported in browser environments and with a valid config
+// Analytics is only supported in browser environments
 let analytics: any;
-if (typeof window !== 'undefined' && isConfigValid) {
+if (typeof window !== 'undefined') {
   try {
     analytics = getAnalytics(app);
   } catch (error) {
-    // Silent fail for analytics if config is still being set up
+    // Silent fail for analytics
   }
 }
 
