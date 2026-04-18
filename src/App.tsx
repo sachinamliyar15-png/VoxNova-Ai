@@ -674,16 +674,16 @@ const CaptionOverlay = ({
   const getPositionClass = (pos?: string) => {
     const p = pos || style.position;
     switch (p) {
-      case 'top': return 'top-10';
+      case 'top': return 'top-24';
       case 'middle': return 'top-1/2 -translate-y-1/2';
-      case 'bottom': return 'bottom-10';
+      case 'bottom': return 'bottom-24';
       case 'left': return 'top-1/2 -translate-y-1/2 left-10 text-left';
       case 'right': return 'top-1/2 -translate-y-1/2 right-10 text-right';
-      case 'top-left': return 'top-10 left-10 text-left';
-      case 'top-right': return 'top-10 right-10 text-right';
-      case 'bottom-left': return 'bottom-10 left-10 text-left';
-      case 'bottom-right': return 'bottom-10 right-10 text-right';
-      default: return 'bottom-10';
+      case 'top-left': return 'top-24 left-10 text-left';
+      case 'top-right': return 'top-24 right-10 text-right';
+      case 'bottom-left': return 'bottom-24 left-10 text-left';
+      case 'bottom-right': return 'bottom-24 right-10 text-right';
+      default: return 'bottom-24';
     }
   };
 

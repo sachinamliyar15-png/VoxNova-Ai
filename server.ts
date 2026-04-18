@@ -117,7 +117,7 @@ const voiceTraits: Record<string, string> = {
   'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
   'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
   'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
-  'Pankaj': 'Ultra-deep, chest-ratting baritone. Authoritative, serious, and 100% masculine with a slight grit.',
+  'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
   'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. High speaker projection, open-mouthed and fearless. 100% Realistic.',
   'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, loud and energetic. 100% Realistic.',
   'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. Open throat resonance. 100% Realistic.',
@@ -149,20 +149,25 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
         }
         
         // Replace escaped newlines with actual newlines
-        privateKey = privateKey.replace(/\\n/g, '\n');
+        privateKey = privateKey.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
         
-        // Ensure the key has the correct PEM headers and footers
+        // If it's just a base64 string without headers, add them
         if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+          // Remove any whitespace from the base64 part first if it's raw base64
+          if (!privateKey.includes('\n')) {
+            // It might be a single line base64 string (common in environment variable UIs)
+            privateKey = privateKey.match(/.{1,64}/g)?.join('\n') || privateKey;
+          }
           privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
         }
-        
-        if (!privateKey.includes('-----END PRIVATE KEY-----')) {
-          privateKey = `${privateKey}\n-----END PRIVATE KEY-----`;
-        }
 
-        // Final cleanup: ensure no double headers/footers and correct newline placement
-        privateKey = privateKey.replace(/(-----BEGIN PRIVATE KEY-----)+/g, '-----BEGIN PRIVATE KEY-----');
-        privateKey = privateKey.replace(/(-----END PRIVATE KEY-----)+/g, '-----END PRIVATE KEY-----');
+        // Final normalization: ensure exactly one block of headers and clean newlines
+        const pemMatch = privateKey.match(/-----BEGIN PRIVATE KEY-----([\s\S]+?)-----END PRIVATE KEY-----/);
+        if (pemMatch) {
+          const content = pemMatch[1].trim().replace(/\s/g, ''); // Remove all whitespace
+          const formattedContent = content.match(/.{1,64}/g)?.join('\n'); // Re-format with 64 char lines
+          privateKey = `-----BEGIN PRIVATE KEY-----\n${formattedContent}\n-----END PRIVATE KEY-----`;
+        }
         
         try {
           admin.initializeApp({
@@ -705,7 +710,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       } else if (speed < 1.0) {
         promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation. The pace should be energetic and engaging—NEVER slow or sluggish. This is a professional Level 1 narrator style. ";
       }
       
       if (pause > 0.1) {
@@ -1022,7 +1027,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       } else if (speed < 1.0) {
         promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation. The pace should be energetic and engaging—NEVER slow or sluggish. This is a professional Level 1 narrator style. ";
       }
       
       if (pause > 0) {
@@ -1032,7 +1037,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       promptPrefix += "CRITICAL: The audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static. ";
 
       // Split text into chunks for parallel processing if it's long
-      const CHUNK_SIZE = 800; // characters
+      const CHUNK_SIZE = 1000; // characters
       const chunks: string[] = [];
       if (text.length > CHUNK_SIZE) {
         const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
@@ -1051,7 +1056,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       }
 
       const audioChunks: Buffer[] = [];
-      const CONCURRENCY = 5;
+      const CONCURRENCY = 10;
 
       for (let i = 0; i < chunks.length; i += CONCURRENCY) {
         const batch = chunks.slice(i, i + CONCURRENCY);
@@ -1201,8 +1206,16 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      // Step 1: Transcribe
-      const prompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
+      // Step 1: Transcribe with Performance Capture
+      const prompt = `Transcribe the following audio/video exactly. 
+      CRITICAL: Also analyze the vocal characteristics of the speaker.
+      Include a "performance_metadata" section at the end that describes:
+      1. TONE: (e.g., Aggressive, Kind, Neutral, Emotional)
+      2. PACE: (e.g., Fast, Slow, Moderate)
+      3. EMPHASIS: (Where did the speaker put stress?)
+      
+      Return the transcription followed by the performance metadata. 
+      If there is no speech, return an empty string.`;
 
       const result = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -1211,35 +1224,41 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         ]
       });
 
-      const transcribedText = result.text?.trim();
-      if (!transcribedText) {
+      const fullTranscribedContent = result.text?.trim();
+      if (!fullTranscribedContent) {
         console.log("[Voice Changer] No text transcribed or transcription failed.");
         return res.status(400).json({ error: "Could not detect any speech in the uploaded file. Please ensure the audio is clear." });
       }
 
+      // Separate text from metadata for the TTS step
+      const logicMatch = fullTranscribedContent.match(/performance_metadata:?([\s\S]+)$/i);
+      const performanceTraits = logicMatch ? logicMatch[1].trim() : "Natural and engaging.";
+      const transcribedText = fullTranscribedContent.replace(/performance_metadata:?[\s\S]+$/i, '').trim();
+
       console.log(`[Voice Changer] Transcribed text: ${transcribedText.substring(0, 50)}...`);
+      console.log(`[Voice Changer] Performance Traits detected: ${performanceTraits}`);
 
       // Step 2: Generate Speech in Target Voice
       const currentTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
       
       const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'].includes(voice_id.toLowerCase());
       
-      const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${targetLanguage}. 
+      const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to perform the provided script while perfectly MIMICKING the detected performance traits.
       
-      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+      TARGET PERFORMANCE FINGERPRINT:
+      ${performanceTraits}
+      
+      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs and sounds 100% like the target voice but with the EMOTION and PACE of the original speaker.
       
       PERFORMANCE GUIDELINES:
       - Use natural human prosody, complex intonation, and realistic rhythm.
       - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative. Use a slow, deliberate pace with heavy emphasis.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative.'}
+      - SPEAK WITH AN ENERGETIC AND BRISK PACE. NEVER BE SLOW OR SLUGGISH.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative.'}
       - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
-      - Avoid any robotic, monotone, or repetitive cadence.
-      - Sound like a real person speaking in a high-end professional studio, not a computer.
+      - Sound like a real person speaking in a high-end professional studio.
       - 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-      - Use natural emphasis on key words to convey meaning and emotion.
-      - Ensure smooth transitions between sentences and ideas.
-      ${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
       
       HINDI LANGUAGE NUANCES (if applicable):
       - Use natural Hindi intonation and stress patterns.
@@ -1258,7 +1277,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         contents: [{ parts: [{ text: transcribedText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: systemInstruction,
+          systemInstruction: ttsSystemInstruction,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
@@ -1703,7 +1722,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       2. The timestamps MUST be perfectly aligned with the audio. 
       3. Use exactly 3 decimal places for maximum precision (e.g., 1.234).
       4. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the word finishes.
-      5. Adjust start times slightly earlier (e.g., -0.1s to -0.2s) if you detect any lag to ensure perfect visual sync.
+      5. CRITICAL SYNC: Captions MUST appear exactly as the sound begins. Shift 'start' timestamps EARLIER by 0.3s to 0.5s to compensate for processing delay and ensure they hit precisely with the voice.
       
       Schema: {"word": string, "start": number, "end": number}[]
       Example: [{"word": "hello", "start": 0.520, "end": 0.880}, ...]
