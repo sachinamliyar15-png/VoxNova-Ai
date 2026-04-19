@@ -54,12 +54,17 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 export async function testFirestoreConnection() {
   try {
+    // Attempt a silent fetch from a dummy document
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firestore connection test successful.");
+    console.log("[Firebase] Firestore connection test successful.");
   } catch (error) {
-    if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. The client is offline.");
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('the client is offline')) {
+      console.error("[Firebase] Error: The client is offline. This usually means the browser is blocked or missing valid credentials.");
+    } else if (msg.includes('permission-denied')) {
+      console.warn("[Firebase] Warning: Permission denied during connection test. This is expected if 'test/connection' is protected.");
+    } else {
+      console.warn("[Firebase] Connection test failed with non-critical error:", msg);
     }
-    // Other errors are ignored as this is just a test
   }
 }

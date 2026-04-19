@@ -16,6 +16,8 @@ dotenv.config();
 // API Key Rotation Logic
 const exhaustedKeys = new Map<string, number>();
 
+const HEAVY_VOICES = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram'];
+
 const getAvailableApiKey = () => {
   const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
   if (!baseKey) return null;
@@ -23,11 +25,11 @@ const getAvailableApiKey = () => {
   const allKeys = Array.from(new Set(baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0)));
   const now = Date.now();
   
-  // Filter out keys that are exhausted and still in the cooldown period (2 minutes)
+  // Filter out keys that are exhausted and still in the cooldown period (5 minutes)
   const availableKeys = allKeys.filter(k => {
     const exhaustedAt = exhaustedKeys.get(k);
     if (!exhaustedAt) return true;
-    if (now - exhaustedAt > 120000) {
+    if (now - exhaustedAt > 300000) {
       exhaustedKeys.delete(k);
       return true;
     }
@@ -50,34 +52,45 @@ const markKeyAsExhausted = (key: string) => {
   exhaustedKeys.set(key, Date.now());
 };
 
-const buildSystemInstruction = (language: string, isHeavyVoice: boolean, pitch: number = 1.0) => {
-  return `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
+const buildSystemInstruction = (language: string, voice_name: string) => {
+  const isHeavyVoice = HEAVY_VOICES.includes((voice_name || '').toLowerCase());
+  
+  return `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
 Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
 
-PHASE 1: SCRIPT INTELLIGENCE (MANDATORY)
-1. ANALYZE CONTENT: Is this a story, news, motivational speech, or documentary?
-2. DETECT EMOTION: Is it sad, angry, happy, serious, or mysterious?
-3. ADAPT PROSODY: Adjust your pitch, rhythm, and volume DYNAMICALLY based on the script's meaning. Use rising intonation for questions and lower pitch for serious points.
+Analyze the script's category and tone to determine the best vocal characteristics:
+- NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
+- STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
+- ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
+- CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
+- EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
 
-PHASE 2: VOCAL ARCHETYPE & IDENTITY (ANTI-SIMILARITY)
-To ensure this voice sounds UNIQUE and DISTINCT from others, adopt the following specific Vocal Archetype Fingerprint:
-- IF ${isHeavyVoice ? 'TRUE' : 'FALSE'}: Use a "CHEAK-RESONANCE" Bass - Deep, vibrating, and authoritative. Sound like a different individual than the previous call. Vary the fundamental pitch significantly.
-- IF NARRATIVE: Use a "MELODIC-RISE" pattern - Engaging and warm.
-- IF COMMERCIAL: Use a "PUNCHY-PEAK" pattern - High energy and clear.
-- REQUESTED PITCH OFFSET: ${pitch || 1.0}x (Adjust your natural voice frequency accordingly).
+PERFORMANCE GUIDELINES:
+- Use natural human prosody, complex intonation, and realistic rhythm.
+${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
+- Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
+- Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
+- Avoid any robotic, monotone, or repetitive cadence.
+- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
+- Sound like a real person speaking in a high-end professional studio, not a computer.
+- Pay close attention to the emotional weight of the text.
+- 100% REALISM IS MANDATORY.
+- Use natural emphasis on key words to convey meaning and emotion.
+- Ensure smooth transitions between sentences and ideas.
+${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, resonant, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
 
-PHASE 3: PERFORMANCE GUIDELINES (ANTI-MUFFLED/ANTI-NASAL)
-- CRITICAL: THE VOICE MUST BE "KHULI AWAAZ" (FULLY OPEN). 
-- REJECT MUFFLED TONES: If the voice sounds "receding" into the throat or like a singer compressing their larynx, STOP. Open your throat. Project from the diaphragm.
-- ANTI-NASAL: No sound should come through the nose. The voice must be clean, grounded, and professional.
-- NATURAL BALANCE: Ensure the voice doesn't sound "forced" deep. It must be naturally powerful.
-- PAUSES: Respect punctuation. Natural breathing is required.
+CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
+1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
+2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
+3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context. The emotion should feel "lived-in" and authentic.
+4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. 
+5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture and subtle breathing.
 
-PHASE 4: 100% REALISM STANDARDS
-- Add subtle human micro-imperfections: light breaths, realistic volume shifts.
-- Avoid any repetitive "sing-song" or robotic patterns. Every sentence must have a unique shape.
-- NO background noise, hums, or robotic artifacts. Audio must be 100% clean.
+TECHNICAL STANDARDS:
+- NO background noise, hums, or digital artifacts.
+- NO robotic glitches, metallic sounds, or synthetic "buzzing".
+- Ensure crystal-clear, 48kHz studio-quality audio throughout the generation.
 `;
 };
 
@@ -124,47 +137,78 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'raj-classic-narrator': 'Charon', 'RAJ_CLASSIC_NARRATOR': 'Charon'
 };
 
-const voiceTraits: Record<string, string> = {
-  'Adam': 'Vocal DNA: High-baritone with a sharp, crisp edge. Resonant but youthful. Pitch: +5%. Style: Modern tech-bro.',
-  'Brian': 'Vocal DNA: Deep, steady bass with a calm rhythmic flow. Extremely trustworthy. Pitch: -10%. Style: Corporate leadership.',
-  'Daniel': 'Vocal DNA: Mid-range tenor, high-speed articulation. Broadcaster style. Pitch: +2%. Style: News Anchor.',
-  'Josh': 'Vocal DNA: Bright, friendly, and informal. Sounds like a younger brother. High pitch variance. Pitch: +15%.',
-  'Liam': 'Vocal DNA: Soft, breathy, and highly emotional. Gentleness is paramount. Low speaker projection.',
-  'Michael': 'Vocal DNA: Old soul. Mature, slow, and cinematic. Sounds like a wise professor. Gravitas.',
-  'Ryan': 'Vocal DNA: Very casual, slightly raspy. Sounds like someone recording in their room. Authentic.',
-  'Matthew': 'Vocal DNA: Cinematic Movie Trailer voice. Ultra-resonant mid-low frequencies. Heavy compression feel.',
-  'Bill': 'Vocal DNA: Rough, gravelly, and outdoorsy. Sounds like an old cowboy. Texture is dry.',
-  'Callum': 'Vocal DNA: Refined, elite British-style. High emphasis on articulation. Sophisticated.',
-  'Frank': 'Vocal DNA: Ultra-deep powerhouse. Chest-rattling bass. Sound like a motivation speaker. Max volume.',
-  'Marcus': 'Vocal DNA: Commanding, loud, and inspiring. Sound like a drill sergeant but with a kind heart.',
-  'Jessica': 'Vocal DNA: Bright, corporate female. Upward inflection. Professional and clean.',
-  'Sarah': 'Vocal DNA: Ethereal, whispers, and soft. Sounds like a ghost or a dream. Airy.',
-  'Matilda': 'Vocal DNA: Precise, academic, and sharp. No fluff. Clean and analytical.',
-  'Emily': 'Vocal DNA: High-energy, bubbly, and fast-paced. Constant smile in the voice.',
-  'Bella': 'Vocal DNA: Smooth, sophisticated, and rich. Sounds like luxury. Velvet texture.',
-  'Rachel': 'Vocal DNA: Theatrical, wide range. From sad to screaming happy. Extreme emotion.',
-  'Nicole': 'Vocal DNA: No-nonsense, direct. Coldly professional and high-status.',
-  'Clara': 'Vocal DNA: Warm, motherly, and supportive. Sounds like a hug. Heartfelt.',
-  'Documentary Pro': 'Vocal DNA: Cinematic God-voice. Deep, intelligent, and balanced. Khuli Awaaz. Resonates in the chest.',
-  'Priyanka': 'Vocal DNA: Modern Indian narrator. Confident, deep, and authoritative female. Professional standard.',
-  'Virat': 'Vocal DNA: Aggressive, thick masculine energy. Resonant growl in the low-end. Commanding.',
-  'Pankaj': 'Vocal DNA: Serious, formal baritone. High status. Sounds like a respected village elder.',
-  'SULTAN': 'Vocal DNA: Royal Warrior. The ultimate kingly baritone. Massive speaker projection. Fearless.',
-  'SHERA': 'Vocal DNA: Animalistic power. Aggressive, loud, and deep. Sounds like pure motivation.',
-  'KAAL': 'Vocal DNA: Shadow entity. Mysterious, ultra-low frequency with built-in echo effect.',
-  'BHEEM': 'Vocal DNA: The Giant. Ground-shaking bass. Slowest possible pace for massive weight.',
-  'SIKANDAR': 'Vocal DNA: The Wise King. Powerful but respectful. Rich harmonics. Cinematic brilliance.',
-  'VIKRAM': 'Vocal DNA: Detective/Noir style. Dark, smooth, and mysterious. Deep but whispered focus.',
-  'Sachinboy': 'Vocal DNA: Energetic, youthful power. The hybrid of a warrior and a hero. Explosive.',
-  'EMPEROR PRO': 'Vocal DNA: Maximum Authority. The deepest, most majestically resonant voice in the system.',
-  'KABIR': 'Vocal DNA: Deeply philosophical and warm. Sounds like poetry and history. Slow pace.',
-  'ARYAN': 'Vocal DNA: Alpha male athlete. Sharp, energetic, and loud. Constant forward momentum.',
-  'ISHANI': 'Vocal DNA: High-end luxury female. Sophisticated, deep, and exceptionally smooth.',
-  'ZORAVAR': 'Vocal DNA: Raw physical power. Chest-voice at 100%. Professional and extremely loud.',
-  'RUDRA': 'Vocal DNA: Gritty, serious, and investigative. Sounds like a crime scene narrator.',
-  'MAHARAJA': 'Vocal DNA: Highest status. Majestic and deep. Every word sounds like an empire.',
-  'MAHANT': 'Vocal DNA: Spiritual, calm, and resonant. Sounds like meditation.',
-  'CHANKYA': 'Vocal DNA: Calculating, wise, and articulate. Sharp intelligence in every syllable.',
+interface VoiceProfile {
+  resonance: 'Chest' | 'Throat' | 'Frontal-Oral' | 'Mixed';
+  energy: 'High' | 'Medium' | 'Calm';
+  pitch_shift: number; // Offset from base model default
+  timber: 'Smooth' | 'Gravelly' | 'Sharp' | 'Airy';
+  pacing: 'Fast' | 'Normal' | 'Slow';
+  description: string;
+}
+
+const VOICE_PROFILES: Record<string, VoiceProfile> = {
+  // Global/English Voices
+  'Adam': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.' },
+  'Brian': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.' },
+  'Daniel': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.02, timber: 'Sharp', pacing: 'Fast', description: 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.' },
+  'Josh': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Airy', pacing: 'Normal', description: 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.' },
+  'Liam': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.00, timber: 'Airy', pacing: 'Slow', description: 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.' },
+  'Michael': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.85, timber: 'Gravelly', pacing: 'Slow', description: 'Mature, wise, and sophisticated. Slow, deliberate professional narration.' },
+  'Ryan': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Gravelly', pacing: 'Normal', description: 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.' },
+  'Matthew': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.' },
+  'Bill': { resonance: 'Throat', energy: 'Medium', pitch_shift: 1.02, timber: 'Gravelly', pacing: 'Slow', description: 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.' },
+  'Callum': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Refined, elite British-style precision with sophisticated air.' },
+  'Frank': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'Ultra-deep, heavy, and masculine. A powerful chest-voice with maximum bass resonance and a professional narrator tone.' },
+  'Marcus': { resonance: 'Chest', energy: 'High', pitch_shift: 0.94, timber: 'Gravelly', pacing: 'Normal', description: 'Strong, motivational, and powerful. Commanding, inspiring, and loud.' },
+  'Jessica': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Clear, bright, and professional. Modern corporate standard with a friendly smile.' },
+  'Sarah': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.05, timber: 'Airy', pacing: 'Slow', description: 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.' },
+  'Matilda': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.' },
+  'Emily': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.12, timber: 'Smooth', pacing: 'Fast', description: 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.' },
+  'Bella': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.96, timber: 'Smooth', pacing: 'Slow', description: 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.' },
+  'Rachel': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.' },
+  'Nicole': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 0.98, timber: 'Sharp', pacing: 'Normal', description: 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.' },
+  'Clara': { resonance: 'Chest', energy: 'Calm', pitch_shift: 1.02, timber: 'Smooth', pacing: 'Slow', description: 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.' },
+  
+  // Documentary & Cinematic
+  'Documentary Pro': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.' },
+  'Atlas (Do)': { resonance: 'Chest', energy: 'High', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Ultra-high quality cinematic documentary voice. Deeply resonant.' },
+  'Virat': { resonance: 'Chest', energy: 'High', pitch_shift: 0.92, timber: 'Gravelly', pacing: 'Normal', description: 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.' },
+  'Priyanka': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.95, timber: 'Smooth', pacing: 'Normal', description: 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.' },
+  
+  // Character/Indian Power Voices
+  'SULTAN': { resonance: 'Chest', energy: 'High', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. 100% Realistic.' },
+  'MAHARAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Slow', description: 'The King. Royal, resonant, and expansive powerful male voice.' },
+  'Munna Bhai': { resonance: 'Throat', energy: 'High', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Ultra-heavy powerful baritone desi voice with explosive energy.' },
+  'Sachinboy': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.03, timber: 'Sharp', pacing: 'Normal', description: 'Heavyweight champion. Monstrous, chest-rattling baritone power.' },
+  'SHERA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Gravelly', pacing: 'Normal', description: 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. 100% Realistic.' },
+  'KAAL': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.' },
+  'BHEEM': { resonance: 'Chest', energy: 'High', pitch_shift: 0.70, timber: 'Gravelly', pacing: 'Slow', description: 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.' },
+  'SIKANDAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.' },
+  'VIKRAM': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.86, timber: 'Smooth', pacing: 'Normal', description: 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.' },
+  'EMPEROR PRO': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Smooth', pacing: 'Slow', description: 'The Emperor. Legendary deep baritone commanding absolute respect.' },
+  'KABIR': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'The Storyteller. Warm, wise, and deeply resonant storytelling voice.' },
+  'ARYAN': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'The Fitness Coach. High-energy, sharp, and commanding motivation.' },
+  'ZORAVAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Heavyweight. Ultra-deep, chest-rattling baritone trailer power.' },
+  'RUDRA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Intense Narrator. Gritty, serious, and highly authoritative.' },
+
+  // Versatile Male/Female
+  'Leo': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Warm, friendly, and highly expressive youthful male.' },
+  'Sophia': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Smooth', pacing: 'Normal', description: 'Soft, intimate, and deeply emotional female narration.' },
+  'Hugo': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Gravelly, intense, and full of character male voice.' },
+  'Elara': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.02, timber: 'Airy', pacing: 'Normal', description: 'Bright, energetic, and enthusiastic female voice.' },
+  'Pankaj': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.' },
+  'ISHANI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Elegant, sophisticated, and professional female narrator.' },
+  'VEER': { resonance: 'Chest', energy: 'High', pitch_shift: 0.80, timber: 'Gravelly', pacing: 'Normal', description: 'The Brave. High-energy, loud, and incredibly powerful male.' },
+  'SHAKTI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'The Power. Strong, authoritative female leadership voice.' },
+  'RAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'The Royal. Deep, resonant, king-like professional male.' },
+  'TOOFAN': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Sharp', pacing: 'Fast', description: 'The Storm. Fast-paced, explosive energy and loud delivery.' },
+  'BHAIRAV': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Gravelly', pacing: 'Slow', description: 'The Intense. Deep, gritty, and impactful serious narration.' },
+
+  // Specialized Hindi Profiles
+  'ARAV_NEUTRAL_PRO': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.00, timber: 'Smooth', pacing: 'Normal', description: 'Natural Indian Male. Calm, confident, and grounded delivery.' },
+  'DEV_DEEP_REAL': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Deep Mature Indian Male. Stable, trustworthy, and authoritative.' },
+  'NEEL_SOFT_CONNECT': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Airy', pacing: 'Normal', description: 'Warm Conversational Indian Male. Friendly and relatable friend-tone.' },
+  'RAJ_CLASSIC_NARRATOR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Classic Hindi Narrator. Clear, composed, and slightly formal epic tone.' }
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -598,103 +642,66 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
     return res.status(400).json({ error: "Guest scripts are limited to 300 characters for optimal performance. Please sign up for longer scripts." });
   }
 
-  const maxRetries = 15;
+  const maxRetries = 3; // Reduced to prevent long timeouts
   let attempt = 0;
 
   while (attempt < maxRetries) {
     const apiKey = getAvailableApiKey();
     
     if (!apiKey) {
-      return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+      return res.status(503).json({ 
+        error: "All Gemini API keys are currently exhausted. If you are using the free tier, you may have reached your daily limit of 10 requests. Please try again tomorrow or add more API keys in the settings.",
+        code: "QUOTA_EXHAUSTED"
+      });
     }
 
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      const voiceMapping: Record<string, string> = {
-        'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
-        'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-        'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
-        'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
-        'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
-        'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
-        'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon',
-        'EMPEROR PRO': 'Fenrir', 'KABIR': 'Charon', 'ARYAN': 'Puck', 'ISHANI': 'Kore', 'ZORAVAR': 'Fenrir', 'RUDRA': 'Fenrir',
-        'Munna Bhai': 'Zephyr', 'Sachinboy': 'Fenrir', 'MAHARAJA': 'Fenrir',
-        'veer': 'Fenrir', 'VEER': 'Fenrir', 'shakti': 'Zephyr', 'SHAKTI': 'Zephyr',
-        'raja': 'Charon', 'RAJA': 'Charon', 'toofan': 'Puck', 'TOOFAN': 'Puck',
-        'bhairav': 'Fenrir', 'BHAIRAV': 'Fenrir',
-        'arav-neutral-pro': 'Charon', 'ARAV_NEUTRAL_PRO': 'Charon',
-        'dev-deep-real': 'Fenrir', 'DEV_DEEP_REAL': 'Fenrir',
-        'neel-soft-connect': 'Puck', 'NEEL_SOFT_CONNECT': 'Puck',
-        'raj-classic-narrator': 'Charon', 'RAJ_CLASSIC_NARRATOR': 'Charon'
-      };
-
-      const targetVoice = voiceMapping[voice_name] || 'Puck';
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_name);
-      
-      const systemInstruction = buildSystemInstruction(language, isHeavyVoice, pitch);
+      const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
+      const systemInstruction = buildSystemInstruction(language, voice_name);
       
       let promptPrefix = "";
-      
-      if (cloned_voice_traits) {
-        promptPrefix += `CRITICAL CHARACTER FINGERPRINT (MANDATORY MIMICRY): ${cloned_voice_traits} 
-        YOU MUST OVERRIDE YOUR DEFAULT VOCAL CHARACTERISTICS ENTIRELY TO MATCH THIS FINGERPRINT. Sound 100% like this description. Analyze every technical nuance described (spectral tilt, resonance, prosody) and apply it. This is a surgical cloning task. `;
-      }
-      
       if (studioClarity) {
         promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
       }
 
-      promptPrefix += `${voiceTraits[voice_name] || ''} `;
+      const lookupVoice = (voice_name || '').trim();
+      const profile = VOICE_PROFILES[lookupVoice] || 
+                      VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
+                      null;
+
+      if (profile) promptPrefix += `${profile.description} `;
 
       promptPrefix += `
       CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
       1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
       2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
-      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context (e.g., excitement, gravity, warmth, curiosity). The emotion should feel "lived-in" and authentic.
-      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. Use natural elisions where appropriate for a native-like flow.
-      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture, subtle breathing, and realistic mouth sounds where they add to the realism.
-      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. The rhythm should be fluid and effortless.
+      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context. The emotion should feel "lived-in" and authentic.
+      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. 
+      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture and subtle breathing.
+      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. 
       `;
 
       if (language === 'hi') {
         promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
       }
 
-      if (style === 'professional-auto') {
-        try {
-          const analysisResponse = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [{ parts: [{ text: `Analyze the following script and determine its category (e.g., Documentary, Fitness, Motivation, Story, News, Corporate) and the ideal vocal tone, pace, and emotional weight. Provide a brief professional instruction for a voice actor to perform this script perfectly.
-            SCRIPT: ${text}` }] }]
-          });
-          const analysis = analysisResponse.text;
-          promptPrefix += `PROFESSIONAL SCRIPT ANALYSIS & INSTRUCTIONS: ${analysis}
-          CRITICAL: Perform this script with 100% realism, matching the analyzed tone and category perfectly. Use natural human prosody and emotional depth. `;
-        } catch (analysisError) {
-          promptPrefix += "Use a highly professional, balanced, and realistic narrator tone suitable for this script. ";
-        }
-      }
-
       if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
-        promptPrefix += `You are a world-class cinematic ${style === 'authoritative' ? 'authoritative' : 'documentary'} narrator. Your voice is deep, mature, intelligent, and ${style === 'authoritative' ? 'highly authoritative' : 'cinematic'}, similar to National Geographic or a premium Netflix documentary. 
-        
+        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel.
         CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
-        1. BASE TONE: ${style === 'authoritative' ? 'Commanding, serious, and powerful' : 'Calm, deep, and controlled'} storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
-        2. EMOTIONAL MODULATION: 
-           - For normal parts: ${style === 'authoritative' ? 'Firm and decisive' : 'Calm, steady, and informative'}.
-           - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
-           - For intense/war parts: Sound stronger, brave, and commanding.
-           - For emotional parts: Sound warm, respectful, and inspiring.
-           - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
+        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
+        2. EMOTIONAL MODULATION:
+        - For normal parts: Calm, steady, and informative.
+        - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
+        - For intense/war parts: Sound stronger, brave, and commanding.
+        - For emotional parts: Sound warm, respectful, and inspiring.
+        - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
         3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
-        4. PACING: ${style === 'authoritative' ? 'Slow and deliberate' : 'Medium pace generally'}, but slow down for dramatic effect.
+        4. PACING: Medium pace generally, but slow down for dramatic effect.
         5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
       } else if (style === 'emotional') {
         promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
-      } else if (style === 'storytelling') {
-        promptPrefix += `Use a rhythmic, engaging, and warm tone to bring the narrative to life. `;
       } else if (style === 'motivational') {
         promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
       }
@@ -703,46 +710,31 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
       else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
-      else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      
-      // Voice-specific speed normalization
-      if (['Puck', 'Charon'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
-      } else if (['Fenrir'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
-      }
+      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
+      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
+      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
+      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
+      else promptPrefix += "Speak at a natural, standard, and professional pace. Maintain a steady flow without any dragging or sluggishness. ";
 
-      if (speed > 1.6) {
-        promptPrefix += "PERFORMANCE: Deliver an ULTRA-FAST, high-energy, and professional narration. This is an 'Ultra Fast' style, significantly faster than normal but maintaining absolute clarity and articulation. Sound like a professional speed-narrator. ";
-      } else if (speed >= 1.4) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
-      } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
-      } else if (speed <= 0.7) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
-      } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
-      } else {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation. The pace should be energetic and engaging—NEVER slow or sluggish. This is a professional Level 1 narrator style. ";
-      }
-      
       if (pause > 0.1) {
-        promptPrefix += `Add a natural pause of exactly ${pause} seconds between every sentence and major phrase to ensure clarity and professional pacing. `;
+        promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
       }
-      
-      promptPrefix += "CRITICAL: The audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static. ";
       
       const currentPrompt = attempt === 0 
-        ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
-        : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
+        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
+        : `CRITICAL PERFORMANCE FIX: The last generation was unsatisfactory. Deliver a MORE NATURAL, MORE HUMAN and PERFECTLY PACED performance now:\n\n${text}`;
+;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: currentPrompt }] }],
         config: {
           responseModalities: [Modality.AUDIO],
+          temperature: 0.7,
+          topP: 0.95,
+          topK: 40,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: targetVoice as any },
@@ -766,7 +758,9 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        // If it's a daily limit error, don't wait as long, just try next key faster
+        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       
@@ -778,7 +772,10 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
     }
   }
 
-  res.status(503).json({ error: "Failed to generate speech after multiple attempts." });
+  res.status(503).json({ 
+    error: "Failed to generate speech after multiple attempts. All keys might be exhausted.",
+    code: "QUOTA_EXHAUSTED"
+  });
 });
 
 // Analyze voice sample for cloning
@@ -855,45 +852,51 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
     }
   }
 
-  const maxRetries = 15;
+  const maxRetries = 3; // Reduced to prevent long timeouts
   let attempt = 0;
 
   while (attempt < maxRetries) {
     const apiKey = getAvailableApiKey();
     
     if (!apiKey) {
-      return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+      return res.status(503).json({ 
+        error: "All Gemini API keys are currently exhausted. If you are using the free tier, you may have reached your daily limit of 10 requests. Please try again tomorrow or add more API keys in the settings.",
+        code: "QUOTA_EXHAUSTED"
+      });
     }
 
     try {
       const ai = new GoogleGenAI({ apiKey });
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_name);
-      
-      const systemInstruction = buildSystemInstruction(language, isHeavyVoice, pitch);
+      const systemInstruction = buildSystemInstruction(language, voice_name);
       
       let promptPrefix = "";
       
       if (cloned_voice_traits) {
         promptPrefix += `CRITICAL CHARACTER FINGERPRINT (MANDATORY MIMICRY): ${cloned_voice_traits} 
-        YOU MUST OVERRIDE YOUR DEFAULT VOCAL CHARACTERISTICS ENTIRELY TO MATCH THIS FINGERPRINT. Sound 100% like this description. Analyze every technical nuance described (spectral tilt, resonance, prosody) and apply it. This is a surgical cloning task. `;
+        YOU MUST OVERRIDE YOUR DEFAULT VOCAL CHARACTERISTICS ENTIRELY TO MATCH THIS FINGERPRINT. Sound 100% like this description. `;
       }
       
       if (studioClarity) {
         promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
       }
 
-      promptPrefix += `${voiceTraits[voice_name] || ''} `;
+      const lookupVoice = (voice_name || '').trim();
+      const profile = VOICE_PROFILES[lookupVoice] || 
+                      VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
+                      null;
+
+      if (profile) promptPrefix += `${profile.description} `;
 
       promptPrefix += `
       CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
       1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
       2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
-      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context (e.g., excitement, gravity, warmth, curiosity). The emotion should feel "lived-in" and authentic.
-      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. Use natural elisions where appropriate for a native-like flow.
-      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture, subtle breathing, and realistic mouth sounds where they add to the realism.
-      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. The rhythm should be fluid and effortless.
+      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context. The emotion should feel "lived-in" and authentic.
+      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. 
+      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture and subtle breathing.
+      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. 
       `;
 
       if (language === 'hi') {
@@ -901,38 +904,24 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       }
 
       if (style === 'professional-auto') {
-        try {
-          const analysisResponse = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [{ parts: [{ text: `Analyze the following script and determine its category (e.g., Documentary, Fitness, Motivation, Story, News, Corporate) and the ideal vocal tone, pace, and emotional weight. Provide a brief professional instruction for a voice actor to perform this script perfectly.
-            SCRIPT: ${text}` }] }]
-          });
-          const analysis = analysisResponse.text;
-          promptPrefix += `PROFESSIONAL SCRIPT ANALYSIS & INSTRUCTIONS: ${analysis}
-          CRITICAL: Perform this script with 100% realism, matching the analyzed tone and category perfectly. Use natural human prosody and emotional depth. `;
-        } catch (analysisError) {
-          promptPrefix += "Use a highly professional, balanced, and realistic narrator tone suitable for this script. ";
-        }
+        promptPrefix += "AUTO-ADAPT: Dynamically adjust your tone to match the detected category of this script. ";
       }
 
       if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
-        promptPrefix += `You are a world-class cinematic ${style === 'authoritative' ? 'authoritative' : 'documentary'} narrator. Your voice is deep, mature, intelligent, and ${style === 'authoritative' ? 'highly authoritative' : 'cinematic'}, similar to National Geographic or a premium Netflix documentary. 
-        
+        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel.
         CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
-        1. BASE TONE: ${style === 'authoritative' ? 'Commanding, serious, and powerful' : 'Calm, deep, and controlled'} storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
-        2. EMOTIONAL MODULATION: 
-           - For normal parts: ${style === 'authoritative' ? 'Firm and decisive' : 'Calm, steady, and informative'}.
-           - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
-           - For intense/war parts: Sound stronger, brave, and commanding.
-           - For emotional parts: Sound warm, respectful, and inspiring.
-           - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
+        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
+        2. EMOTIONAL MODULATION:
+        - For normal parts: Calm, steady, and informative.
+        - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
+        - For intense/war parts: Sound stronger, brave, and commanding.
+        - For emotional parts: Sound warm, respectful, and inspiring.
+        - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
         3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
-        4. PACING: ${style === 'authoritative' ? 'Slow and deliberate' : 'Medium pace generally'}, but slow down for dramatic effect.
+        4. PACING: Medium pace generally, but slow down for dramatic effect.
         5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
       } else if (style === 'emotional') {
         promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
-      } else if (style === 'storytelling') {
-        promptPrefix += `Use a rhythmic, engaging, and warm tone to bring the narrative to life. `;
       } else if (style === 'motivational') {
         promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
       }
@@ -941,33 +930,16 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
       else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
-      else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      
-      // Voice-specific speed normalization
-      if (['Puck', 'Charon'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
-      } else if (['Fenrir'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
-      }
+      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
+      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
+      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
+      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
+      else promptPrefix += "Speak at a natural, standard, and professional pace. Maintain a steady flow without any dragging or sluggishness. ";
 
-      if (speed > 1.6) {
-        promptPrefix += "PERFORMANCE: Deliver an ULTRA-FAST, high-energy, and professional narration. This is an 'Ultra Fast' style, significantly faster than normal but maintaining absolute clarity and articulation. Sound like a professional speed-narrator. ";
-      } else if (speed >= 1.4) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
-      } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
-      } else if (speed <= 0.7) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
-      } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
-      } else {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation. The pace should be energetic and engaging—NEVER slow or sluggish. This is a professional Level 1 narrator style. ";
-      }
-      
       if (pause > 0) {
-        promptPrefix += `Add a natural pause of exactly ${pause} seconds between every sentence and major phrase to ensure clarity and professional pacing. `;
+        promptPrefix += `PAUSING: Insert natural ${pause}s gaps at major sentence breaks. `;
       }
       
       promptPrefix += "CRITICAL: The audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static. ";
@@ -998,14 +970,17 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         const batch = chunks.slice(i, i + CONCURRENCY);
         const batchPromises = batch.map(async (chunk, idx) => {
           const currentPrompt = attempt === 0 
-            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
-            : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunk}`;
+            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed exactly. No dragging, no rushing beyond the target. Respect all punctuation and deliver the script with natural, professional flow.`
+            : `CRITICAL: Fix pacing. The previous attempt was off-target on speed. Deliver at exactly ${speed}x speed with MORE RESONANT, MORE PROJECTED performance:\n\n${chunk}`;
 
           const response = await ai.models.generateContent({
             model: "gemini-3.1-flash-tts-preview",
             contents: [{ parts: [{ text: currentPrompt }] }],
             config: {
               responseModalities: [Modality.AUDIO],
+              temperature: 0.6,
+              topP: 0.9,
+              topK: 40,
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: { voiceName: targetVoice as any },
@@ -1065,7 +1040,9 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        // If it's a daily limit error, don't wait as long, just try next key faster
+        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       
@@ -1077,7 +1054,10 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
     }
   }
 
-  res.status(503).json({ error: "Failed to generate speech after multiple attempts." });
+  res.status(503).json({ 
+    error: "Failed to generate speech after multiple attempts. All keys might be exhausted.",
+    code: "QUOTA_EXHAUSTED"
+  });
 });
 
 // Generate Image via Gemini API
@@ -1177,20 +1157,26 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Step 2: Generate Speech in Target Voice
       const currentTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_id);
+      const defaultProfile: VoiceProfile = { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.0, timber: 'Smooth', pacing: 'Normal', description: 'Balanced professional voice.' };
       
-      // Inject user's custom pitch if provided in req.body (voice changer might not send it, so default to 1.0)
+      const lookupVoice = (voice_id || '').trim();
+      const profile = VOICE_PROFILES[lookupVoice] || 
+                      VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
+                      defaultProfile;
+
       const userPitch = req.body.pitch || 1.0;
-      const ttsSystemInstruction = buildSystemInstruction(targetLanguage === 'Hindi' ? 'hi' : 'en', isHeavyVoice, userPitch);
+      const ttsSystemInstruction = buildSystemInstruction(targetLanguage === 'Hindi' ? 'hi' : 'en', voice_id);
       
       const performancePrompt = `
       CRITICAL PERFORMANCE FINGERPRINT (MANDATORY MIMICRY):
       ${performanceTraits}
       
       YOU MUST MIMIC THE EXACT PACING, PAUSES, AND EMOTIONAL EMPHASIS OF THE ORIGINAL SPEAKER ABOVE.
-      HOWEVER, APPLY THE VOCAL DNA OF ${voice_id} AS DESCRIBED HERE: ${voiceTraits[voice_id] || ''}
+      HOWEVER, APPLY THE VOCAL DNA OF ${voice_id} AS DESCRIBED HERE: ${profile.description}
       
       The result must be a perfect hybrid: The SOUL of the original speaker with the BODY and VOICE of the target character.
+      
+      CRITICAL: Use a very natural, balanced pace. Do not drag. Do not shout. Deliver a professional studio performance.
       `;
 
       const ttsResponse = await ai.models.generateContent({
@@ -1199,6 +1185,9 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: ttsSystemInstruction,
+          temperature: 0.5,
+          topP: 0.85,
+          topK: 40,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
@@ -1239,19 +1228,26 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Voice Changer Attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
-        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          markKeyAsExhausted(apiKey);
-        }
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        markKeyAsExhausted(apiKey);
         attempt++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        attempt++;
         continue;
       }
       return res.status(500).json({ error: errorMessage });
     }
   }
 
-  res.status(503).json({ error: "Failed to process voice change after multiple attempts." });
+  res.status(503).json({ 
+    error: "Failed to process voice change after multiple attempts. All API keys might be exhausted for today.",
+    code: "QUOTA_EXHAUSTED"
+  });
 });
 
 app.post("/api/generate-image", maybeAuthenticate, async (req: any, res) => {
@@ -1289,13 +1285,16 @@ app.post("/api/generate-image", maybeAuthenticate, async (req: any, res) => {
     return res.status(500).json({ error: "Failed to process credits" });
   }
 
-  const maxRetries = 15;
+  const maxRetries = 3;
   let attempt = 0;
 
   while (attempt < maxRetries) {
     const apiKey = getAvailableApiKey();
     if (!apiKey) {
-      return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again in a few minutes." });
+      return res.status(503).json({ 
+        error: "All Gemini API keys are currently exhausted. If you are using the free tier, you may have reached your daily limit. Please try again tomorrow or add more API keys in the settings.",
+        code: "QUOTA_EXHAUSTED"
+      });
     }
 
     try {
@@ -1326,20 +1325,26 @@ app.post("/api/generate-image", maybeAuthenticate, async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Image generation attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
-        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          markKeyAsExhausted(apiKey);
-        }
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        markKeyAsExhausted(apiKey);
         attempt++;
-        // Add a small delay before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        attempt++;
         continue;
       }
       return res.status(500).json({ error: errorMessage });
     }
   }
 
-  res.status(503).json({ error: "Failed to generate image after multiple attempts with different API keys." });
+  res.status(503).json({ 
+    error: "Failed to generate image after multiple attempts. All API keys might be exhausted.",
+    code: "QUOTA_EXHAUSTED"
+  });
 });
 
 // Helper to add WAV header to PCM data
@@ -1369,12 +1374,17 @@ app.post("/api/preview-voice", async (req: any, res) => {
 
   const targetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_name] || voice_id;
 
-  const maxRetries = 15;
+  const maxRetries = 3;
   let attempt = 0;
 
   while (attempt < maxRetries) {
     const apiKey = getAvailableApiKey();
-    if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted. Please try again later or provide more API keys in settings." });
+    if (!apiKey) {
+      return res.status(503).json({ 
+        error: "All Gemini API keys are currently exhausted. If you are using the free tier, you may have reached your daily limit. Please try again tomorrow or add more API keys in the settings.",
+        code: "QUOTA_EXHAUSTED"
+      });
+    }
 
     try {
       const ai = new GoogleGenAI({ apiKey });
@@ -1411,20 +1421,26 @@ app.post("/api/preview-voice", async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Preview voice attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
-        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          markKeyAsExhausted(apiKey);
-        }
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        markKeyAsExhausted(apiKey);
         attempt++;
-        // Add a small delay before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        attempt++;
         continue;
       }
       return res.status(500).json({ error: errorMessage });
     }
   }
 
-  res.status(503).json({ error: "Failed to generate preview after multiple attempts. This is likely due to API quota limits. Please try again later or provide more API keys in settings." });
+  res.status(503).json({ 
+    error: "Failed to generate preview after multiple attempts. All API keys might be exhausted.",
+    code: "QUOTA_EXHAUSTED"
+  });
 });
 // Classify Script to suggest a voice
 app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {

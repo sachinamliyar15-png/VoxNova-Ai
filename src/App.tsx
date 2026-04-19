@@ -1533,7 +1533,7 @@ function App() {
   const [style, setStyle] = useState('normal');
   const [speed, setSpeed] = useState(1);
   const [pitch, setPitch] = useState(1);
-  const [pause, setPause] = useState(1.0);
+  const [pause, setPause] = useState(0.5);
   const [audioFormat, setAudioFormat] = useState<'wav' | 'mp3'>('wav');
   const [targetSampleRate, setTargetSampleRate] = useState<24000 | 44100 | 48000>(44100);
   const [studioClarity, setStudioClarity] = useState(true);
@@ -1757,7 +1757,7 @@ function App() {
   const handleResetSettings = () => {
     setSpeed(1.0);
     setPitch(1.0);
-    setPause(0.8);
+    setPause(0.5);
     setAudioFormat('mp3');
     setTargetSampleRate(48000);
     setStyle('normal');
