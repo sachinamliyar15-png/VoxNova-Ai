@@ -498,32 +498,42 @@ const CaptionOverlay = ({
 
   const getAnimationProps = () => {
     switch (animation) {
+      case 'typing':
+        return {
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          transition: { duration: 0.1 }
+        };
+      case 'typing':
+        return {
+          initial: { opacity: 0, scale: 0.9 },
+          animate: { opacity: 1, scale: 1 },
+          transition: { duration: 0.1 }
+        };
       case 'pop':
         return {
-          initial: { scale: 0.8, opacity: 0 },
+          initial: { scale: 0.9, opacity: 0 },
           animate: { scale: 1, opacity: 1 },
-          transition: { type: 'spring' as const, stiffness: 400, damping: 15 }
+          transition: { type: 'spring' as const, stiffness: 600, damping: 25 }
         };
       case 'professional':
         return {
-          initial: { scale: 0.5, opacity: 0, y: 15 },
+          initial: { scale: 0.9, opacity: 0, y: 10 },
           animate: { scale: 1, opacity: 1, y: 0 },
           transition: { 
-            type: "spring" as const,
-            stiffness: 500,
-            damping: 20,
-            duration: 0.1
+            duration: 0.1,
+            ease: "easeOut" as const
           }
         };
       case 'snappy':
         return {
-          initial: { scale: 0, opacity: 0 },
+          initial: { scale: 0.5, opacity: 0 },
           animate: { scale: 1, opacity: 1 },
           transition: { 
             type: "spring" as const,
-            stiffness: 600,
+            stiffness: 1000,
             damping: 15,
-            duration: 0.08
+            duration: 0.05
           }
         };
       case 'snappy-pop':
@@ -758,20 +768,36 @@ const CaptionOverlay = ({
     const linePosition = lineWords[0]?.position || style.position;
 
     // Typewriter style
-    if (animation === 'typewriter') {
+    if (animation === 'typing' || animation === 'typewriter') {
       return (
-        <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
-          {visibleWords.map((w, i) => (
-            <motion.span 
-              key={`typewriter-${w.word}-${w.start}-${i}`} 
-              initial={{ opacity: 0, scale: 0.8, y: 5 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              style={getWordStyle(w, i)}
-              className="mx-1"
-            >
-              {w.word}
-            </motion.span>
-          ))}
+        <div className={`absolute left-0 right-0 w-full flex justify-center px-4 ${positionClass}`}>
+          <div 
+            style={{...textStyle, maxWidth: '95%', margin: '0 auto'}} 
+            className="flex flex-wrap justify-center gap-x-[0.2em]"
+          >
+            {lineWords.map((w, i) => {
+              const isVisible = currentTime >= w.start;
+              const isActive = currentTime >= w.start && currentTime <= w.end;
+              return (
+                <motion.span 
+                  key={`typewriter-${w.start}-${i}`}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ 
+                    opacity: isVisible ? 1 : 0,
+                    scale: isVisible ? (isActive ? 1.2 : 1) : 0.8,
+                  }}
+                  transition={{ duration: 0.1 }}
+                  style={{
+                    ...getWordStyle(w, i),
+                    display: 'inline-block',
+                    color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : '#ffff00')) : (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)),
+                  }}
+                >
+                  {w.word}
+                </motion.span>
+              );
+            })}
+          </div>
         </div>
       );
     }
@@ -896,15 +922,16 @@ const CaptionOverlay = ({
         <AnimatePresence mode="wait">
           <motion.div
             key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
-            initial={{ scale: 0.5, opacity: 0, y: 20 }}
+            initial={{ scale: 0.9, opacity: 0, y: 10 }}
             animate={{ 
-              scale: 1.2, 
+              scale: 1.1, 
               opacity: 1, 
               y: style.isSmart ? floatingOffset.y : 0,
               x: style.isSmart ? floatingOffset.x : 0
             }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+            style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)), maxWidth: '90%', margin: '0 auto' }}
             className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
           >
             {style.isDynamic ? (
@@ -1100,6 +1127,25 @@ const VoiceLibrary = ({ onSelect, selectedVoiceId, activeTab, voices }: { onSele
   );
 };
 
+// Helper to format time for SRT
+const formatSRTTime = (seconds: number) => {
+  const date = new Date(0);
+  date.setSeconds(seconds);
+  const hh = date.getUTCHours().toString().padStart(2, '0');
+  const mm = date.getUTCMinutes().toString().padStart(2, '0');
+  const ss = date.getUTCSeconds().toString().padStart(2, '0');
+  const ms = Math.floor((seconds % 1) * 1000).toString().padStart(3, '0');
+  return `${hh}:${mm}:${ss},${ms}`;
+};
+
+// Helper to generate SRT content from words
+const generateSRT = (words: CaptionWord[]) => {
+  if (!words || words.length === 0) return "";
+  return words.map((word, i) => {
+    return `${i + 1}\n${formatSRTTime(word.start)} --> ${formatSRTTime(word.end)}\n${word.word}\n`;
+  }).join('\n');
+};
+
 const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Generation[], onPlay: (gen: Generation) => void, onDelete: (id: string | number) => void, onRestore: (gen: Generation) => void }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -1184,7 +1230,25 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
                 >
                   <Trash2 size={18} />
                 </button>
-                {gen.audio_data && gen.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" && (
+                
+                {gen.type === 'caption' ? (
+                  <button 
+                    onClick={() => {
+                      const srtContent = gen.words ? generateSRT(gen.words) : '';
+                      const blob = new Blob([srtContent], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `captions-${gen.id}.srt`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    title="Download SRT"
+                    className="p-3 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                  >
+                    <Download size={18} />
+                  </button>
+                ) : (gen.audio_data && gen.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") ? (
                   <button 
                     onClick={() => {
                       const blob = new Blob([base64ToArrayBuffer(gen.audio_data!)], { 
@@ -1193,7 +1257,7 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `VoxNova Text to Speech - ${gen.voice_name || 'AI Voice'}-${gen.id}.${gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                      a.download = `VoxNova - ${gen.voice_name || 'AI Voice'}-${gen.id}.${gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
                       a.click();
                       URL.revokeObjectURL(url);
                     }}
@@ -1202,7 +1266,7 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
                   >
                     <Download size={18} />
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           ))}
@@ -1675,7 +1739,7 @@ function App() {
   const [isSettingsLocked, setIsSettingsLocked] = useState(false);
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [captionOffset, setCaptionOffset] = useState(0);
+  const [captionOffset, setCaptionOffset] = useState(550); // Default to +550ms to compensate for AI lateness
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [isCaptioning, setIsCaptioning] = useState(false);
@@ -1683,6 +1747,26 @@ function App() {
   const [captionProgress, setCaptionProgress] = useState(0);
   const [showConfigError, setShowConfigError] = useState(false);
   const [translateToEnglish, setTranslateToEnglish] = useState(false);
+  
+  // Smooth time tracking for captions to ensure millimeter-precision
+  useEffect(() => {
+    let frameId: number;
+    const updateSmoothTime = () => {
+      const activeRef = activeTab === 'captions' ? videoRef.current : audioRef.current;
+      if (activeRef && !activeRef.paused) {
+        // Only update if the difference is meaningful (prevents jitter)
+        const diff = Math.abs(activeRef.currentTime - currentTime);
+        if (diff > 0.005) { 
+          setCurrentTime(activeRef.currentTime);
+          setAudioCurrentTime(activeRef.currentTime);
+        }
+      }
+      frameId = requestAnimationFrame(updateSmoothTime);
+    };
+    
+    frameId = requestAnimationFrame(updateSmoothTime);
+    return () => cancelAnimationFrame(frameId);
+  }, [activeTab, currentTime]);
   const [shadowColor, setShadowColor] = useState('#000000');
 
   // Auto-save feature
@@ -2156,22 +2240,6 @@ function App() {
   useEffect(() => {
     loadFFmpeg();
   }, []);
-
-  const generateSRT = (words: CaptionWord[]) => {
-    const formatTime = (seconds: number) => {
-      const date = new Date(0);
-      date.setSeconds(seconds);
-      const hh = date.getUTCHours().toString().padStart(2, '0');
-      const mm = date.getUTCMinutes().toString().padStart(2, '0');
-      const ss = date.getUTCSeconds().toString().padStart(2, '0');
-      const ms = Math.floor((seconds % 1) * 1000).toString().padStart(3, '0');
-      return `${hh}:${mm}:${ss},${ms}`;
-    };
-
-    return words.map((word, i) => {
-      return `${i + 1}\n${formatTime(word.start)} --> ${formatTime(word.end)}\n${word.word}\n`;
-    }).join('\n');
-  };
 
   const generateASS = (words: CaptionWord[], style: CaptionStyle) => {
     const displayWords = groupWordsIntoLines(words.map(w => ({
@@ -3073,9 +3141,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return;
       }
 
-      // Fix: History audio is already a WAV/MP3 base64
-      const blob = new Blob([base64ToArrayBuffer(audioData)], { 
-        type: audioData.startsWith('//') || audioData.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
+      // Fix: Improved MIME type detection and support for data URLs
+      let sanitizedData = audioData;
+      if (sanitizedData.includes(',')) {
+        sanitizedData = sanitizedData.split(',')[1];
+      }
+      
+      const pcmBuffer = base64ToArrayBuffer(sanitizedData);
+      const isMp3 = sanitizedData.startsWith('//') || sanitizedData.startsWith('SUQz') || audioData.includes('audio/mp3') || audioData.includes('audio/mpeg');
+      
+      const blob = new Blob([pcmBuffer], { 
+        type: isMp3 ? 'audio/mp3' : 'audio/wav' 
       });
       const audioUrl = URL.createObjectURL(blob);
       
@@ -3358,25 +3434,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         >
                           <RefreshCw size={16} />
                         </button>
-                        {item.audio_data && item.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" && (
-                          <button 
-                            onClick={() => {
-                              const blob = new Blob([base64ToArrayBuffer(item.audio_data!)], { 
-                                type: item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
-                              });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `VoxNova Text to Speech - ${item.voice_name || 'AI Voice'}-${item.id}.${item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }}
-                            className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
-                            title="Download Audio"
-                          >
-                            <Download size={16} />
-                          </button>
-                        )}
+                        
                         {item.type === 'caption' ? (
                           <button 
                             onClick={() => {
@@ -3394,13 +3452,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           >
                             <Download size={16} />
                           </button>
+                        ) : (item.audio_data && item.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") ? (
+                          <button 
+                            onClick={() => {
+                              const blob = new Blob([base64ToArrayBuffer(item.audio_data!)], { 
+                                type: item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
+                              });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `VoxNova - ${item.voice_name || 'AI Voice'}-${item.id}.${item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="p-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                            title="Download Audio"
+                          >
+                            <Download size={16} />
+                          </button>
                         ) : (
                           <button 
                             onClick={() => {
-                              if (item.audio_data && item.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
-                                downloadAudio(item.audio_data, `voxnova-${(item.voice_name || 'audio').toLowerCase()}-${item.id}.wav`);
-                              } else if (currentAudio && idx === 0) {
-                                // If it's the most recent one and data is missing, try currentAudio
+                              if (currentAudio && idx === 0) {
                                 downloadAudio(currentAudio, `voxnova-${(item.voice_name || 'audio').toLowerCase()}-${item.id}.wav`);
                               } else {
                                 setError("Audio data is not available for download. Try playing it first to see if it can be restored.");

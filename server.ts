@@ -1618,25 +1618,25 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ? (scriptType === 'hinglish' ? "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto'." : "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.")
         : "";
 
-      const prompt = `Transcribe the ENTIRE video/audio with EXTREME precision from start to finish. DO NOT skip any parts. 
-      The content is primarily in ${language}.
+      const prompt = `Transcribe the ENTIRE video/audio with MILIMITER-PRECISION synchronization.
+      CONTENT LANGUAGE: ${language}.
       ${scriptInstruction}
       ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions." : ""}
       
       OUTPUT FORMAT: You MUST return a JSON array of objects.
-      Each object MUST represent EXACTLY ONE word (or very short phrase) with its PRECISE start and end time.
+      Each object represents EXACTLY ONE word.
       
-      CRITICAL FOR COMPLETENESS & SYNC: 
-      1. Transcribe EVERY SINGLE WORD spoken in the video. Do not summarize or skip any segments.
-      2. The timestamps MUST be perfectly aligned with the audio. 
-      3. Use exactly 3 decimal places for maximum precision (e.g., 1.234).
-      4. Ensure the "start" time is exactly when the word begins and "end" time is exactly when the word finishes.
-      5. CRITICAL SYNC: Captions MUST appear exactly as the sound begins. Shift 'start' timestamps EARLIER by 0.3s to 0.5s to compensate for processing delay and ensure they hit precisely with the voice.
+      PRECISION GUIDELINES:
+      1. Every single word must have its own unique entry.
+      2. "start" timestamp MUST be the exact millisecond the word begins to be audible.
+      3. "end" timestamp MUST be the exact millisecond the word finish being audible.
+      4. DO NOT summarize. DO NOT skip words.
+      5. DO NOT apply any manual offsets. Return the RAW, TRUE timestamps as they exist in the file.
       
       Schema: {"word": string, "start": number, "end": number}[]
-      Example: [{"word": "hello", "start": 0.520, "end": 0.880}, ...]
+      Example: [{"word": "नमस्ते", "start": 0.520, "end": 0.880}, {"word": "दोस्तों", "start": 0.890, "end": 1.250}]
       
-      Only return the JSON array, no other text.`;
+      Strictly return JSON array ONLY.`;
 
       const mimeType = videoData.startsWith('data:') 
         ? videoData.split(';')[0].split(':')[1] 
