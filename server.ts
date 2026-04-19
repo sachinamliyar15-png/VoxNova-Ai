@@ -114,12 +114,12 @@ const voiceTraits: Record<string, string> = {
   'Rachel': 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.',
   'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
   'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
-  'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
-  'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
-  'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
-  'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
-  'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. High speaker projection, open-mouthed and fearless. 100% Realistic.',
-  'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, loud and energetic. 100% Realistic.',
+  'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent. Open vocal projection with a balanced, professional tone. Khuli Awaaz.',
+  'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries. Open and clear.',
+  'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Khuli Awaaz, professional documentary standard with open projection.',
+  'Pankaj': 'Ultra-deep, resonant baritone. Authoritative, serious, and 100% masculine. High speaker projection with a clear and open tone (Khuli Awaaz).',
+  'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance with high speaker projection, open-mouthed and fearless. Khuli Awaaz. 100% Realistic.',
+  'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, khuli awaaz, loud and energetic. 100% Realistic.',
   'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. Open throat resonance. 100% Realistic.',
   'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. High speaker volume. 100% Realistic.',
   'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. Open and clear projection. 100% Realistic.',
@@ -580,7 +580,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
 
       const targetVoice = voiceMapping[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
@@ -592,16 +592,17 @@ Analyze the script's category and tone to determine the best vocal characteristi
 - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
 - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
 
-PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
-- CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
-- The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
+PERFORMANCE GUIDELINES FOR MAXIMUM REALISM, POWER, AND CLARITY:
+- CRITICAL: VOICES MUST BE FULLY OPEN, CONFIDENT, AND PROFESSIONALLY PROJECTED. 
+- ABSOLUTELY PROHIBITED: "nasal" (naak se bolna), "muffled" (dabbi hui awaaz), "pressed," or "thin" tones.
+- The voice must sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
 - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
 - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
 - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
 - THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
 - USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
-- Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
+${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear. Ensure the voice is fully resonant and not "boxed-in".' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection. Ensure a bright, professional finish to the voice.'}
+- Maintain a rich harmonic texture without the voice sounding strained or constrained. It must sound "Khul kar" (fully open).
 - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
 - Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
 - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
@@ -720,7 +721,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       promptPrefix += "CRITICAL: The audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static. ";
       
       const currentPrompt = attempt === 0 
-        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
+        ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
         : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
       const response = await ai.models.generateContent({
@@ -739,7 +740,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
       const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (audioData) {
         const pcmBuffer = Buffer.from(audioData, 'base64');
-        const wavBuffer = addWavHeader(pcmBuffer, 48000);
+        const wavBuffer = addWavHeader(pcmBuffer, 24000);
         return res.json({ audioData: wavBuffer.toString('base64') });
       } else {
         throw new Error("No audio data generated");
@@ -815,57 +816,6 @@ app.post("/api/analyze-voice", async (req, res) => {
   }
 });
 
-// Professional Multimodal Voice Changer (Audio-to-Audio)
-app.post("/api/voice-changer", async (req, res) => {
-  const { audioData, mimeType, targetVoiceTraits, targetVoiceName, targetVoiceMapping } = req.body;
-  if (!audioData) return res.status(400).json({ error: "Audio data is required" });
-
-  try {
-    const apiKey = getAvailableApiKey();
-    if (!apiKey) throw new Error("API keys exhausted");
-
-    const instruction = `VOICE CONVERSION TASK (AUDIO-TO-AUDIO):
-    You are an elite AI audio engineer specializing in high-fidelity vocal cloning and synthesis. 
-    1. ANALYZE SOURCE: Listen to the source audio. Extract the exact timing, emotional arc, rhythm, and cadence.
-    2. NEURAL REMAPPING: Transform the vocal profile to sound exactly like the target identity below.
-    3. TARGET IDENTITY FINGERPRINT: ${targetVoiceTraits}.
-    4. CRITICAL: Maintain 100% exact timing and "pause gaps" between sentences from the original audio. 
-    5. MIMICRY: Every nuance of the target fingerprint must be applied. The resulting voice must be a CLONE of the target, but performing the source script.
-    6. QUALITY: The output must be crystal clear, 48kHz studio-master quality, and 100% human-level realistic.
-    7. Output ONLY the resulting transformed audio.`;
-    
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-live-preview",
-      contents: [{
-        role: "user",
-        parts: [
-          { text: instruction },
-          { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }
-        ]
-      }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: (targetVoiceMapping || 'Puck') as any }
-          }
-        }
-      }
-    });
-
-    const outputAudio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (outputAudio) {
-      res.json({ audioData: outputAudio });
-    } else {
-      throw new Error("Voice conversion failed to produce audio data.");
-    }
-  } catch (error: any) {
-    console.error("Voice changer error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Update the Generate Speech logic to handle cloned voices
 app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
   const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits } = req.body;
@@ -897,7 +847,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
       
-      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_name);
       
       const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
@@ -909,16 +859,17 @@ Analyze the script's category and tone to determine the best vocal characteristi
 - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
 - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
 
-PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
-- CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
-- The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
+PERFORMANCE GUIDELINES FOR MAXIMUM REALISM, POWER, AND CLARITY:
+- CRITICAL: VOICES MUST BE FULLY OPEN, CONFIDENT, AND PROFESSIONALLY PROJECTED. 
+- ABSOLUTELY PROHIBITED: "nasal" (naak se bolna), "muffled" (dabbi hui awaaz), "pressed," or "thin" tones.
+- The voice must sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
 - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
 - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
 - 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
 - THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
 - USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
-- Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
+${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear. Ensure the voice is fully resonant and not "boxed-in".' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection. Ensure a bright, professional finish to the voice.'}
+- Maintain a rich harmonic texture without the voice sounding strained or constrained. It must sound "Khul kar" (fully open).
 - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
 - Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
 - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
@@ -1062,7 +1013,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
         const batch = chunks.slice(i, i + CONCURRENCY);
         const batchPromises = batch.map(async (chunk, idx) => {
           const currentPrompt = attempt === 0 
-            ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
+            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
             : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance for this script in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${chunk}`;
 
           const response = await ai.models.generateContent({
@@ -1091,7 +1042,7 @@ TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
 
       // Merge PCM chunks
       const mergedPcm = Buffer.concat(audioChunks);
-      const SAMPLE_RATE = 48000;
+      const SAMPLE_RATE = 24000;
       const wavBuffer = addWavHeader(mergedPcm, SAMPLE_RATE);
       const audioData = wavBuffer.toString('base64');
 
@@ -1241,7 +1192,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Step 2: Generate Speech in Target Voice
       const currentTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
       
-      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'].includes(voice_id.toLowerCase());
+      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav', 'documentary pro'].includes(voice_id.toLowerCase());
       
       const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to perform the provided script while perfectly MIMICKING the detected performance traits.
       
@@ -1250,12 +1201,13 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       
       Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs and sounds 100% like the target voice but with the EMOTION and PACE of the original speaker.
       
-      PERFORMANCE GUIDELINES:
-      - Use natural human prosody, complex intonation, and realistic rhythm.
-      - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+      PERFORMANCE GUIDELINES FOR MAXIMUM REALISM, POWER, AND CLARITY:
+      - CRITICAL: VOICES MUST BE FULLY OPEN, CONFIDENT, AND PROFESSIONALLY PROJECTED. 
+      - ABSOLUTELY PROHIBITED: "nasal" (naak se bolna), "muffled" (dabbi hui awaaz), "pressed," or "thin" tones.
+      - The voice must sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
       - SPEAK WITH AN ENERGETIC AND BRISK PACE. NEVER BE SLOW OR SLUGGISH.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative.'}
-      - Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
+      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Ensure the voice is fully resonant and not "boxed-in".' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative. Ensure a bright, professional finish to the voice.'}
+      - Maintain a rich harmonic texture without the voice sounding strained or constrained. It must sound "Khul kar" (fully open).
       - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
       - Sound like a real person speaking in a high-end professional studio.
       - 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
@@ -1291,7 +1243,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
 
       // Convert PCM to WAV
       const pcmBuffer = Buffer.from(audioData, 'base64');
-      const wavBuffer = addWavHeader(pcmBuffer, 48000);
+      const wavBuffer = addWavHeader(pcmBuffer, 24000);
       const finalAudioData = wavBuffer.toString('base64');
 
       // Save to history if firestore is available
@@ -1484,7 +1436,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
       
       // Convert PCM to WAV
       const pcmBuffer = Buffer.from(base64Audio, 'base64');
-      const wavBuffer = addWavHeader(pcmBuffer, 48000);
+      const wavBuffer = addWavHeader(pcmBuffer, 24000);
       return res.json({ audioData: wavBuffer.toString('base64') });
     } catch (error: any) {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));

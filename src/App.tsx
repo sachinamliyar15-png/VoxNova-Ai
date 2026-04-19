@@ -2418,58 +2418,42 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     setVoiceChangingStep('Preparing file...');
 
     try {
-      const base64Data = await fileToBase64(voiceChangingFile);
-      const mimeType = voiceChangingFile.type;
+      const fileData = await fileToBase64(voiceChangingFile);
       
       setVoiceChangingProgress(20);
-      setVoiceChangingStep('Analyzing vocal fingerprint...');
-      
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      if (!geminiApiKey) {
-        throw new Error("Gemini API key is not configured. Please check your settings.");
-      }
-      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-      
-      // Step 1: Transcribe
-      setVoiceChangingStep('Transcribing audio with AI...');
-      const transcribePrompt = `Transcribe the following audio/video exactly. Return ONLY the transcribed text. Do not add any notes, explanations, or metadata. If there is no speech, return an empty string.`;
-
-      const transcribeResult = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          { parts: [{ text: transcribePrompt }, { inlineData: { data: base64Data.split(',')[1], mimeType } }] }
-        ]
-      });
-
-      const transcribedText = transcribeResult.text?.trim();
-      if (!transcribedText || transcribedText.length < 2) {
-        throw new Error("Could not detect any clear speech in the uploaded file. Please ensure the audio is clear and contains spoken words.");
-      }
-
-      setVoiceChangingProgress(50);
       setVoiceChangingStep('Neural voice transfer in progress...');
 
-      const targetMapping = INTERNAL_VOICE_MAPPING[selectedVoice.name] || 'Puck';
+      const token = currentUser ? await currentUser.getIdToken() : null;
       
       const response = await fetch('/api/voice-changer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
-          audioData: base64Data.split(',')[1],
-          mimeType: voiceChangingFile.type,
-          targetVoiceName: selectedVoice.name,
-          targetVoiceTraits: selectedVoice.description + ((selectedVoice as any).fingerprint ? `\nFingerprint: ${(selectedVoice as any).fingerprint}` : ''),
-          targetVoiceMapping: targetMapping
+          fileData,
+          voice_id: selectedVoice.name,
+          mode: 'dubbing', // Using dubbing mode for voice changing
+          targetLanguage: language === 'hi' ? 'Hindi' : 'English'
         })
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Voice conversion failed");
+        let errMessage = "Voice conversion failed";
+        try {
+          const errData = await response.json();
+          errMessage = errData.error || errMessage;
+        } catch (e) {
+          const textErr = await response.text();
+          console.error("Non-JSON error from voice-changer:", textErr.substring(0, 200));
+        }
+        throw new Error(errMessage);
       }
 
       const data = await response.json();
       const audioBase64 = data.audioData;
+      const resultText = data.transcribedText || "";
       
       setVoiceChangingProgress(80);
       setVoiceChangingStep('Finalizing audio stream...');
@@ -2491,6 +2475,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if (isAlreadyWav) {
           finalBlob = new Blob([pcmBuffer], { type: 'audio/wav' });
         } else {
+          // Note: Gemini flash-tts-preview returns 24kHz PCM for voice changer mode
           const wavHeader = createWavHeader(pcmBuffer, 24000);
           const combinedBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
           combinedBuffer.set(new Uint8Array(wavHeader), 0);
@@ -2504,29 +2489,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         });
       }
 
-      // Deduct credits and save history in background
-      if (currentUser) {
-        const token = await currentUser.getIdToken();
-        fetch('/api/voice-changer-save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            transcribedText,
-            voice_id: selectedVoice.name,
-            audioData: audioBase64,
-            creditCost: 10
-          })
-        }).then(() => {
-          if (auth.currentUser) fetchUserProfile(auth.currentUser);
-        }).catch(err => console.error("Failed to save voice changer history:", err));
-      }
-
       setVoiceChangingProgress(100);
       setVoiceChangingStep('Complete!');
       showToast("Voice changed successfully!");
+      if (auth.currentUser) fetchUserProfile(auth.currentUser);
     } catch (err: any) {
       console.error("Voice changer error:", err);
       setError(`Voice changer failed: ${err.message}`);
