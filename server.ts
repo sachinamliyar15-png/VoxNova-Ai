@@ -50,6 +50,37 @@ const markKeyAsExhausted = (key: string) => {
   exhaustedKeys.set(key, Date.now());
 };
 
+const buildSystemInstruction = (language: string, isHeavyVoice: boolean, pitch: number = 1.0) => {
+  return `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
+
+Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+
+PHASE 1: SCRIPT INTELLIGENCE (MANDATORY)
+1. ANALYZE CONTENT: Is this a story, news, motivational speech, or documentary?
+2. DETECT EMOTION: Is it sad, angry, happy, serious, or mysterious?
+3. ADAPT PROSODY: Adjust your pitch, rhythm, and volume DYNAMICALLY based on the script's meaning. Use rising intonation for questions and lower pitch for serious points.
+
+PHASE 2: VOCAL ARCHETYPE & IDENTITY (ANTI-SIMILARITY)
+To ensure this voice sounds UNIQUE and DISTINCT from others, adopt the following specific Vocal Archetype Fingerprint:
+- IF ${isHeavyVoice ? 'TRUE' : 'FALSE'}: Use a "CHEAK-RESONANCE" Bass - Deep, vibrating, and authoritative. Sound like a different individual than the previous call. Vary the fundamental pitch significantly.
+- IF NARRATIVE: Use a "MELODIC-RISE" pattern - Engaging and warm.
+- IF COMMERCIAL: Use a "PUNCHY-PEAK" pattern - High energy and clear.
+- REQUESTED PITCH OFFSET: ${pitch || 1.0}x (Adjust your natural voice frequency accordingly).
+
+PHASE 3: PERFORMANCE GUIDELINES (ANTI-MUFFLED/ANTI-NASAL)
+- CRITICAL: THE VOICE MUST BE "KHULI AWAAZ" (FULLY OPEN). 
+- REJECT MUFFLED TONES: If the voice sounds "receding" into the throat or like a singer compressing their larynx, STOP. Open your throat. Project from the diaphragm.
+- ANTI-NASAL: No sound should come through the nose. The voice must be clean, grounded, and professional.
+- NATURAL BALANCE: Ensure the voice doesn't sound "forced" deep. It must be naturally powerful.
+- PAUSES: Respect punctuation. Natural breathing is required.
+
+PHASE 4: 100% REALISM STANDARDS
+- Add subtle human micro-imperfections: light breaths, realistic volume shifts.
+- Avoid any repetitive "sing-song" or robotic patterns. Every sentence must have a unique shape.
+- NO background noise, hums, or robotic artifacts. Audio must be 100% clean.
+`;
+};
+
 // Initialize Razorpay
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || '',
@@ -94,43 +125,46 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
 };
 
 const voiceTraits: Record<string, string> = {
-  'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.',
-  'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.',
-  'Daniel': 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.',
-  'Josh': 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.',
-  'Liam': 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.',
-  'Michael': 'Mature, wise, and sophisticated. Slow, deliberate professional narration.',
-  'Ryan': 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.',
-  'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
-  'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
-  'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
-  'Frank': 'Ultra-deep, heavy, and masculine. A powerful chest-voice with maximum bass resonance and a professional narrator tone.',
-  'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
-  'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
-  'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
-  'Matilda': 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.',
-  'Emily': 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.',
-  'Bella': 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.',
-  'Rachel': 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.',
-  'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
-  'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
-  'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent. Open vocal projection with a balanced, professional tone. Khuli Awaaz.',
-  'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries. Open and clear.',
-  'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Khuli Awaaz, professional documentary standard with open projection.',
-  'Pankaj': 'Ultra-deep, resonant baritone. Authoritative, serious, and 100% masculine. High speaker projection with a clear and open tone (Khuli Awaaz).',
-  'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance with high speaker projection, open-mouthed and fearless. Khuli Awaaz. 100% Realistic.',
-  'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, khuli awaaz, loud and energetic. 100% Realistic.',
-  'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. Open throat resonance. 100% Realistic.',
-  'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. High speaker volume. 100% Realistic.',
-  'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. Open and clear projection. 100% Realistic.',
-  'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. Clear and confident. 100% Realistic.',
-  'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. High speaker projection, energetic and loud. 100% Realistic and Professional.',
-  'EMPEROR PRO': 'The King of Voices. Most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. High speaker projection, open and majestic. 100% Realistic.',
-  'KABIR': 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives and soulful storytelling. 100% Realistic.',
-  'ARYAN': 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation and sports commentary. 100% Realistic.',
-  'ISHANI': 'The Elegant Narrator. Smooth, sophisticated, and professional female voice. Ideal for luxury brands and high-end documentaries. 100% Realistic.',
-  'ZORAVAR': 'The Heavyweight. An ultra-deep, chest-rattling baritone with immense power. 100% Realistic.',
-  'RUDRA': 'The Intense Narrator. Gritty, serious, and highly authoritative. Best for crime thrillers and investigative content. 100% Realistic.'
+  'Adam': 'Vocal DNA: High-baritone with a sharp, crisp edge. Resonant but youthful. Pitch: +5%. Style: Modern tech-bro.',
+  'Brian': 'Vocal DNA: Deep, steady bass with a calm rhythmic flow. Extremely trustworthy. Pitch: -10%. Style: Corporate leadership.',
+  'Daniel': 'Vocal DNA: Mid-range tenor, high-speed articulation. Broadcaster style. Pitch: +2%. Style: News Anchor.',
+  'Josh': 'Vocal DNA: Bright, friendly, and informal. Sounds like a younger brother. High pitch variance. Pitch: +15%.',
+  'Liam': 'Vocal DNA: Soft, breathy, and highly emotional. Gentleness is paramount. Low speaker projection.',
+  'Michael': 'Vocal DNA: Old soul. Mature, slow, and cinematic. Sounds like a wise professor. Gravitas.',
+  'Ryan': 'Vocal DNA: Very casual, slightly raspy. Sounds like someone recording in their room. Authentic.',
+  'Matthew': 'Vocal DNA: Cinematic Movie Trailer voice. Ultra-resonant mid-low frequencies. Heavy compression feel.',
+  'Bill': 'Vocal DNA: Rough, gravelly, and outdoorsy. Sounds like an old cowboy. Texture is dry.',
+  'Callum': 'Vocal DNA: Refined, elite British-style. High emphasis on articulation. Sophisticated.',
+  'Frank': 'Vocal DNA: Ultra-deep powerhouse. Chest-rattling bass. Sound like a motivation speaker. Max volume.',
+  'Marcus': 'Vocal DNA: Commanding, loud, and inspiring. Sound like a drill sergeant but with a kind heart.',
+  'Jessica': 'Vocal DNA: Bright, corporate female. Upward inflection. Professional and clean.',
+  'Sarah': 'Vocal DNA: Ethereal, whispers, and soft. Sounds like a ghost or a dream. Airy.',
+  'Matilda': 'Vocal DNA: Precise, academic, and sharp. No fluff. Clean and analytical.',
+  'Emily': 'Vocal DNA: High-energy, bubbly, and fast-paced. Constant smile in the voice.',
+  'Bella': 'Vocal DNA: Smooth, sophisticated, and rich. Sounds like luxury. Velvet texture.',
+  'Rachel': 'Vocal DNA: Theatrical, wide range. From sad to screaming happy. Extreme emotion.',
+  'Nicole': 'Vocal DNA: No-nonsense, direct. Coldly professional and high-status.',
+  'Clara': 'Vocal DNA: Warm, motherly, and supportive. Sounds like a hug. Heartfelt.',
+  'Documentary Pro': 'Vocal DNA: Cinematic God-voice. Deep, intelligent, and balanced. Khuli Awaaz. Resonates in the chest.',
+  'Priyanka': 'Vocal DNA: Modern Indian narrator. Confident, deep, and authoritative female. Professional standard.',
+  'Virat': 'Vocal DNA: Aggressive, thick masculine energy. Resonant growl in the low-end. Commanding.',
+  'Pankaj': 'Vocal DNA: Serious, formal baritone. High status. Sounds like a respected village elder.',
+  'SULTAN': 'Vocal DNA: Royal Warrior. The ultimate kingly baritone. Massive speaker projection. Fearless.',
+  'SHERA': 'Vocal DNA: Animalistic power. Aggressive, loud, and deep. Sounds like pure motivation.',
+  'KAAL': 'Vocal DNA: Shadow entity. Mysterious, ultra-low frequency with built-in echo effect.',
+  'BHEEM': 'Vocal DNA: The Giant. Ground-shaking bass. Slowest possible pace for massive weight.',
+  'SIKANDAR': 'Vocal DNA: The Wise King. Powerful but respectful. Rich harmonics. Cinematic brilliance.',
+  'VIKRAM': 'Vocal DNA: Detective/Noir style. Dark, smooth, and mysterious. Deep but whispered focus.',
+  'Sachinboy': 'Vocal DNA: Energetic, youthful power. The hybrid of a warrior and a hero. Explosive.',
+  'EMPEROR PRO': 'Vocal DNA: Maximum Authority. The deepest, most majestically resonant voice in the system.',
+  'KABIR': 'Vocal DNA: Deeply philosophical and warm. Sounds like poetry and history. Slow pace.',
+  'ARYAN': 'Vocal DNA: Alpha male athlete. Sharp, energetic, and loud. Constant forward momentum.',
+  'ISHANI': 'Vocal DNA: High-end luxury female. Sophisticated, deep, and exceptionally smooth.',
+  'ZORAVAR': 'Vocal DNA: Raw physical power. Chest-voice at 100%. Professional and extremely loud.',
+  'RUDRA': 'Vocal DNA: Gritty, serious, and investigative. Sounds like a crime scene narrator.',
+  'MAHARAJA': 'Vocal DNA: Highest status. Majestic and deep. Every word sounds like an empire.',
+  'MAHANT': 'Vocal DNA: Spiritual, calm, and resonant. Sounds like meditation.',
+  'CHANKYA': 'Vocal DNA: Calculating, wise, and articulate. Sharp intelligence in every syllable.',
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -504,46 +538,64 @@ app.post("/api/user/deduct-credits", authenticate, async (req: any, res) => {
   });
 
 // Guest Rate Limiter
-const guestRateLimit = new Map<string, { count: number, lastReset: number }>();
+const guestRateLimit = new Map<string, { count: number, lastReset: number, premiumCount?: number }>();
 
-const checkGuestLimit = (ip: string) => {
+const checkGuestLimit = (ip: string, isPremium: boolean = false) => {
   const now = Date.now();
   const limit = guestRateLimit.get(ip);
   
   if (!limit || now - limit.lastReset > 24 * 60 * 60 * 1000) {
     // Reset limit every 24 hours
-    guestRateLimit.set(ip, { count: 1, lastReset: now });
-    return true;
+    guestRateLimit.set(ip, { 
+      count: 1, 
+      lastReset: now,
+      premiumCount: isPremium ? 1 : 0 
+    });
+    return { allowed: true };
   }
   
-  if (limit.count >= 10) { // 10 generations per day for guests
-    return false;
+  if (limit.count >= 10) { // 10 generations per day total
+    return { allowed: false, reason: "DAILY_LIMIT" };
+  }
+
+  if (isPremium && (limit.premiumCount || 0) >= 3) {
+    return { allowed: false, reason: "PREMIUM_TRIAL_EXHAUSTED" };
   }
   
   limit.count++;
+  if (isPremium) limit.premiumCount = (limit.premiumCount || 0) + 1;
   guestRateLimit.set(ip, limit);
-  return true;
+  return { allowed: true };
 };
 
 // Generate Speech via Gemini API (Guest) - VOXNOVA_GUEST_EP
 app.post("/api/generate-speech-guest", async (req: any, res) => {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits } = req.body;
+
+  const premiumVoices = ['Documentary Pro', 'Virat', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'MAHARAJA', 'Sachinboy', 'Munna Bhai', 'Pankaj', 'Priyanka', 'ISHANI'];
+  const isPremium = premiumVoices.includes(voice_name);
+
+  const limitCheck = checkGuestLimit(ip, isPremium);
   
-  if (!checkGuestLimit(ip)) {
+  if (!limitCheck.allowed) {
+    if (limitCheck.reason === "PREMIUM_TRIAL_EXHAUSTED") {
+      return res.status(403).json({ 
+        error: "Premium voice trial exhausted (3/3). Please sign up to get 20,000 free monthly credits and continue using high-quality professional voices!" 
+      });
+    }
     return res.status(429).json({ 
       error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
     });
   }
-
-  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
   }
 
-  // Limit text length for guests to prevent abuse
-  if (text.length > 200) {
-    return res.status(400).json({ error: "Guest scripts are limited to 200 characters. Please sign up for longer scripts." });
+  // Limit text length for guests to prevent abuse - Increased to 300 characters
+  if (text.length > 300) {
+    return res.status(400).json({ error: "Guest scripts are limited to 300 characters for optimal performance. Please sign up for longer scripts." });
   }
 
   const maxRetries = 15;
@@ -579,47 +631,9 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       };
 
       const targetVoice = voiceMapping[voice_name] || 'Puck';
-      
       const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_name);
       
-      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
-
-Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
-Analyze the script's category and tone to determine the best vocal characteristics:
-- NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
-- STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
-- ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
-- CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
-- EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
-
-PERFORMANCE GUIDELINES FOR MAXIMUM REALISM, POWER, AND CLARITY:
-- CRITICAL: VOICES MUST BE FULLY OPEN, CONFIDENT, AND PROFESSIONALLY PROJECTED. 
-- ABSOLUTELY PROHIBITED: "nasal" (naak se bolna), "muffled" (dabbi hui awaaz), "pressed," or "thin" tones.
-- The voice must sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
-- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
-- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
-- 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-- THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
-- USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear. Ensure the voice is fully resonant and not "boxed-in".' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection. Ensure a bright, professional finish to the voice.'}
-- Maintain a rich harmonic texture without the voice sounding strained or constrained. It must sound "Khul kar" (fully open).
-- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
-- Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
-- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
-- Sound like a real person speaking in a high-end professional studio, not a computer.
-- Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
-- Use natural emphasis on key words to convey meaning and emotion.
-- Ensure smooth, fluid transitions between sentences and ideas.
-${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
-
-TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-- NO background noise, hums, hissing, or digital artifacts.
-- NO robotic glitches, metallic sounds, or synthetic "buzzing".
-- NO background music, bell-like sounds, or hallucinations in the background.
-- ZERO background noise is mandatory. Audio must be 100% clean and professional.
-- Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
-- If the script is long, maintain consistent tone, energy, and quality from start to finish.
-`;
+      const systemInstruction = buildSystemInstruction(language, isHeavyVoice, pitch);
       
       let promptPrefix = "";
       
@@ -827,7 +841,16 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
   // Rate limit for guests
   if (!req.user) {
     const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    if (!checkGuestLimit(ip as string)) {
+    const premiumVoices = ['Documentary Pro', 'Virat', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'MAHARAJA', 'Sachinboy', 'Munna Bhai', 'Pankaj', 'Priyanka', 'ISHANI'];
+    const isPremium = premiumVoices.includes(voice_name);
+    const limitCheck = checkGuestLimit(ip as string, isPremium);
+    
+    if (!limitCheck.allowed) {
+      if (limitCheck.reason === "PREMIUM_TRIAL_EXHAUSTED") {
+        return res.status(403).json({ 
+          error: "Premium voice trial exhausted (3/3). Please sign up to get 20,000 free monthly credits and continue using high-quality professional voices!" 
+        });
+      }
       return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
     }
   }
@@ -846,47 +869,9 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       const ai = new GoogleGenAI({ apiKey });
       
       const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
-      
       const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_name);
       
-      const systemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-aligned, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
-
-Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
-Analyze the script's category and tone to determine the best vocal characteristics:
-- NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
-- STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
-- ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
-- CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
-- EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
-
-PERFORMANCE GUIDELINES FOR MAXIMUM REALISM, POWER, AND CLARITY:
-- CRITICAL: VOICES MUST BE FULLY OPEN, CONFIDENT, AND PROFESSIONALLY PROJECTED. 
-- ABSOLUTELY PROHIBITED: "nasal" (naak se bolna), "muffled" (dabbi hui awaaz), "pressed," or "thin" tones.
-- The voice must sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
-- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
-- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
-- 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-- THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
-- USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear. Ensure the voice is fully resonant and not "boxed-in".' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection. Ensure a bright, professional finish to the voice.'}
-- Maintain a rich harmonic texture without the voice sounding strained or constrained. It must sound "Khul kar" (fully open).
-- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
-- Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
-- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
-- Sound like a real person speaking in a high-end professional studio, not a computer.
-- Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
-- Use natural emphasis on key words to convey meaning and emotion.
-- Ensure smooth, fluid transitions between sentences and ideas.
-${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
-
-TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-- NO background noise, hums, hissing, or digital artifacts.
-- NO robotic glitches, metallic sounds, or synthetic "buzzing".
-- NO background music, bell-like sounds, or hallucinations in the background.
-- ZERO background noise is mandatory. Audio must be 100% clean and professional.
-- Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
-- If the script is long, maintain consistent tone, energy, and quality from start to finish.
-`;
+      const systemInstruction = buildSystemInstruction(language, isHeavyVoice, pitch);
       
       let promptPrefix = "";
       
@@ -1192,41 +1177,25 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Step 2: Generate Speech in Target Voice
       const currentTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
       
-      const isHeavyVoice = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'kabir', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav', 'documentary pro'].includes(voice_id.toLowerCase());
+      const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat', 'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV', 'Documentary Pro'].includes(voice_id);
       
-      const ttsSystemInstruction = `You are an elite, world-class professional voice actor and narrator. Your task is to perform the provided script while perfectly MIMICKING the detected performance traits.
+      // Inject user's custom pitch if provided in req.body (voice changer might not send it, so default to 1.0)
+      const userPitch = req.body.pitch || 1.0;
+      const ttsSystemInstruction = buildSystemInstruction(targetLanguage === 'Hindi' ? 'hi' : 'en', isHeavyVoice, userPitch);
       
-      TARGET PERFORMANCE FINGERPRINT:
+      const performancePrompt = `
+      CRITICAL PERFORMANCE FINGERPRINT (MANDATORY MIMICRY):
       ${performanceTraits}
       
-      Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs and sounds 100% like the target voice but with the EMOTION and PACE of the original speaker.
+      YOU MUST MIMIC THE EXACT PACING, PAUSES, AND EMOTIONAL EMPHASIS OF THE ORIGINAL SPEAKER ABOVE.
+      HOWEVER, APPLY THE VOCAL DNA OF ${voice_id} AS DESCRIBED HERE: ${voiceTraits[voice_id] || ''}
       
-      PERFORMANCE GUIDELINES FOR MAXIMUM REALISM, POWER, AND CLARITY:
-      - CRITICAL: VOICES MUST BE FULLY OPEN, CONFIDENT, AND PROFESSIONALLY PROJECTED. 
-      - ABSOLUTELY PROHIBITED: "nasal" (naak se bolna), "muffled" (dabbi hui awaaz), "pressed," or "thin" tones.
-      - The voice must sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
-      - SPEAK WITH AN ENERGETIC AND BRISK PACE. NEVER BE SLOW OR SLUGGISH.
-      ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Ensure the voice is fully resonant and not "boxed-in".' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE. Sound mature, professional, and authoritative. Ensure a bright, professional finish to the voice.'}
-      - Maintain a rich harmonic texture without the voice sounding strained or constrained. It must sound "Khul kar" (fully open).
-      - Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
-      - Sound like a real person speaking in a high-end professional studio.
-      - 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-      
-      HINDI LANGUAGE NUANCES (if applicable):
-      - Use natural Hindi intonation and stress patterns.
-      - Ensure correct pronunciation of "Nukta" sounds (z, f, kh, gh, q).
-      - Maintain a professional "Shuddh" (Pure) or "Hindustani" (Conversational) tone as appropriate for the text.
-      
-      TECHNICAL STANDARDS:
-      - NO background noise, hums, or digital artifacts.
-      - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-      - NO background music, bell-like sounds, or hallucinations in the background.
-      - Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts.
+      The result must be a perfect hybrid: The SOUL of the original speaker with the BODY and VOICE of the target character.
       `;
 
       const ttsResponse = await ai.models.generateContent({
         model: "gemini-3.1-flash-tts-preview",
-        contents: [{ parts: [{ text: transcribedText }] }],
+        contents: [{ parts: [{ text: `${performancePrompt}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: ttsSystemInstruction,
