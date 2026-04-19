@@ -16,7 +16,7 @@ dotenv.config();
 // API Key Rotation Logic
 const exhaustedKeys = new Map<string, number>();
 
-const HEAVY_VOICES = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram'];
+const HEAVY_VOICES = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'];
 
 const getAvailableApiKey = () => {
   const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
@@ -58,39 +58,39 @@ const buildSystemInstruction = (language: string, voice_name: string) => {
   return `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
 Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
-
-Analyze the script's category and tone to determine the best vocal characteristics:
+Analyze the script’s category and tone to determine the best vocal characteristics:
 - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
 - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
 - ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
 - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
 - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
 
-PERFORMANCE GUIDELINES:
-- Use natural human prosody, complex intonation, and realistic rhythm.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound like it is coming from the deep chest of a powerful, large-framed man. Sound 100% "Mardana" (Masculine) and authoritative.' : '- CRITICAL: Use a DEEP CHEST VOICE with BASS RESONANCE.'}
-- Incorporate a vibrating 'gravelly' texture (vocal fry) in every word to sound 100% mature and authoritative.
-- Add subtle, natural human imperfections like light breaths and realistic mouth sounds to achieve 100% realism.
-- Avoid any robotic, monotone, or repetitive cadence.
+PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
+- CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
+- The voice should sound like it’s coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
+- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
+- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
+- 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
+- THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
+- USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
+${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
+- Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
+- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
+- Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
 - For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
 - Sound like a real person speaking in a high-end professional studio, not a computer.
-- Pay close attention to the emotional weight of the text.
-- 100% REALISM IS MANDATORY.
+- Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
 - Use natural emphasis on key words to convey meaning and emotion.
 - Ensure smooth transitions between sentences and ideas.
-${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, resonant, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a legendary warrior or a king.' : '- The voice should sound professional, mature, and cinematic.'}
+${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, resonant, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
 
-CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
-1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
-2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
-3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context. The emotion should feel "lived-in" and authentic.
-4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. 
-5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture and subtle breathing.
-
-TECHNICAL STANDARDS:
-- NO background noise, hums, or digital artifacts.
+TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
+- NO background noise, hums, hissing, or digital artifacts.
 - NO robotic glitches, metallic sounds, or synthetic "buzzing".
-- Ensure crystal-clear, 48kHz studio-quality audio throughout the generation.
+- NO background music, bell-like sounds, or hallucinations in the background.
+- ZERO background noise is mandatory. Audio must be 100% clean and professional.
+- Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
+- If the script is long, maintain consistent tone, energy, and quality from start to finish.
 `;
 };
 
@@ -673,58 +673,47 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
 
       if (profile) promptPrefix += `${profile.description} `;
 
-      promptPrefix += `
-      CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
-      1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
-      2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
-      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context. The emotion should feel "lived-in" and authentic.
-      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. 
-      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture and subtle breathing.
-      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. 
-      `;
-
-      if (language === 'hi') {
-        promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
-      }
-
-      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
-        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel.
-        CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
-        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
-        2. EMOTIONAL MODULATION:
-        - For normal parts: Calm, steady, and informative.
-        - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
-        - For intense/war parts: Sound stronger, brave, and commanding.
-        - For emotional parts: Sound warm, respectful, and inspiring.
-        - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
-        3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
-        4. PACING: Medium pace generally, but slow down for dramatic effect.
-        5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
-      } else if (style === 'emotional') {
-        promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
-      } else if (style === 'motivational') {
-        promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
+      // Voice-specific speed normalization
+      if (['Puck', 'Charon'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
+      } else if (['Fenrir'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
       }
 
       if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
       else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
+      else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
-      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
-      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
-      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
-      else promptPrefix += "Speak at a natural, standard, and professional pace. Maintain a steady flow without any dragging or sluggishness. ";
+      
+      if (speed >= 1.4) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
+      } else if (speed > 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
+      } else if (speed <= 0.7) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
+      } else if (speed < 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
+      } else {
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
+      }
 
       if (pause > 0.1) {
-        promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
+        promptPrefix += `Add a natural pause of exactly ${pause} seconds between sentence and major phrase to ensure clarity and professional pacing. `;
       }
       
+      promptPrefix += `
+      TECHNICAL STANDARDS (MANDATORY):
+      - Audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static.
+      - Ensure crystal-clear, 48kHz studio-quality articulation with ZERO digital artifacts.
+      - Performance must be 100% human-like, resonant, and emotionally balanced.
+      `;
+
       const currentPrompt = attempt === 0 
-        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}`
-        : `CRITICAL PERFORMANCE FIX: The last generation was unsatisfactory. Deliver a MORE NATURAL, MORE HUMAN and PERFECTLY PACED performance now:\n\n${text}`;
+        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
+        : `CRITICAL: The previous attempt sounded slightly robotic or off-pacing. Please deliver a MORE HUMAN, MORE REALISTIC, and MORE RESONANT performance in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 ;
 
       const response = await ai.models.generateContent({
@@ -889,60 +878,43 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
 
       if (profile) promptPrefix += `${profile.description} `;
 
-      promptPrefix += `
-      CRITICAL PERFORMANCE GUIDELINES FOR 100% REALISM:
-      1. NATURAL PROSODY: Avoid a flat or robotic monotone. Vary the pitch, volume, and rhythm naturally based on the content's meaning. Use rising and falling intonation to sound conversational.
-      2. HUMAN-LIKE PAUSES: Add subtle, natural pauses at commas, periods, and between major ideas. Use micro-pauses for emphasis and to simulate natural thought processes.
-      3. EMOTIONAL INFLECTION: Infuse the voice with genuine emotion that matches the script's context. The emotion should feel "lived-in" and authentic.
-      4. CLEAR ARTICULATION: Ensure every word is pronounced clearly but naturally, avoiding over-enunciation that sounds artificial. 
-      5. BREATHING & TEXTURE: Aim for a voice that sounds like it's coming from a human throat, with natural vocal texture and subtle breathing.
-      6. NATIVE FLOW: For ${language === 'hi' ? 'Hindi' : 'English'}, use the natural flow, idioms, and emphasis patterns of a native speaker. 
-      `;
-
-      if (language === 'hi') {
-        promptPrefix += "CRITICAL: For Hindi, ensure natural 'Schwa deletion' where appropriate, correct aspiration of consonants, and natural sentence-ending intonation. Avoid a 'reading' tone; instead, sound like a native speaker in a natural conversation. ";
-      }
-
-      if (style === 'professional-auto') {
-        promptPrefix += "AUTO-ADAPT: Dynamically adjust your tone to match the detected category of this script. ";
-      }
-
-      if (style === 'documentary' || style === 'doc-pro' || voice_name === 'Documentary Pro' || style === 'cinematic' || style === 'authoritative') {
-        promptPrefix += `You are a world-class cinematic documentary narrator. Your voice is deep, mature, intelligent, and authoritative, similar to National Geographic or Discovery Channel.
-        CRITICAL INSTRUCTIONS FOR THIS PERFORMANCE:
-        1. BASE TONE: Calm, deep, and controlled storytelling with perfect ${language === 'hi' ? 'Hindi' : 'English'} native pronunciation.
-        2. EMOTIONAL MODULATION:
-        - For normal parts: Calm, steady, and informative.
-        - For suspense: Slow down slightly, add dramatic pauses, and sound mysterious.
-        - For intense/war parts: Sound stronger, brave, and commanding.
-        - For emotional parts: Sound warm, respectful, and inspiring.
-        - For big reveals: Pause briefly before the sentence, then speak slower and deeper for impact.
-        3. DELIVERY: Natural storytelling flow, NOT robotic. Use human-like pauses, subtle breathing, and natural emphasis.
-        4. PACING: Medium pace generally, but slow down for dramatic effect.
-        5. QUALITY: Studio-grade, clean audio. NO background noise or glitches.`;
-      } else if (style === 'emotional') {
-        promptPrefix += `Use a voice filled with deep feeling, expression, and appropriate pauses to convey profound emotion. `;
-      } else if (style === 'motivational') {
-        promptPrefix += `Use a strong, inspiring, and energetic tone to uplift and empower the audience. `;
+      // Voice-specific speed normalization
+      if (['Puck', 'Charon'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
+      } else if (['Fenrir'].includes(targetVoice)) {
+        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
       }
 
       if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
       else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
+      else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
-      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
-      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
-      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
-      else promptPrefix += "Speak at a natural, standard, and professional pace. Maintain a steady flow without any dragging or sluggishness. ";
+      
+      if (speed >= 1.4) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
+      } else if (speed > 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
+      } else if (speed <= 0.7) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
+      } else if (speed < 1.0) {
+        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
+      } else {
+        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
+      }
 
       if (pause > 0) {
-        promptPrefix += `PAUSING: Insert natural ${pause}s gaps at major sentence breaks. `;
+        promptPrefix += `Add a natural pause of exactly ${pause} seconds between sentence and major phrase to ensure clarity and professional pacing. `;
       }
       
-      promptPrefix += "CRITICAL: The audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static. ";
+      promptPrefix += `
+      TECHNICAL STANDARDS (MANDATORY):
+      - Audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static.
+      - Ensure crystal-clear, 48kHz studio-quality articulation with ZERO digital artifacts.
+      - Performance must be 100% human-like, resonant, and emotionally balanced.
+      `;
 
       // Split text into chunks for parallel processing if it's long
       const CHUNK_SIZE = 1000; // characters
@@ -970,8 +942,8 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         const batch = chunks.slice(i, i + CONCURRENCY);
         const batchPromises = batch.map(async (chunk, idx) => {
           const currentPrompt = attempt === 0 
-            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed exactly. No dragging, no rushing beyond the target. Respect all punctuation and deliver the script with natural, professional flow.`
-            : `CRITICAL: Fix pacing. The previous attempt was off-target on speed. Deliver at exactly ${speed}x speed with MORE RESONANT, MORE PROJECTED performance:\n\n${chunk}`;
+            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
+            : `CRITICAL: The previous attempt sounded slightly robotic or off-pacing. Please deliver a MORE HUMAN, MORE REALISTIC, and MORE RESONANT performance in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
           const response = await ai.models.generateContent({
             model: "gemini-3.1-flash-tts-preview",
