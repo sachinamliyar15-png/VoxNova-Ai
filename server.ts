@@ -780,11 +780,11 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        // If it's a daily limit error, don't wait as long, just try next key faster
-        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        // If it's a 503 error, wait a bit longer to let the spike pass
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -1042,11 +1042,11 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        // If it's a daily limit error, don't wait as long, just try next key faster
-        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        // If it's a 503 error, wait a bit longer to let the spike pass
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -1235,10 +1235,10 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Voice Changer Attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -1332,10 +1332,10 @@ app.post("/api/generate-image", maybeAuthenticate, async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Image generation attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -1428,10 +1428,10 @@ app.post("/api/preview-voice", async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Preview voice attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        const waitTime = (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -1732,9 +1732,11 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       return res.json({ words });
     } catch (error: any) {
       console.error(`[Captions] Attempt ${attempt + 1} failed:`, error.message);
-      if (error.message.includes("429") || error.message.includes("quota")) {
+      if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("503") || error.message.includes("UNAVAILABLE")) {
         markKeyAsExhausted(apiKey);
         attempt++;
+        const waitTime = (error.message.includes("503") || error.message.includes("UNAVAILABLE")) ? 2000 : 500;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       return res.status(500).json({ error: error.message });
