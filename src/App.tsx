@@ -245,6 +245,22 @@ declare global {
 }
 
 // Helper to convert base64 to ArrayBuffer
+const fetchChunkedAudio = async (historyId: string, collectionName: string = 'voice_history'): Promise<string | null> => {
+  try {
+    const chunksRef = collection(db, collectionName, historyId, 'chunks');
+    const q = query(chunksRef, orderBy('index'));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) return null;
+    
+    const chunks = querySnapshot.docs.map(doc => doc.data().data);
+    return chunks.join('');
+  } catch (error) {
+    console.error("Failed to fetch chunked audio:", error);
+    return null;
+  }
+};
+
 const base64ToArrayBuffer = (base64: any) => {
   try {
     if (typeof base64 !== 'string') {
@@ -1250,14 +1266,20 @@ const HistoryView = ({ history, onPlay, onDelete, onRestore }: { history: Genera
                   </button>
                 ) : (gen.audio_data && gen.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") ? (
                   <button 
-                    onClick={() => {
-                      const blob = new Blob([base64ToArrayBuffer(gen.audio_data!)], { 
-                        type: gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
+                    onClick={async () => {
+                      let data = gen.audio_data!;
+                      if (data === "CHUNKED") {
+                        const fullAudio = await fetchChunkedAudio(gen.id.toString(), 'voice_history') || "";
+                        if (!fullAudio) return;
+                        data = fullAudio;
+                      }
+                      const blob = new Blob([base64ToArrayBuffer(data)], { 
+                        type: data.startsWith('//') || data.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
                       });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `VoxNova - ${gen.voice_name || 'AI Voice'}-${gen.id}.${gen.audio_data!.startsWith('//') || gen.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                      a.download = `VoxNova - ${gen.voice_name || 'AI Voice'}-${gen.id}.${data.startsWith('//') || data.startsWith('SUQz') ? 'mp3' : 'wav'}`;
                       a.click();
                       URL.revokeObjectURL(url);
                     }}
@@ -3120,7 +3142,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
   };
 
-  const playFromHistory = (item: Generation) => {
+  const playFromHistory = async (item: Generation) => {
     try {
       if (playingId === item.id) {
         if (audioRef.current) {
@@ -3135,7 +3157,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return;
       }
 
-      const audioData = item.audio_data;
+      let audioData = item.audio_data;
+      
+      // Support for chunked audio
+      if (audioData === "CHUNKED") {
+        setIsHistoryLoading(true);
+        const fullAudio = await fetchChunkedAudio(item.id.toString(), item.type === 'caption' ? 'caption_history' : 'voice_history');
+        setIsHistoryLoading(false);
+        if (!fullAudio) {
+          setError("Failed to load chunked audio data.");
+          return;
+        }
+        audioData = fullAudio;
+      }
+
       if (!audioData || audioData === "null" || audioData === "undefined" || audioData === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
         setError("This audio was too large to be stored in history. You can only play audio generated within the last few minutes.");
         return;
@@ -3454,14 +3489,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           </button>
                         ) : (item.audio_data && item.audio_data !== "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") ? (
                           <button 
-                            onClick={() => {
-                              const blob = new Blob([base64ToArrayBuffer(item.audio_data!)], { 
-                                type: item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
+                            onClick={async () => {
+                              let data = item.audio_data!;
+                              if (data === "CHUNKED") {
+                                setIsHistoryLoading(true);
+                                const fullAudio = await fetchChunkedAudio(item.id.toString(), 'voice_history') || "";
+                                setIsHistoryLoading(false);
+                                if (!fullAudio) return;
+                                data = fullAudio;
+                              }
+                              const blob = new Blob([base64ToArrayBuffer(data)], { 
+                                type: data.startsWith('//') || data.startsWith('SUQz') ? 'audio/mp3' : 'audio/wav' 
                               });
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement('a');
                               a.href = url;
-                              a.download = `VoxNova - ${item.voice_name || 'AI Voice'}-${item.id}.${item.audio_data!.startsWith('//') || item.audio_data!.startsWith('SUQz') ? 'mp3' : 'wav'}`;
+                              a.download = `VoxNova - ${item.voice_name || 'AI Voice'}-${item.id}.${data.startsWith('//') || data.startsWith('SUQz') ? 'mp3' : 'wav'}`;
                               a.click();
                               URL.revokeObjectURL(url);
                             }}
@@ -3476,7 +3519,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               if (currentAudio && idx === 0) {
                                 downloadAudio(currentAudio, `voxnova-${(item.voice_name || 'audio').toLowerCase()}-${item.id}.wav`);
                               } else {
-                                setError("Audio data is not available for download. Try playing it first to see if it can be restored.");
+                                if (item.audio_data === "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY") {
+                                  setError("Yah purani audio bahut badi thi aur history mein puri tarah save nahi ho payi. Maaf kijiye, par ab naye generations chunking ki wajah se safe rahenge.");
+                                } else {
+                                  setError("Audio data available nahi hai. Play karke dekhein agar restore ho sake.");
+                                }
                               }
                             }}
                             title="Download Audio"

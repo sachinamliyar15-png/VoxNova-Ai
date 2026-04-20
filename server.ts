@@ -52,12 +52,56 @@ const markKeyAsExhausted = (key: string) => {
   exhaustedKeys.set(key, Date.now());
 };
 
+// Helper to save audio data to Firestore history (with chunking for large files)
+const saveToHistory = async (collectionName: string, data: any) => {
+  if (!firestore) return null;
+  
+  const audioData = data.audio_data;
+  const CHUNK_LIMIT = 800000; // ~800KB chunk limit to be safe (Firestore limit is 1MB total doc size)
+
+  if (audioData && audioData.length > CHUNK_LIMIT) {
+    const totalLength = audioData.length;
+    const numChunks = Math.ceil(totalLength / CHUNK_LIMIT);
+    
+    // Save main document without the full audio data
+    const docRef = await firestore.collection(collectionName).add({
+      ...data,
+      audio_data: "CHUNKED",
+      chunkCount: numChunks,
+      totalAudioSize: totalLength
+    });
+
+    // Save chunks to a subcollection
+    const chunksRef = docRef.collection('chunks');
+    const chunkPromises = [];
+    
+    for (let i = 0; i < numChunks; i++) {
+      const chunk = audioData.substring(i * CHUNK_LIMIT, (i + 1) * CHUNK_LIMIT);
+      chunkPromises.push(chunksRef.doc(i.toString()).set({
+        data: chunk,
+        index: i
+      }));
+    }
+    
+    await Promise.all(chunkPromises);
+    return docRef;
+  } else {
+    // Save normally if small enough
+    return await firestore.collection(collectionName).add(data);
+  }
+};
+
 const buildSystemInstruction = (language: string, voice_name: string) => {
+  const lookupVoice = (voice_name || '').trim();
+  const profile = VOICE_PROFILES[lookupVoice] || 
+                  VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
+                  null;
+
   const isHeavyVoice = HEAVY_VOICES.includes((voice_name || '').toLowerCase());
   
   return `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
-Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+Your goal is to generate high-fidelity, natural, and expressive speech. 
 Analyze the script’s category and tone to determine the best vocal characteristics:
 - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
 - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
@@ -65,32 +109,24 @@ Analyze the script’s category and tone to determine the best vocal characteris
 - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
 - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
 
-PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
-- CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
-- The voice should sound like it’s coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
-- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
-- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word, not just added on top.
-- 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-- THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR WEAK TONES.
-- USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
-- Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100% mature and authoritative.
-- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
-- Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
-- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
-- Sound like a real person speaking in a high-end professional studio, not a computer.
-- Pay close attention to the emotional weight of the text. If the text is sad, the voice should sound heavy; if exciting, it should sound bright and energetic.
-- Use natural emphasis on key words to convey meaning and emotion.
-- Ensure smooth transitions between sentences and ideas.
-${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, resonant, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
+VOCAL IDENTITY FOR ${voice_name.toUpperCase()}:
+${profile ? `- CHARACTER DESCRIPTION: ${profile.description}
+- RESONANCE: ${profile.resonance}
+- ENERGY: ${profile.energy}
+- TIMBER: ${profile.timber}
+- PACING: ${profile.pacing}` : '- STATUS: Professional Cinematic Narrator'}
 
-TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-- NO background noise, hums, hissing, or digital artifacts.
-- NO robotic glitches, metallic sounds, or synthetic "buzzing".
-- NO background music, bell-like sounds, or hallucinations in the background.
-- ZERO background noise is mandatory. Audio must be 100% clean and professional.
-- Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts throughout the entire generation.
-- If the script is long, maintain consistent tone, energy, and quality from start to finish.
+PERFORMANCE GUIDELINES FOR MAXIMUM REALISM:
+- CRITICAL: VOICES MUST BE DISTINCT AND UNIQUE. Do not sound like a generic AI. 
+- USE A NATURAL HUMAN CONVERSATIONAL PACE. Avoid stretching syllables or "singing" words. The delivery must sound like a real person talking at a normal, clear speed, not a computer performing slowly.
+- CRITICAL: THE VOICE MUST BE OPEN ("Khuli Awaaz") AND POWERFUL ("Damdaar"). Avoid nasal or muffled tones.
+- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns or slow, dragging articulation.
+- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+- 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
+${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy) and "Gambhir" (Serious). Speak with absolute authority.' : '- CRITICAL: Use a professional, mature, and resonant voice with natural human textures.'}
+- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch.
+- Avoid robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
+- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation and natural flow.
 `;
 };
 
@@ -689,15 +725,15 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
       
       if (speed >= 1.4) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
+        promptPrefix += "PERFORMANCE: Deliver an ultra-fast, professional, and high-energy narration. Maintain crystal clear articulation. ";
       } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
+        promptPrefix += "PERFORMANCE: Deliver a brisk, energetic, and professional narration. ";
       } else if (speed <= 0.7) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
+        promptPrefix += "PERFORMANCE: Deliver a slow, deliberate, and steady narration. ";
       } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
+        promptPrefix += "PERFORMANCE: Deliver a calm, relaxed, and clear narration. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
+        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced - exactly like a real person talking in a room. Avoid any singing-like or slow stretching of vowels unless specifically asked for narration. ";
       }
 
       if (pause > 0.1) {
@@ -894,15 +930,15 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
       
       if (speed >= 1.4) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, high-energy, and fast-paced narration. Maintain absolute naturalness, clarity, and perfect articulation. This is a high-speed, professional Level 2 narrator style. ";
+        promptPrefix += "PERFORMANCE: Deliver an ultra-fast, professional, and high-energy narration. Maintain crystal clear articulation. ";
       } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and energetic narration. The pace should be slightly faster than normal but still feel completely natural and easy to follow. Perfect for engaging social media content. ";
+        promptPrefix += "PERFORMANCE: Deliver a brisk, energetic, and professional narration. ";
       } else if (speed <= 0.7) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, steady, and deliberate narration. The pace should be slightly slower than normal to emphasize every word, while maintaining a natural flow and professional tone. ";
+        promptPrefix += "PERFORMANCE: Deliver a slow, deliberate, and steady narration. ";
       } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a professional, calm, and steady narration. The pace should be relaxed and clear, perfect for educational or long-form storytelling content. ";
+        promptPrefix += "PERFORMANCE: Deliver a calm, relaxed, and clear narration. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a professional, brisk, and natural performance. The narrator should speak with perfect clarity and articulation, at a pace that is naturally fast but conversational and engaging. This is a professional Level 1 narrator style. ";
+        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced - exactly like a real person talking in a room. Avoid any singing-like or slow stretching of vowels unless specifically asked for narration. ";
       }
 
       if (pause > 0) {
@@ -982,10 +1018,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         // Save to Firestore history if user is authenticated
         if (req.user && firestore) {
           try {
-            // Cap audio data to avoid Firestore 1MB document limit
-            const audioToSave = audioData.length > 900000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData;
-            
-            await firestore.collection('voice_history').add({
+            await saveToHistory('voice_history', {
               userId: req.user.uid,
               text,
               voice_name,
@@ -993,7 +1026,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
               speed,
               pitch,
               language,
-              audio_data: audioToSave,
+              audio_data: audioData,
               created_at: admin.firestore.FieldValue.serverTimestamp()
             });
             console.log(`[History] Voice history saved for user: ${req.user.uid}`);
@@ -1143,10 +1176,14 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       CRITICAL PERFORMANCE FINGERPRINT (MANDATORY MIMICRY):
       ${performanceTraits}
       
-      YOU MUST MIMIC THE EXACT PACING, PAUSES, AND EMOTIONAL EMPHASIS OF THE ORIGINAL SPEAKER ABOVE.
-      HOWEVER, APPLY THE VOCAL DNA OF ${voice_id} AS DESCRIBED HERE: ${profile.description}
+      CRITICAL TRANSFORMATION:
+      YOU MUST ADAPT THE ABOVE PERFORMANCE INTO THE VOICE OF ${voice_id}.
+      - DO NOT keep the original speaker's vocal tone.
+      - YOU MUST change the vocal identity ENTIRELY to ${voice_id}.
+      - CHARACTER DNA: ${profile.description}
+      - MIMIC the timing and emotion, but VOICED BY ${voice_id}.
       
-      The result must be a perfect hybrid: The SOUL of the original speaker with the BODY and VOICE of the target character.
+      The result must be: The EMOTION of the original speaker, but 100% THE VOICE of ${voice_id}.
       
       CRITICAL: Use a very natural, balanced pace. Do not drag. Do not shout. Deliver a professional studio performance.
       `;
@@ -1179,15 +1216,13 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Save to history if firestore is available
       if (firestore && userId) {
         try {
-          const audioToSave = finalAudioData.length > 900000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : finalAudioData;
-          
-          await firestore.collection('voice_history').add({
+          await saveToHistory('voice_history', {
             userId,
             text: transcribedText,
             voice_name: voice_id,
             mode,
             targetLanguage,
-            audio_data: audioToSave,
+            audio_data: finalAudioData,
             created_at: admin.firestore.FieldValue.serverTimestamp()
           });
         } catch (saveErr) {
@@ -1475,20 +1510,31 @@ app.post("/api/voice-changer-save", authenticate, async (req: any, res) => {
       });
     }
 
-    // Save to History
-    const historyRef = firestore.collection('voice_history');
-    const audioToSave = audioData && audioData.length > 900000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData;
-
-    await historyRef.add({
-      userId,
-      text: transcribedText,
-      voice_name: voice_id,
-      audio_data: audioToSave,
-      mode: 'convert',
-      created_at: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    res.json({ success: true });
+    // Save to History using chunked helper
+    try {
+      await saveToHistory('voice_history', {
+        userId,
+        text: transcribedText,
+        voice_name: voice_id,
+        audio_data: audioData,
+        mode: 'convert',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      res.json({ success: true });
+    } catch (saveError) {
+      console.error("Failed to chunks audio for voice changer:", saveError);
+      // Fallback for extreme cases (should not happen with saveToHistory)
+      const historyRef = firestore.collection('voice_history');
+      await historyRef.add({
+        userId,
+        text: transcribedText,
+        voice_name: voice_id,
+        audio_data: audioData.length > 900000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData,
+        mode: 'convert',
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      res.json({ success: true });
+    }
   } catch (error: any) {
     console.error("Failed to save voice changer history:", error);
     res.status(500).json({ error: "Failed to save history" });
@@ -1534,24 +1580,21 @@ app.post(["/api/save", "/api/save/"], authenticate, async (req: any, res) => {
     }
     
       // Save to Firestore (History)
-      const audioToSave = audioData && audioData.length > 1000000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData;
-      
       const collectionName = type === 'caption' ? 'caption_history' : 'voice_history';
-      const historyRef = firestore.collection(collectionName);
-      const docRef = await historyRef.add({
+      const docRef = await saveToHistory(collectionName, {
         userId,
         text: text || '',
         voice_name: voice || (type === 'caption' ? 'Captions' : 'Unknown'),
         style: style || 'Default',
         speed: speed || 1.0,
         pitch: pitch || 1.0,
-        audio_data: audioToSave || (type === 'caption' ? null : "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY"),
+        audio_data: audioData || null,
         type: type || 'tts',
         words: words || null,
         created_at: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      res.json({ success: true, id: docRef.id });
+      res.json({ success: true, id: docRef ? docRef.id : null });
   } catch (error: any) {
     console.error("Database save error:", error);
     res.status(500).json({ error: error.message });
@@ -1678,7 +1721,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
 
       // Save to Firestore history (Background)
       if (firestore) {
-        firestore.collection('caption_history').add({
+        saveToHistory('caption_history', {
           userId,
           words,
           language,
