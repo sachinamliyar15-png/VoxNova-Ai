@@ -3453,7 +3453,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               setActiveTab('captions');
                               setShowHistoryModal(false);
                             } else {
-                              setShowHistoryModal(false);
+                              // Reduced flashing: Don't close modal on play so user can continue browsing history
                               playFromHistory(item);
                             }
                           }}
