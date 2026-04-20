@@ -412,10 +412,26 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
     while (i < words.length) {
       const currentWord = words[i];
       const nextWord = words[i + 1];
+      const nextNextWord = words[i + 2];
       
       let count = 1;
-      if (nextWord && currentWord.word.length < 6 && nextWord.word.length < 6) {
-        count = 2;
+      
+      // Smart chunking: Group words if they are close in time and short in length
+      if (nextWord) {
+        const gap = nextWord.start - currentWord.end;
+        const totalLen = currentWord.word.length + nextWord.word.length;
+        
+        if (gap < 0.3 && totalLen < 12) {
+          count = 2;
+          
+          if (nextNextWord) {
+             const gap2 = nextNextWord.start - nextWord.end;
+             const totalLen2 = totalLen + nextNextWord.word.length;
+             if (gap2 < 0.2 && totalLen2 < 18) {
+               count = 3;
+             }
+          }
+        }
       }
       
       const chunk = words.slice(i, i + count);
@@ -446,7 +462,7 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
     const next = grouped[i + 1];
     const gap = next.start - current.end;
     
-    if (gap > 0 && gap < 1.5) {
+    if (gap > 0 && gap < 0.2) {
       current.end = next.start;
     }
   }
@@ -776,37 +792,58 @@ const CaptionOverlay = ({
   };
 
   const renderContent = () => {
-    const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+    const currentLine = displayWords.find(line => adjustedTime >= line.start && adjustedTime <= line.end);
     if (!currentLine) return null;
 
-    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
-    const visibleWords = lineWords.filter(w => currentTime >= w.start);
-    const linePosition = lineWords[0]?.position || style.position;
+    // Get original words that are part of this line for word-level precision
+    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= (currentLine.end + 0.1));
+    
+    // Check if we should use sequential reveal (now default for most styles to improve readability)
+    const isSequential = ['pop', 'snappy-pop', 'professional', 'fade', 'glow', 'typewriter', 'snappy', 'zoom', 'typing'].includes(animation);
 
-    // Typewriter style
-    if (animation === 'typing' || animation === 'typewriter') {
+    if (isSequential || animation === 'karaoke' || animation === 'zeemo') {
       return (
-        <div className={`absolute left-0 right-0 w-full flex justify-center px-4 ${positionClass}`}>
+        <div className={`absolute left-0 right-0 w-full flex justify-center px-4 pointer-events-none ${positionClass}`}>
           <div 
-            style={{...textStyle, maxWidth: '95%', margin: '0 auto'}} 
-            className="flex flex-wrap justify-center gap-x-[0.2em]"
+            style={{...textStyle, maxWidth: '95%', margin: '0 auto', backgroundColor: 'transparent', padding: 0}} 
+            className="flex flex-wrap justify-center gap-x-[0.25em] gap-y-1 overflow-visible"
           >
             {lineWords.map((w, i) => {
-              const isVisible = currentTime >= w.start;
-              const isActive = currentTime >= w.start && currentTime <= w.end;
+              const isVisible = adjustedTime >= w.start;
+              const isActive = adjustedTime >= w.start && adjustedTime <= w.end;
+              const isKaraoke = animation === 'karaoke' || animation === 'zeemo';
+              
+              const wordAnimation = animation === 'zeemo' ? {
+                scale: isActive ? 1.25 : 1,
+                y: isActive ? -8 : 0,
+                color: isActive ? (style.threeColors?.[0] || '#FFD700') : (style.color || '#FFFFFF')
+              } : (animation === 'pop' || animation === 'snappy-pop') ? {
+                scale: isActive ? 1.15 : (isVisible ? 1 : 0.5),
+                y: isActive ? -5 : 0,
+                opacity: isVisible ? 1 : 0
+              } : {
+                opacity: isVisible ? 1 : 0,
+                scale: isVisible ? 1 : 0.9,
+                y: isVisible ? 0 : 5
+              };
+
               return (
                 <motion.span 
-                  key={`typewriter-${w.start}-${i}`}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ 
-                    opacity: isVisible ? 1 : 0,
-                    scale: isVisible ? (isActive ? 1.2 : 1) : 0.8,
+                  key={`word-${w.start}-${i}-${animation}`}
+                  initial={{ opacity: 0, scale: 0.5, y: 10 }}
+                  animate={wordAnimation}
+                  transition={{ 
+                    type: 'spring', 
+                    stiffness: animation.includes('snappy') ? 800 : 400, 
+                    damping: 20,
+                    duration: 0.1 
                   }}
-                  transition={{ duration: 0.1 }}
                   style={{
                     ...getWordStyle(w, i),
                     display: 'inline-block',
-                    color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : '#ffff00')) : (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)),
+                    // Apply line-specific or word-specific overrides
+                    color: (isActive || isVisible) ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : (isActive ? '#facc15' : style.color))) : 'rgba(255,255,255,0.2)',
+                    opacity: isVisible ? 1 : (isKaraoke ? 0.3 : 0)
                   }}
                 >
                   {w.word}
@@ -817,76 +854,10 @@ const CaptionOverlay = ({
         </div>
       );
     }
-    if (animation === 'karaoke') {
-      const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
-      if (!currentLine) return null;
 
-      // Find the original words that belong to this line
-      const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
-      
-      return (
-        <div style={textStyle} className="font-bold text-center px-4 flex flex-wrap justify-center gap-x-2">
-          {lineWords.map((w, i) => {
-              const isActive = currentTime >= w.start && currentTime <= w.end;
-              return (
-                <span 
-                  key={`karaoke-${w.word}-${w.start}-${i}`} 
-                  className={`transition-all duration-150 ${isActive ? 'scale-110' : 'opacity-70 scale-100'}`}
-                  style={{
-                    ...getWordStyle(w, i),
-                    color: isActive ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.5)',
-                    textShadow: isActive ? (style.shadow ? `${shadowColor} 2px 2px 4px` : 'none') : 'none',
-                  }}
-                >
-                  {w.word}
-                </span>
-              );
-            })}
-          </div>
-      );
-    }
-
-    // Zeemo Pro Style
-    if (animation === 'zeemo') {
-      const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
-      if (!currentLine) return null;
-
-      const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
-
-      return (
-        <div className="flex flex-wrap justify-center gap-x-4 px-4">
-          {lineWords.map((w, i) => {
-              const isActive = currentTime >= w.start && currentTime <= w.end;
-              return (
-                <motion.span
-                  key={`zeemo-${w.word}-${w.start}-${i}`}
-                  initial={{ scale: 1, y: 0 }}
-                  animate={{ 
-                    scale: isActive ? 1.2 : 1,
-                    y: isActive ? -5 : 0,
-                    color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF'
-                  }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                  style={{
-                    ...getWordStyle(w, i),
-                    WebkitTextStroke: '2px #000000',
-                    paintOrder: 'stroke fill',
-                    ['WebkitPaintOrder' as any]: 'stroke fill',
-                    textShadow: '3px 3px 0px rgba(0,0,0,0.8)',
-                    color: isActive ? (style.threeColors?.[0] || '#FFD700') : '#FFFFFF',
-                  }}
-                >
-                  {w.word}
-                </motion.span>
-              );
-            })}
-          </div>
-      );
-    }
-
-    // Kinetic Stacking Style
+    // Kinetic Stacking Style remains special as it is layout dependent
     if (animation === 'kinetic') {
-      const currentLine = displayWords.find(line => currentTime >= line.start && currentTime <= line.end);
+      const currentLine = displayWords.find(line => adjustedTime >= line.start && adjustedTime <= line.end);
       if (!currentLine) return null;
 
       const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= currentLine.end);
@@ -898,37 +869,39 @@ const CaptionOverlay = ({
       ].filter(l => l.length > 0);
 
       return (
-        <div className="flex flex-col items-center gap-2 px-4">
-          <AnimatePresence mode="popLayout">
-            {lines.map((line, lineIdx) => (
-                <motion.div
-                  key={`kinetic-line-${lineIdx}-${line[0]?.start || 0}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                  className="flex flex-wrap justify-center gap-x-3"
-                >
-                  {line.map((w, i) => {
-                    const isActive = currentTime >= w.start && currentTime <= w.end;
-                    return (
-                      <span
-                        key={`kinetic-word-${w.word}-${w.start}-${i}`}
-                        style={{
-                          ...getWordStyle(w, i),
-                          color: isActive ? '#FFD700' : '#FFFFFF',
-                          fontWeight: '900',
-                          transition: 'color 0.1s ease'
-                        }}
-                      >
-                        {w.word}
-                      </span>
-                    );
-                  })}
-                </motion.div>
-              ))}
+        <div className={`absolute left-0 right-0 w-full flex justify-center px-4 ${positionClass}`}>
+          <div className="flex flex-col items-center gap-2">
+            <AnimatePresence mode="popLayout">
+              {lines.map((line, lineIdx) => (
+                  <motion.div
+                    key={`kinetic-line-${lineIdx}-${line[0]?.start || 0}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                    className="flex flex-wrap justify-center gap-x-3"
+                  >
+                    {line.map((w, i) => {
+                      const isActive = adjustedTime >= w.start && adjustedTime <= w.end;
+                      return (
+                        <span
+                          key={`kinetic-word-${w.word}-${w.start}-${i}`}
+                          style={{
+                            ...getWordStyle(w, i),
+                            color: isActive ? '#FFD700' : '#FFFFFF',
+                            fontWeight: '900',
+                            transition: 'color 0.1s ease'
+                          }}
+                        >
+                          {w.word}
+                        </span>
+                      );
+                    })}
+                  </motion.div>
+                ))}
             </AnimatePresence>
           </div>
+        </div>
       );
     }
 
@@ -1761,7 +1734,7 @@ function App() {
   const [isSettingsLocked, setIsSettingsLocked] = useState(false);
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [captionOffset, setCaptionOffset] = useState(550); // Default to +550ms to compensate for AI lateness
+  const [captionOffset, setCaptionOffset] = useState(0); // Set to 0 by default for true sync
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [isCaptioning, setIsCaptioning] = useState(false);
