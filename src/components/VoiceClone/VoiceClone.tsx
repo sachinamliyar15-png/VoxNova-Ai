@@ -167,7 +167,7 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: `नमस्ते! मैं आपकी नई क्लोन की गई आवाज़ हूँ। मेरा नाम ${clonedVoiceName} है। मैं बिल्कुल असली और प्रोफेशनल लग रही हूँ ना?`,
+          text: `Hello! I am your new cloned voice. My name is ${clonedVoiceName}. I sound incredibly realistic and professional, don't I?`,
           voice_name: 'Pankaj', // Using a high-quality base for preview
           cloned_voice_traits: vocalFingerprint,
           style: 'professional',

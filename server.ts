@@ -1190,10 +1190,9 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
 
       const ttsResponse = await ai.models.generateContent({
         model: "gemini-3.1-flash-tts-preview",
-        contents: [{ parts: [{ text: `${performancePrompt}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
+        contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\n${performancePrompt}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: ttsSystemInstruction,
           temperature: 0.5,
           topP: 0.85,
           topK: 40,

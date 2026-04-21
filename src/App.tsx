@@ -103,6 +103,75 @@ import {
 import { db, auth, googleProvider, analytics, logEvent } from './firebase';
 import { testFirestoreConnection } from './lib/firebaseUtils';
 
+const BLOG_ARTICLES = [
+  {
+    title: "How AI Voice Generators are Changing Content Creation",
+    excerpt: "AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable. VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion...",
+    date: "March 28, 2026",
+    img: "https://picsum.photos/seed/ai-voice/800/450",
+    content: (
+      <article className="space-y-6">
+        <h2 className="text-4xl font-display font-bold text-zinc-900">How AI Voice Generators are Changing Content Creation</h2>
+        <div className="text-zinc-500 leading-relaxed space-y-4">
+          <p className="text-lg font-medium text-zinc-900">AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable.</p>
+          <p>VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion, making it perfect for YouTube creators, filmmakers, and businesses. The ability to generate high-quality audio without a voice actor has opened up new possibilities for small creators.</p>
+          <p>With the rise of short-form content like TikTok, Reels, and YouTube Shorts, the demand for quick and effective voiceovers is at an all-time high. AI voices allow creators to iterate faster and produce more content in less time.</p>
+          <h3 className="text-2xl font-bold text-zinc-900 pt-4">Why Realism Matters</h3>
+          <p>In the past, AI voices were easy to spot. They lacked the natural rhythm and breathing patterns of human speech. Today, VoxNova's technology incorporates these subtle details, making the voices sound 100% realistic.</p>
+        </div>
+      </article>
+    )
+  },
+  {
+    title: "Best Hindi AI Voices for YouTube Shorts and Reels",
+    excerpt: "Hindi content is booming on social media. To stand out, you need high-quality voiceovers. VoxNova offers voices like 'Pankaj' and 'Sultan' which are perfect for motivational videos, news, and storytelling in Hindi...",
+    date: "March 25, 2026",
+    img: "https://picsum.photos/seed/hindi/800/450",
+    content: (
+      <article className="space-y-6">
+        <h2 className="text-4xl font-display font-bold text-zinc-900">Best Hindi AI Voices for YouTube Shorts and Reels</h2>
+        <div className="text-zinc-500 leading-relaxed space-y-4">
+          <p className="text-lg font-medium text-zinc-900">Hindi content is booming on social media. To stand out, you need high-quality voiceovers that resonate with the audience.</p>
+          <p>VoxNova offers a specialized library of Hindi voices that are perfect for various niches. For example, 'Pankaj' is an ultra-deep, authoritative voice ideal for news and documentary-style videos. On the other hand, 'Sultan' provides a powerful, warrior-like tone for motivational content.</p>
+          <h3 className="text-2xl font-bold text-zinc-900 pt-4">Tips for Hindi Voiceovers</h3>
+          <p>When generating Hindi audio, it's important to use proper punctuation. This helps the AI understand where to pause and which words to emphasize. Our Hindi models are trained on native speakers to ensure perfect pronunciation and cultural nuance.</p>
+        </div>
+      </article>
+    )
+  },
+  {
+    title: "The Future of Text to Speech Technology in 2026",
+    excerpt: "As we move further into 2026, AI voices are becoming indistinguishable from real humans. VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing...",
+    date: "March 22, 2026",
+    img: "https://picsum.photos/seed/future/800/450",
+    content: (
+      <article className="space-y-6">
+        <h2 className="text-4xl font-display font-bold text-zinc-900">The Future of Text to Speech Technology in 2026</h2>
+        <div className="text-zinc-500 leading-relaxed space-y-4">
+          <p className="text-lg font-medium text-zinc-900">As we move further into 2026, AI voices are becoming indistinguishable from real humans.</p>
+          <p>VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing. The next step in TTS evolution is the integration of real-time emotional intelligence, where the AI can adapt its tone based on the sentiment of the text automatically.</p>
+          <p>We are also seeing a shift towards personalized AI voices, where users can create a unique digital twin of their own voice for use in various applications.</p>
+        </div>
+      </article>
+    )
+  },
+  {
+    title: "How to Create Professional Voiceovers with VoxNova",
+    excerpt: "Creating a professional voiceover used to require expensive equipment and a recording studio. Now, with VoxNova Text to Speech, you can generate studio-quality audio in seconds. Learn how to fine-tune your scripts for the best results...",
+    date: "March 18, 2026",
+    img: "https://picsum.photos/seed/studio/800/450",
+    content: (
+      <article className="space-y-6">
+        <h2 className="text-4xl font-display font-bold text-zinc-900">How to Create Professional Voiceovers with VoxNova</h2>
+        <div className="text-zinc-500 leading-relaxed space-y-4">
+          <p className="text-lg font-medium text-zinc-900">Creating a professional voiceover used to require expensive equipment and a recording studio. Now, you can do it in seconds.</p>
+          <p>Step 1: Write a clear script. Use punctuation to guide the AI's rhythm.<br/>Step 2: Choose the right voice. Each voice in VoxNova has a specific 'vibe' described in the library.<br/>Step 3: Fine-tune the settings. Adjust the speed for energy and the pitch for authority.<br/>Step 4: Use 'Studio Clarity' to ensure the output is crisp and professional.</p>
+        </div>
+      </article>
+    )
+  }
+];
+
 // Error Boundary Component
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
@@ -472,6 +541,15 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
     grouped[0].start = 0;
   }
 
+  // Ensure the last caption lasts until the end of the audio/video (approx)
+  if (grouped.length > 0) {
+    const last = grouped[grouped.length - 1];
+    // If it's a short voiceover, make sure the last word stays on screen
+    if (last.end - last.start < 1.0) {
+      last.end += 1.0;
+    }
+  }
+
   return grouped;
 };
 
@@ -480,7 +558,7 @@ const CaptionOverlay = ({
   currentTime, 
   style, 
   animation,
-  shadowColor,
+  shadowColor: propShadowColor,
   onUpdateStyle
 }: { 
   words: CaptionWord[], 
@@ -497,16 +575,26 @@ const CaptionOverlay = ({
   const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
   const currentWord = displayWords[currentWordIndex];
   
-  // Floating offset for Smart Mode
-  const floatingOffset = React.useMemo(() => {
-    if (!style.isSmart || !currentWord) return { x: 0, y: 0 };
-    // Generate a semi-random offset based on the word index to make it feel "alive"
-    const seed = currentWordIndex * 123.45;
-    return {
-      x: Math.sin(seed) * 10,
-      y: Math.cos(seed) * 15
+  // RE-INTRODUCED: Subtle "living" motion that is predictable and smooth
+  // This uses a sine wave based on global time to avoid jitter between captions
+  const [floatY, setFloatY] = React.useState(0);
+  const [floatX, setFloatX] = React.useState(0);
+
+  React.useEffect(() => {
+    let frameId: number;
+    const start = Date.now();
+    const animate = () => {
+      const elapsed = (Date.now() - start) / 1000;
+      // Very subtle slow drift
+      setFloatY(Math.sin(elapsed * 1.5) * 5);
+      setFloatX(Math.cos(elapsed * 1.2) * 3);
+      frameId = requestAnimationFrame(animate);
     };
-  }, [style.isSmart, currentWordIndex, currentWord]);
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  const floatingOffset = style.isSmart ? { x: floatX, y: floatY } : { x: 0, y: 0 };
 
   if (!currentWord) return null;
 
@@ -531,16 +619,11 @@ const CaptionOverlay = ({
   const getAnimationProps = () => {
     switch (animation) {
       case 'typing':
+      case 'typewriter':
         return {
-          initial: { opacity: 0 },
-          animate: { opacity: 1 },
-          transition: { duration: 0.1 }
-        };
-      case 'typing':
-        return {
-          initial: { opacity: 0, scale: 0.9 },
-          animate: { opacity: 1, scale: 1 },
-          transition: { duration: 0.1 }
+          initial: { opacity: 0, y: 2 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.15, ease: "easeOut" as const }
         };
       case 'pop':
         return {
@@ -676,12 +759,6 @@ const CaptionOverlay = ({
           animate: { opacity: 1 },
           transition: { duration: 0.1 }
         };
-      case 'typewriter':
-        return {
-          initial: { width: 0, opacity: 0 },
-          animate: { width: 'auto', opacity: 1 },
-          transition: { duration: 0.3 }
-        };
       default:
         return {
           initial: { opacity: 0 },
@@ -716,20 +793,28 @@ const CaptionOverlay = ({
   const getPositionClass = (pos?: string) => {
     const p = pos || style.position;
     switch (p) {
-      case 'top': return 'top-24';
-      case 'middle': return 'top-1/2 -translate-y-1/2';
-      case 'bottom': return 'bottom-24';
-      case 'left': return 'top-1/2 -translate-y-1/2 left-10 text-left';
-      case 'right': return 'top-1/2 -translate-y-1/2 right-10 text-right';
-      case 'top-left': return 'top-24 left-10 text-left';
-      case 'top-right': return 'top-24 right-10 text-right';
-      case 'bottom-left': return 'bottom-24 left-10 text-left';
-      case 'bottom-right': return 'bottom-24 right-10 text-right';
-      default: return 'bottom-24';
+      case 'top': return 'top-[15%] justify-center';
+      case 'middle': return 'top-1/2 -translate-y-1/2 justify-center';
+      case 'bottom': return 'bottom-[15%] justify-center';
+      case 'left': return 'top-1/2 -translate-y-1/2 justify-start px-12';
+      case 'right': return 'top-1/2 -translate-y-1/2 justify-end px-12';
+      case 'top-left': return 'top-[15%] justify-start px-12';
+      case 'top-right': return 'top-[15%] justify-end px-12';
+      case 'bottom-left': return 'bottom-[15%] justify-start px-12';
+      case 'bottom-right': return 'bottom-[15%] justify-end px-12';
+      default: return 'bottom-[15%]';
     }
   };
 
+  const getAlignmentClass = (pos?: string) => {
+    const p = pos || style.position;
+    if (p.includes('left')) return 'justify-start text-left';
+    if (p.includes('right')) return 'justify-end text-right';
+    return 'justify-center text-center';
+  };
+
   const getWordStyle = (word: CaptionWord, index: number): React.CSSProperties => {
+    const finalShadow = style.shadowColor || propShadowColor;
     const baseStyle: React.CSSProperties = {
       fontFamily: style.font,
       fontSize: `${word.fontSize || style.fontSize}px`,
@@ -760,7 +845,7 @@ const CaptionOverlay = ({
     }
 
     if (style.shadow) {
-      baseStyle.textShadow = `2px 2px 0px ${shadowColor}, -2px -2px 0px ${shadowColor}, 2px -2px 0px ${shadowColor}, -2px 2px 0px ${shadowColor}, 0px 4px 10px rgba(0,0,0,0.5)`;
+      baseStyle.textShadow = `2px 2px 0px ${finalShadow}, -2px -2px 0px ${finalShadow}, 2px -2px 0px ${finalShadow}, -2px 2px 0px ${finalShadow}, 0px 4px 10px rgba(0,0,0,0.5)`;
     }
     
     // Highlight logic
@@ -771,7 +856,7 @@ const CaptionOverlay = ({
         color: '#000000',
         transform: 'rotate(-2deg) scale(1.15)',
         fontWeight: '900',
-        boxShadow: `4px 4px 0px ${shadowColor}4D`,
+        boxShadow: `4px 4px 0px ${finalShadow}4D`,
       };
     }
 
@@ -779,7 +864,6 @@ const CaptionOverlay = ({
   };
 
   const currentWordPosition = currentWord.position || style.position;
-  const positionClass = getPositionClass(currentWordPosition);
 
   // Handle Dragging
   const handleDragEnd = (_: any, info: any) => {
@@ -791,66 +875,69 @@ const CaptionOverlay = ({
     }
   };
 
+  const displayPosition = style.position || 'middle';
+  const positionClass = getPositionClass(displayPosition);
+  const alignmentClass = getAlignmentClass(displayPosition);
+
   const renderContent = () => {
-    const currentLine = displayWords.find(line => adjustedTime >= line.start && adjustedTime <= line.end);
+    // Grace period: if we're between captions, keep the previous one for up to 0.5s 
+    // to prevent unwanted disappearing before voice ends.
+    const currentLine = displayWords.find(line => adjustedTime >= line.start && adjustedTime <= line.end) || 
+                       displayWords.find(line => adjustedTime >= line.end && adjustedTime <= line.end + 0.5);
+
     if (!currentLine) return null;
 
     // Get original words that are part of this line for word-level precision
-    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= (currentLine.end + 0.1));
+    const lineWords = words.filter(w => w.start >= currentLine.start && w.end <= (currentLine.end + 0.15));
     
-    // Check if we should use sequential reveal (now default for most styles to improve readability)
-    const isSequential = ['pop', 'snappy-pop', 'professional', 'fade', 'glow', 'typewriter', 'snappy', 'zoom', 'typing'].includes(animation);
+    // typewriter is now the default sequential animation
+    const isSequential = ['professional', 'snappy', 'zoom', 'typing', 'typewriter'].includes(animation);
 
     if (isSequential || animation === 'karaoke' || animation === 'zeemo') {
       return (
-        <div className={`absolute left-0 right-0 w-full flex justify-center px-4 pointer-events-none ${positionClass}`}>
-          <div 
-            style={{...textStyle, maxWidth: '95%', margin: '0 auto', backgroundColor: 'transparent', padding: 0}} 
-            className="flex flex-wrap justify-center gap-x-[0.25em] gap-y-1 overflow-visible"
-          >
-            {lineWords.map((w, i) => {
-              const isVisible = adjustedTime >= w.start;
-              const isActive = adjustedTime >= w.start && adjustedTime <= w.end;
-              const isKaraoke = animation === 'karaoke' || animation === 'zeemo';
-              
-              const wordAnimation = animation === 'zeemo' ? {
-                scale: isActive ? 1.25 : 1,
-                y: isActive ? -8 : 0,
-                color: isActive ? (style.threeColors?.[0] || '#FFD700') : (style.color || '#FFFFFF')
-              } : (animation === 'pop' || animation === 'snappy-pop') ? {
-                scale: isActive ? 1.15 : (isVisible ? 1 : 0.5),
-                y: isActive ? -5 : 0,
-                opacity: isVisible ? 1 : 0
-              } : {
-                opacity: isVisible ? 1 : 0,
-                scale: isVisible ? 1 : 0.9,
-                y: isVisible ? 0 : 5
-              };
+        <div 
+          style={{...textStyle, maxWidth: '95%', margin: '0 auto', backgroundColor: 'transparent', padding: 0}} 
+          className={`flex flex-wrap ${alignmentClass} gap-x-[0.25em] gap-y-1 overflow-visible pointer-events-none`}
+        >
+          {lineWords.map((w, i) => {
+            const isVisible = adjustedTime >= w.start;
+            const isActive = adjustedTime >= w.start && adjustedTime <= w.end;
+            const isKaraoke = animation === 'karaoke' || animation === 'zeemo';
+            
+            // Dynamic animation per word
+            const wordAnimation = animation === 'zeemo' ? {
+              scale: isActive ? 1.25 : 1,
+              y: isActive ? -8 : 0,
+              color: isActive ? (style.threeColors?.[0] || '#FFD700') : (style.color || '#FFFFFF')
+            } : animation === 'karaoke' ? {
+              color: isActive ? (style.threeColors?.[0] || '#FFFF00') : (style.color || '#FFFFFF'),
+            } : {
+              opacity: isVisible ? 1 : 0,
+              scale: isVisible ? 1 : 0.9,
+              y: isVisible ? 0 : 5
+            };
 
-              return (
-                <motion.span 
-                  key={`word-${w.start}-${i}-${animation}`}
-                  initial={{ opacity: 0, scale: 0.5, y: 10 }}
-                  animate={wordAnimation}
-                  transition={{ 
-                    type: 'spring', 
-                    stiffness: animation.includes('snappy') ? 800 : 400, 
-                    damping: 20,
-                    duration: 0.1 
-                  }}
-                  style={{
-                    ...getWordStyle(w, i),
-                    display: 'inline-block',
-                    // Apply line-specific or word-specific overrides
-                    color: (isActive || isVisible) ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : (isActive ? '#facc15' : style.color))) : 'rgba(255,255,255,0.2)',
-                    opacity: isVisible ? 1 : (isKaraoke ? 0.3 : 0)
-                  }}
-                >
-                  {w.word}
-                </motion.span>
-              );
-            })}
-          </div>
+            return (
+              <motion.span 
+                key={`word-${w.start}-${i}-${animation}`}
+                initial={{ opacity: 0, scale: 0.8, y: 5 }}
+                animate={wordAnimation as any}
+                transition={{ 
+                  duration: 0.15,
+                  ease: "easeOut"
+                }}
+                style={{
+                  ...getWordStyle(w, i),
+                  display: 'inline-block',
+                  whiteSpace: 'nowrap', // Prevent awkward wrapping mid-word
+                  color: (isActive || isVisible) ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.2)',
+                  opacity: isVisible ? 1 : (isKaraoke ? 0.3 : 0)
+                }}
+              >
+                {w.word}
+              </motion.span>
+            );
+          })}
         </div>
       );
     }
@@ -905,22 +992,30 @@ const CaptionOverlay = ({
       );
     }
 
-    // Pop Up animation
-    if (animation === 'pop') {
+    // Snappy Pop / Pop Animation (Restore classic high-quality centered look)
+    if (animation === 'pop' || animation === 'snappy-pop') {
       return (
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           <motion.div
-            key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
-            initial={{ scale: 0.9, opacity: 0, y: 10 }}
+            key={`${currentWord.word}-${currentWord.start}`}
+            initial={{ scale: 0.8, opacity: 0, y: 15 }}
             animate={{ 
-              scale: 1.1, 
+              scale: 1.15, 
               opacity: 1, 
-              y: style.isSmart ? floatingOffset.y : 0,
-              x: style.isSmart ? floatingOffset.x : 0
+              y: 0,
+              color: style.color
             }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-            style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)), maxWidth: '90%', margin: '0 auto' }}
+            exit={{ scale: 0.9, opacity: 0, y: -10 }}
+            transition={{ 
+              type: 'spring', 
+              stiffness: animation === 'snappy-pop' ? 700 : 450, 
+              damping: 25 
+            }}
+            style={{ 
+              ...getWordStyle(currentWord, words.indexOf(currentWord)), 
+              maxWidth: '90%', 
+              margin: '0 auto',
+            }}
             className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
           >
             {style.isDynamic ? (
@@ -990,7 +1085,7 @@ const CaptionOverlay = ({
             y: style.isSmart ? floatingOffset.y : 0
           }}
           style={getWordStyle(currentWord, words.indexOf(currentWord))}
-          className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
+          className={`font-bold ${alignmentClass} px-4 flex flex-wrap gap-[0.25em]`}
         >
           {style.isDynamic ? (
             currentWord.word.split(' ').map((w, i) => {
@@ -1012,17 +1107,20 @@ const CaptionOverlay = ({
   };
 
   return (
-    <div className={`absolute left-0 right-0 flex justify-center pointer-events-none z-[100] ${getPositionClass(currentWordPosition)}`}>
+    <div className={`absolute left-0 right-0 flex pointer-events-none z-[100] ${getPositionClass(displayPosition)}`}>
       <motion.div 
         drag
         dragMomentum={false}
         onDragEnd={handleDragEnd}
+        animate={{
+          x: (style.x || 0) + floatingOffset.x,
+          y: (style.y || 0) + floatingOffset.y
+        }}
+        transition={{ type: 'spring', stiffness: 100, damping: 30 }}
         style={{ 
-          x: style.x || 0, 
-          y: style.y || 0,
           cursor: 'grab'
         }}
-        className="pointer-events-auto active:cursor-grabbing"
+        className="pointer-events-auto active:cursor-grabbing min-h-[100px] flex items-center justify-center"
       >
         {renderContent()}
       </motion.div>
@@ -4420,6 +4518,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             <Maximize size={18} />
                             Full Screen
                           </button>
+                          <button 
+                            onClick={() => document.getElementById('video-upload-captions')?.click()}
+                            className="absolute top-4 right-4 p-3 bg-white/10 text-white rounded-xl transition-all z-[110] hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center gap-2 font-bold text-xs group"
+                            title="Change Video"
+                          >
+                            <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
+                            Change Video
+                          </button>
                         </div>
                     ) : (
                       <div 
@@ -5477,32 +5583,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-10">
-              {[
-                {
-                  title: "How AI Voice Generators are Changing Content Creation",
-                  excerpt: "AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable. VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion...",
-                  date: "March 28, 2026",
-                  img: "https://picsum.photos/seed/ai-voice/800/450"
-                },
-                {
-                  title: "Best Hindi AI Voices for YouTube Shorts and Reels",
-                  excerpt: "Hindi content is booming on social media. To stand out, you need high-quality voiceovers. VoxNova offers voices like 'Pankaj' and 'Sultan' which are perfect for motivational videos, news, and storytelling in Hindi...",
-                  date: "March 25, 2026",
-                  img: "https://picsum.photos/seed/hindi/800/450"
-                },
-                {
-                  title: "The Future of Text to Speech Technology in 2026",
-                  excerpt: "As we move further into 2026, AI voices are becoming indistinguishable from real humans. VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing...",
-                  date: "March 22, 2026",
-                  img: "https://picsum.photos/seed/future/800/450"
-                },
-                {
-                  title: "How to Create Professional Voiceovers with VoxNova",
-                  excerpt: "Creating a professional voiceover used to require expensive equipment and a recording studio. Now, with VoxNova Text to Speech, you can generate studio-quality audio in seconds. Learn how to fine-tune your scripts for the best results...",
-                  date: "March 18, 2026",
-                  img: "https://picsum.photos/seed/studio/800/450"
-                }
-              ].map((article, i) => (
+              {BLOG_ARTICLES.map((article, i) => (
                 <div 
                   key={`article-${i}`} 
                   className="group cursor-pointer space-y-6" 
@@ -5560,8 +5641,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             <div className="glass-panel p-12 md:p-20 rounded-[4rem] border-zinc-100 bg-white shadow-xl shadow-emerald-900/5 space-y-12 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
               <div className="text-center space-y-4 relative z-10">
-                <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900">VoxNova Text to Speech: हिंदी में प्रोफेशनल वॉइसओवर</h2>
-                <p className="text-zinc-600 max-w-2xl mx-auto text-lg">VoxNova एक बेहतरीन AI वॉइस जनरेटर है जो आपको हिंदी में उच्च गुणवत्ता वाले वॉइसओवर बनाने की सुविधा देता है।</p>
+                <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900">VoxNova Text to Speech: Professional Hindi Voiceovers</h2>
+                <p className="text-zinc-600 max-w-2xl mx-auto text-lg">VoxNova is a premium AI voice generator that enables you to create high-quality Hindi voiceovers with ease.</p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-16 relative z-10">
@@ -5570,9 +5651,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <Video size={28} />
                   </div>
                   <div className="space-y-3">
-                    <h4 className="text-2xl font-bold text-zinc-900">यूट्यूब और रील्स के लिए बेस्ट आवाज़ें</h4>
+                    <h4 className="text-2xl font-bold text-zinc-900">Perfect for YouTube and Reels</h4>
                     <p className="text-zinc-600 leading-relaxed text-lg">
-                      चाहे आप यूट्यूब वीडियो बना रहे हों या इंस्टाग्राम रील्स, हमारी आवाज़ें आपके कंटेंट को और भी आकर्षक बनाएंगी। 'Pankaj' और 'Sultan' जैसी आवाज़ें मोटिवेशनल और न्यूज़ वीडियो के लिए एकदम सही हैं।
+                      Whether you're creating YouTube videos or Instagram Reels, our voices will make your content more engaging. Voices like 'Pankaj' and 'Sultan' are perfect for motivational and news content.
                     </p>
                   </div>
                 </div>
@@ -5581,9 +5662,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <Zap size={28} />
                   </div>
                   <div className="space-y-3">
-                    <h4 className="text-2xl font-bold text-zinc-900">आसान और तेज़ वॉइस जनरेशन</h4>
+                    <h4 className="text-2xl font-bold text-zinc-900">Fast and Easy Voice Generation</h4>
                     <p className="text-zinc-600 leading-relaxed text-lg">
-                      बस अपना टेक्स्ट टाइप करें, अपनी पसंदीदा आवाज़ चुनें, और 'Generate' पर क्लिक करें। कुछ ही सेकंड में आपका प्रोफेशनल वॉइसओवर तैयार हो जाएगा। आप पिच और स्पीड को भी अपनी ज़रूरत के अनुसार बदल सकते हैं।
+                      Simply type your text, choose your favorite voice, and click 'Generate'. Your professional voiceover will be ready in seconds. You can also customize the pitch and speed to suit your needs.
                     </p>
                   </div>
                 </div>
@@ -5622,15 +5703,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         <section className="bg-zinc-50 py-24">
           <div className="max-w-6xl mx-auto px-6 space-y-16">
             <div className="text-center space-y-4">
-              <h3 className="text-4xl font-display font-bold text-zinc-900">VoxNova कैसे काम करता है?</h3>
-              <p className="text-zinc-500">चार आसान चरणों में अपनी आवाज़ तैयार करें।</p>
+              <h3 className="text-4xl font-display font-bold text-zinc-900">How VoxNova Works?</h3>
+              <p className="text-zinc-500">Create your voice in four simple steps.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {[
-                { step: '01', title: 'टेक्स्ट दर्ज करें', desc: 'अपना स्क्रिप्ट हमारे एडिटर में पेस्ट करें। हम 5,000 अक्षरों तक के लंबे कंटेंट का समर्थन करते हैं।', img: 'https://picsum.photos/seed/hi-step1/400/300' },
-                { step: '02', title: 'आवाज़ चुनें', desc: 'हमारी 50+ प्रोफेशनल AI आवाज़ों की लाइब्रेरी से अपनी पसंद की आवाज़ चुनें।', img: 'https://picsum.photos/seed/hi-step2/400/300' },
-                { step: '03', title: 'सेटिंग्स बदलें', desc: 'अपनी आवाज़ को बेहतर बनाने के लिए पिच, स्पीड और इमोशनल स्टाइल को एडजस्ट करें।', img: 'https://picsum.photos/seed/hi-step3/400/300' },
-                { step: '04', title: 'वॉइस जनरेट करें', desc: 'हमारा AI इंजन कुछ ही सेकंड में आपके लिए स्टूडियो-क्वालिटी ऑडियो तैयार कर देगा।', img: 'https://picsum.photos/seed/hi-step4/400/300' }
+                { step: '01', title: 'Enter Text', desc: 'Paste your script into our editor. We support long-form content up to 5,000 characters.', img: 'https://picsum.photos/seed/hi-step1/400/300' },
+                { step: '02', title: 'Select Voice', desc: 'Choose your preferred voice from our library of 50+ professional AI voices.', img: 'https://picsum.photos/seed/hi-step2/400/300' },
+                { step: '03', title: 'Adjust Settings', desc: 'Fine-tune pitch, speed, and emotional style to perfect your audio output.', img: 'https://picsum.photos/seed/hi-step3/400/300' },
+                { step: '04', title: 'Generate Audio', desc: 'Our advanced AI engine will deliver studio-quality audio in just a few seconds.', img: 'https://picsum.photos/seed/hi-step4/400/300' }
               ].map((item, i) => (
                 <div key={`step-hi-${i}`} className="space-y-6 group">
                   <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-white border border-zinc-200 shadow-sm group-hover:shadow-md transition-all duration-300">
@@ -5840,28 +5921,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 <div className="space-y-8">
                   <h2 className="text-4xl font-display font-bold text-zinc-900">VoxNova AI Voice Blog</h2>
                   <div className="grid grid-cols-1 gap-8">
-                    {[
-                      {
-                        title: "How AI Voice Generators are Changing Content Creation",
-                        excerpt: "AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable. VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion...",
-                        date: "March 28, 2026"
-                      },
-                      {
-                        title: "Best Hindi AI Voices for YouTube Shorts and Reels",
-                        excerpt: "Hindi content is booming on social media. To stand out, you need high-quality voiceovers. VoxNova offers voices like 'Pankaj' and 'Sultan' which are perfect for motivational videos, news, and storytelling in Hindi...",
-                        date: "March 25, 2026"
-                      },
-                      {
-                        title: "The Future of Text to Speech Technology in 2026",
-                        excerpt: "As we move further into 2026, AI voices are becoming indistinguishable from real humans. VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing...",
-                        date: "March 22, 2026"
-                      },
-                      {
-                        title: "How to Create Professional Voiceovers with VoxNova",
-                        excerpt: "Creating a professional voiceover used to require expensive equipment and a recording studio. Now, with VoxNova Text to Speech, you can generate studio-quality audio in seconds. Learn how to fine-tune your scripts for the best results...",
-                        date: "March 18, 2026"
-                      }
-                    ].map((article, i) => (
+                    {BLOG_ARTICLES.map((article, i) => (
                       <div key={`blog-list-${i}`} className="p-6 rounded-3xl border border-zinc-100 hover:border-emerald-500/20 transition-all cursor-pointer" onClick={() => setSelectedArticle(i)}>
                         <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mb-2">{article.date}</div>
                         <h3 className="text-2xl font-bold text-zinc-900 mb-3">{article.title}</h3>
@@ -5877,51 +5937,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <ArrowUp className="-rotate-90" size={16} /> Back to Blog
                   </button>
                   
-                  {selectedArticle === 0 && (
-                    <article className="space-y-6">
-                      <h2 className="text-4xl font-display font-bold text-zinc-900">How AI Voice Generators are Changing Content Creation</h2>
-                      <div className="text-zinc-500 leading-relaxed space-y-4">
-                        <p className="text-lg font-medium text-zinc-900">AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable.</p>
-                        <p>VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion, making it perfect for YouTube creators, filmmakers, and businesses. The ability to generate high-quality audio without a voice actor has opened up new possibilities for small creators.</p>
-                        <p>With the rise of short-form content like TikTok, Reels, and YouTube Shorts, the demand for quick and effective voiceovers is at an all-time high. AI voices allow creators to iterate faster and produce more content in less time.</p>
-                        <h3 className="text-2xl font-bold text-zinc-900 pt-4">Why Realism Matters</h3>
-                        <p>In the past, AI voices were easy to spot. They lacked the natural rhythm and breathing patterns of human speech. Today, VoxNova's technology incorporates these subtle details, making the voices sound 100% realistic.</p>
-                      </div>
-                    </article>
-                  )}
-                  
-                  {selectedArticle === 1 && (
-                    <article className="space-y-6">
-                      <h2 className="text-4xl font-display font-bold text-zinc-900">Best Hindi AI Voices for YouTube Shorts and Reels</h2>
-                      <div className="text-zinc-500 leading-relaxed space-y-4">
-                        <p className="text-lg font-medium text-zinc-900">Hindi content is booming on social media. To stand out, you need high-quality voiceovers that resonate with the audience.</p>
-                        <p>VoxNova offers a specialized library of Hindi voices that are perfect for various niches. For example, 'Pankaj' is an ultra-deep, authoritative voice ideal for news and documentary-style videos. On the other hand, 'Sultan' provides a powerful, warrior-like tone for motivational content.</p>
-                        <h3 className="text-2xl font-bold text-zinc-900 pt-4">Tips for Hindi Voiceovers</h3>
-                        <p>When generating Hindi audio, it's important to use proper punctuation. This helps the AI understand where to pause and which words to emphasize. Our Hindi models are trained on native speakers to ensure perfect pronunciation and cultural nuance.</p>
-                      </div>
-                    </article>
-                  )}
-
-                  {selectedArticle === 2 && (
-                    <article className="space-y-6">
-                      <h2 className="text-4xl font-display font-bold text-zinc-900">The Future of Text to Speech Technology in 2026</h2>
-                      <div className="text-zinc-500 leading-relaxed space-y-4">
-                        <p className="text-lg font-medium text-zinc-900">As we move further into 2026, AI voices are becoming indistinguishable from real humans.</p>
-                        <p>VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing. The next step in TTS evolution is the integration of real-time emotional intelligence, where the AI can adapt its tone based on the sentiment of the text automatically.</p>
-                        <p>We are also seeing a shift towards personalized AI voices, where users can create a unique digital twin of their own voice for use in various applications.</p>
-                      </div>
-                    </article>
-                  )}
-
-                  {selectedArticle === 3 && (
-                    <article className="space-y-6">
-                      <h2 className="text-4xl font-display font-bold text-zinc-900">How to Create Professional Voiceovers with VoxNova</h2>
-                      <div className="text-zinc-500 leading-relaxed space-y-4">
-                        <p className="text-lg font-medium text-zinc-900">Creating a professional voiceover used to require expensive equipment and a recording studio. Now, you can do it in seconds.</p>
-                        <p>Step 1: Write a clear script. Use punctuation to guide the AI's rhythm.<br/>Step 2: Choose the right voice. Each voice in VoxNova has a specific 'vibe' described in the library.<br/>Step 3: Fine-tune the settings. Adjust the speed for energy and the pitch for authority.<br/>Step 4: Use 'Studio Clarity' to ensure the output is crisp and professional.</p>
-                      </div>
-                    </article>
-                  )}
+                  {BLOG_ARTICLES[selectedArticle].content}
                 </div>
               )}
             </motion.div>
