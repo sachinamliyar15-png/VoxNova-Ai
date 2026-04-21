@@ -102,6 +102,12 @@ const buildSystemInstruction = (language: string, voice_name: string) => {
   return `You are an elite, world-class professional voice actor and narrator. Your task is to
 provide a stunningly realistic, human-like, and emotionally resonant performance in
 ${language === 'hi' ? 'Hindi' : 'English'}.
+
+SOUND ARCHITECTURE (MANDATORY):
+- OUTWARD PROJECTION: Project your voice forward with clarity and force. Direct delivery. Imagine a professional performance in a grand hall.
+- STUDIO ACOUSTICS: Imagine an acoustically treated pro-studio. Zero reverb, zero echo, zero "indoor" or "band kamre" sound quality. Direct microphone placement.
+- CLEAR ARTICULATION: Every syllable must be crisp, pushed forward, and articulate. Do not swallow endings or mumble words.
+
 Your goal is to generate high-fidelity, natural, and expressive speech.
 Analyze the script’s category and tone to determine the best vocal characteristics:
 - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
@@ -187,71 +193,68 @@ interface VoiceProfile {
   timber: 'Smooth' | 'Gravelly' | 'Sharp' | 'Airy';
   pacing: 'Fast' | 'Normal' | 'Slow';
   description: string;
-}
-
-const VOICE_PROFILES: Record<string, VoiceProfile> = {
+}const VOICE_PROFILES: Record<string, VoiceProfile> = {
   // Global/English Voices
-  'Adam': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.' },
-  'Brian': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.' },
-  'Daniel': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.02, timber: 'Sharp', pacing: 'Fast', description: 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.' },
-  'Josh': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Airy', pacing: 'Normal', description: 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.' },
-  'Liam': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.00, timber: 'Airy', pacing: 'Slow', description: 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.' },
-  'Michael': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.85, timber: 'Gravelly', pacing: 'Slow', description: 'Mature, wise, and sophisticated. Slow, deliberate professional narration.' },
-  'Ryan': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Gravelly', pacing: 'Normal', description: 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.' },
-  'Matthew': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.' },
-  'Bill': { resonance: 'Throat', energy: 'Medium', pitch_shift: 1.02, timber: 'Gravelly', pacing: 'Slow', description: 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.' },
-  'Callum': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Refined, elite British-style precision with sophisticated air.' },
-  'Frank': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'Ultra-deep, heavy, and masculine. A powerful chest-voice with maximum bass resonance and a professional narrator tone.' },
-  'Marcus': { resonance: 'Chest', energy: 'High', pitch_shift: 0.94, timber: 'Gravelly', pacing: 'Normal', description: 'Strong, motivational, and powerful. Commanding, inspiring, and loud.' },
-  'Jessica': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Clear, bright, and professional. Modern corporate standard with a friendly smile.' },
-  'Sarah': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.05, timber: 'Airy', pacing: 'Slow', description: 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.' },
-  'Matilda': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.' },
-  'Emily': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.12, timber: 'Smooth', pacing: 'Fast', description: 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.' },
-  'Bella': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.96, timber: 'Smooth', pacing: 'Slow', description: 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.' },
-  'Rachel': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.' },
-  'Nicole': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 0.98, timber: 'Sharp', pacing: 'Normal', description: 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.' },
-  'Clara': { resonance: 'Chest', energy: 'Calm', pitch_shift: 1.02, timber: 'Smooth', pacing: 'Slow', description: 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.' },
+  'Adam': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Deep, authoritative tone of a 45-year-old male leader. Resonant, commanding, and professional cinematic voice.' },
+  'Brian': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Kind, trustworthy 30-year-old male with a soft, steady cadence and a friendly neighborhood vibe.' },
+  'Daniel': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.02, timber: 'Sharp', pacing: 'Fast', description: 'Energetic news anchor, mid-30s. Crisp, fast-paced, highly articulate broadcast professional.' },
+  'Josh': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Airy', pacing: 'Normal', description: 'Youthful, energetic 20-year-old male. Natural conversational tone with slight breathiness and upbeat delivery.' },
+  'Liam': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.00, timber: 'Airy', pacing: 'Slow', description: 'Soft-spoken storyteller, mid-20s. Warm, empathetic, and gentle with distinct emotional depth.' },
+  'Michael': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.85, timber: 'Gravelly', pacing: 'Slow', description: 'Mature 60-year-old narrator. Wise, sophisticated, with a distinct gravelly texture in the lower range.' },
+  'Ryan': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Gravelly', pacing: 'Normal', description: 'Casual, relatable mid-30s male. Authentic "guy-next-door" with slight rasp and conversational inflections.' },
+  'Matthew': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Intense 40-year-old action trailer narrator. Cinematic, dramatic, and intensely resonant.' },
+  'Bill': { resonance: 'Throat', energy: 'Medium', pitch_shift: 1.02, timber: 'Gravelly', pacing: 'Slow', description: 'Rugged 50-year-old farmer type. Experienced, husky, and character-rich performance with rough edges.' },
+  'Callum': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Elite British-style professor. Refined, precise, and sophisticated academic delivery.' },
+  'Frank': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'Ultra-deep 55-year-old masculine icon. Powerful chest-voice with maximum bass resonance and authority.' },
+  'Marcus': { resonance: 'Chest', energy: 'High', pitch_shift: 0.94, timber: 'Gravelly', pacing: 'Normal', description: 'Strong, motivational army sergeant. Commanding, inspiring, loud, and impactful.' },
+  'Jessica': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Clear, professional 30-year-old corporate leader. Confident, friendly smile in the voice, and extremely crisp.' },
+  'Sarah': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.05, timber: 'Airy', pacing: 'Slow', description: 'Ethereal, soft-spoken young female. Gentle, soothing, and very quiet with a dream-like quality.' },
+  'Matilda': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Intelligent, articulate university student. Professional, focused, and academic with clear delivery.' },
+  'Emily': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.12, timber: 'Smooth', pacing: 'Fast', description: 'Youthful, bubbly 19-year-old girl. High-energy, cheerful, and friendly with rapid pacing.' },
+  'Bella': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.96, timber: 'Smooth', pacing: 'Slow', description: 'Elegant, sophisticated 40-year-old businesswoman. Premium, rich texture with a calm presence.' },
+  'Rachel': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Dynamic, wide-ranging female actor. Versatile, expressive, and clear with high emotional intelligence.' },
+  'Nicole': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 0.98, timber: 'Sharp', pacing: 'Normal', description: 'Direct, confident 35-year-old journalist. No-nonsense, firm tone with broadcast standard clarity.' },
+  'Clara': { resonance: 'Chest', energy: 'Calm', pitch_shift: 1.02, timber: 'Smooth', pacing: 'Slow', description: 'Kind 45-year-old motherly figure. Approachable, warm, and natural with a nurturing tone.' },
   
   // Documentary & Cinematic
-  'Documentary Pro': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.' },
-  'Atlas (Do)': { resonance: 'Chest', energy: 'High', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Ultra-high quality cinematic documentary voice. Deeply resonant.' },
-  'Virat': { resonance: 'Chest', energy: 'High', pitch_shift: 0.92, timber: 'Gravelly', pacing: 'Normal', description: 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.' },
-  'Priyanka': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.95, timber: 'Smooth', pacing: 'Normal', description: 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.' },
+  'Documentary Pro': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'The absolute summit of documentary narration. Deep, mature, cinematic, and profoundly intelligent.' },
+  'Atlas (Do)': { resonance: 'Chest', energy: 'High', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Ultra-high fidelity cinematic voice. Deeply resonant with a legendary storytelling aura.' },
+  'Virat': { resonance: 'Chest', energy: 'High', pitch_shift: 0.92, timber: 'Gravelly', pacing: 'Normal', description: 'Realistic, high-energy Hindi-English mix professional. Masculine, thick, and commanding. Documentary standard.' },
+  'Priyanka': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.95, timber: 'Smooth', pacing: 'Normal', description: 'Powerful 40-year-old authoritative female. Perfect for documentaries and high-stakes narration.' },
   
   // Character/Indian Power Voices
-  'SULTAN': { resonance: 'Chest', energy: 'High', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. 100% Realistic.' },
-  'MAHARAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Slow', description: 'The King. Royal, resonant, and expansive powerful male voice.' },
-  'Munna Bhai': { resonance: 'Throat', energy: 'High', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Ultra-heavy powerful baritone desi voice with explosive energy.' },
-  'Sachinboy': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.03, timber: 'Sharp', pacing: 'Normal', description: 'Heavyweight champion. Monstrous, chest-rattling baritone power.' },
-  'SHERA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Gravelly', pacing: 'Normal', description: 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. 100% Realistic.' },
-  'KAAL': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.' },
-  'BHEEM': { resonance: 'Chest', energy: 'High', pitch_shift: 0.70, timber: 'Gravelly', pacing: 'Slow', description: 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.' },
-  'SIKANDAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.' },
-  'VIKRAM': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.86, timber: 'Smooth', pacing: 'Normal', description: 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.' },
-  'EMPEROR PRO': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Smooth', pacing: 'Slow', description: 'The Emperor. Legendary deep baritone commanding absolute respect.' },
-  'KABIR': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'The Storyteller. Warm, wise, and deeply resonant storytelling voice.' },
-  'ARYAN': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'The Fitness Coach. High-energy, sharp, and commanding motivation.' },
-  'ZORAVAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Heavyweight. Ultra-deep, chest-rattling baritone trailer power.' },
-  'RUDRA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Intense Narrator. Gritty, serious, and highly authoritative.' },
-
+  'SULTAN': { resonance: 'Chest', energy: 'High', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'The Warrior. Ancient king tone. Every word vibrates with massive bass resonance and vocal fry.' },
+  'MAHARAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Slow', description: 'The Emperor. Royal, resonant, and expansive male voice. Grand and prestigious delivery.' },
+  'Munna Bhai': { resonance: 'Throat', energy: 'High', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Massive baritone Desi voice. Street-smart, energetic, and explosive power.' },
+  'Sachinboy': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.03, timber: 'Sharp', pacing: 'Normal', description: 'Heavyweight sporting champion. Monstrous energy, chest-rattling baritone, and confidence.' },
+  'SHERA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Gravelly', pacing: 'Normal', description: 'Alpha Motivator. Raw, aggressive, testosterone-driven masculine power. Extremely realistic.' },
+  'KAAL': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Mystery Shadow. Dark, cinematic, ultra-low frequency with mysterious undertones. Villainous profile.' },
+  'BHEEM': { resonance: 'Chest', energy: 'High', pitch_shift: 0.70, timber: 'Gravelly', pacing: 'Slow', description: 'The Mythical Giant. Super-heavy baritone. The ground shakes with every word. Deepest human limit.' },
+  'SIKANDAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Legend. Mature, wise warrior king. Rich bass for professional and epic narrations.' },
+  'VIKRAM': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.86, timber: 'Smooth', pacing: 'Normal', description: 'The Dark Master. Smooth, mysterious, and cinematic with a brooding intensity.' },
+  'EMPEROR PRO': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Smooth', pacing: 'Slow', description: 'Absolute Sovereign. Legendary deep baritone with a regal and commanding presence.' },
+  'KABIR': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Warm Poet and Storyteller. Wise, resonant, and deeply soulful storytelling tone.' },
+  'ARYAN': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Intense Fitness Coach. High-energy, sharp, commanding, and extremely loud.' },
+  'ZORAVAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Heavy Tank. Ultra-deep, chest-rattling baritone built for trailer impact.' },
+  'RUDRA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Fearless Narrator. Gritty, serious, and extremely authoritative. Pure masculine grit.' },
   // Versatile Male/Female
-  'Leo': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Warm, friendly, and highly expressive youthful male.' },
-  'Sophia': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Smooth', pacing: 'Normal', description: 'Soft, intimate, and deeply emotional female narration.' },
-  'Hugo': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Gravelly, intense, and full of character male voice.' },
-  'Elara': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.02, timber: 'Airy', pacing: 'Normal', description: 'Bright, energetic, and enthusiastic female voice.' },
-  'Pankaj': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.' },
-  'ISHANI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Elegant, sophisticated, and professional female narrator.' },
-  'VEER': { resonance: 'Chest', energy: 'High', pitch_shift: 0.80, timber: 'Gravelly', pacing: 'Normal', description: 'The Brave. High-energy, loud, and incredibly powerful male.' },
-  'SHAKTI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'The Power. Strong, authoritative female leadership voice.' },
-  'RAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'The Royal. Deep, resonant, king-like professional male.' },
-  'TOOFAN': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Sharp', pacing: 'Fast', description: 'The Storm. Fast-paced, explosive energy and loud delivery.' },
-  'BHAIRAV': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Gravelly', pacing: 'Slow', description: 'The Intense. Deep, gritty, and impactful serious narration.' },
+  'Leo': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Vibrant young male, early 20s. Energetic, expressive, and friendly conversationalist.' },
+  'Sophia': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Smooth', pacing: 'Normal', description: 'Intimate female storyteller. Deeply emotional, soft, and resonant narration.' },
+  'Hugo': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Gravelly character actor. Mid-50s male with intense personality and rich tone.' },
+  'Elara': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.02, timber: 'Airy', pacing: 'Normal', description: 'Enthusiastic female host. Bright, energetic, and highly engaging for modern content.' },
+  'Pankaj': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'Ultra-authoritative male baritone. 100% realistic masculine grit with authority.' },
+  'ISHANI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'High-class female presenter. Elegant, sophisticated, and flawlessly professional.' },
+  'VEER': { resonance: 'Chest', energy: 'High', pitch_shift: 0.80, timber: 'Gravelly', pacing: 'Normal', description: 'The Braveheart. High-energy, loud, and incredibly powerful warrior male.' },
+  'SHAKTI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Female Power Leader. Strong, authoritative, and inspiring leadership voice.' },
+  'RAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'The Royal Prince. Youthful but powerful. Deep, resonant, and prestigious male.' },
+  'TOOFAN': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Sharp', pacing: 'Fast', description: 'The Storm. Extremely fast-paced, explosive energy, and rapid-fire delivery.' },
+  'BHAIRAV': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Gravelly', pacing: 'Slow', description: 'The Intense Sage. Gritty, impactful, and serious professional narration.' },
 
   // Specialized Hindi Profiles
-  'ARAV_NEUTRAL_PRO': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.00, timber: 'Smooth', pacing: 'Normal', description: 'Natural Indian Male. Calm, confident, and grounded delivery.' },
-  'DEV_DEEP_REAL': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Deep Mature Indian Male. Stable, trustworthy, and authoritative.' },
-  'NEEL_SOFT_CONNECT': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Airy', pacing: 'Normal', description: 'Warm Conversational Indian Male. Friendly and relatable friend-tone.' },
-  'RAJ_CLASSIC_NARRATOR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Classic Hindi Narrator. Clear, composed, and slightly formal epic tone.' }
+  'ARAV_NEUTRAL_PRO': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.00, timber: 'Smooth', pacing: 'Normal', description: 'Modern Indian Male. Balanced, confident, and grounded. Natural urban Hindi speaker.' },
+  'DEV_DEEP_REAL': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Deep Mature Indian Elder. Stable, trustworthy, and authoritative traditional Hindi voice.' },
+  'NEEL_SOFT_CONNECT': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Airy', pacing: 'Normal', description: 'Friendly Indian Friend. Warm, casual, and relatable with a soft Hindi-English touch.' },
+  'RAJ_CLASSIC_NARRATOR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Epic Hindi Narrator. Clear, composed, and formal. Built for grand stories and historical accounts.' }
 };
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
@@ -1529,17 +1532,7 @@ app.post("/api/voice-changer-save", authenticate, async (req: any, res) => {
       res.json({ success: true });
     } catch (saveError) {
       console.error("Failed to chunks audio for voice changer:", saveError);
-      // Fallback for extreme cases (should not happen with saveToHistory)
-      const historyRef = firestore.collection('voice_history');
-      await historyRef.add({
-        userId,
-        text: transcribedText,
-        voice_name: voice_id,
-        audio_data: audioData.length > 900000 ? "LONG_AUDIO_DATA_TOO_LARGE_FOR_HISTORY" : audioData,
-        mode: 'convert',
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      });
-      res.json({ success: true });
+      res.status(500).json({ error: "Failed to save audio history. Please try a shorter script." });
     }
   } catch (error: any) {
     console.error("Failed to save voice changer history:", error);
