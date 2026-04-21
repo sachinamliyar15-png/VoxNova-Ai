@@ -576,25 +576,8 @@ const CaptionOverlay = ({
   const currentWord = displayWords[currentWordIndex];
   
   // RE-INTRODUCED: Subtle "living" motion that is predictable and smooth
-  // This uses a sine wave based on global time to avoid jitter between captions
-  const [floatY, setFloatY] = React.useState(0);
-  const [floatX, setFloatX] = React.useState(0);
-
-  React.useEffect(() => {
-    let frameId: number;
-    const start = Date.now();
-    const animate = () => {
-      const elapsed = (Date.now() - start) / 1000;
-      // Very subtle slow drift
-      setFloatY(Math.sin(elapsed * 1.5) * 5);
-      setFloatX(Math.cos(elapsed * 1.2) * 3);
-      frameId = requestAnimationFrame(animate);
-    };
-    frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
-  }, []);
-
-  const floatingOffset = style.isSmart ? { x: floatX, y: floatY } : { x: 0, y: 0 };
+  // REMOVED: Motion removed as per user request for STABILITY
+  const floatingOffset = { x: 0, y: 0 };
 
   if (!currentWord) return null;
 
@@ -920,18 +903,18 @@ const CaptionOverlay = ({
             return (
               <motion.span 
                 key={`word-${w.start}-${i}-${animation}`}
-                initial={{ opacity: 0, scale: 0.8, y: 5 }}
+                initial={{ opacity: 1, scale: 1, y: 0 }}
                 animate={wordAnimation as any}
                 transition={{ 
-                  duration: 0.15,
-                  ease: "easeOut"
+                  duration: 0.01,
+                  ease: "linear"
                 }}
                 style={{
                   ...getWordStyle(w, i),
                   display: 'inline-block',
                   whiteSpace: 'nowrap', // Prevent awkward wrapping mid-word
-                  color: (isActive || isVisible) ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.2)',
-                  opacity: isVisible ? 1 : (isKaraoke ? 0.3 : 0)
+                  color: (isActive || isVisible) ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.05)',
+                  opacity: isVisible ? 1 : 0
                 }}
               >
                 {w.word}
@@ -1107,20 +1090,13 @@ const CaptionOverlay = ({
   };
 
   return (
-    <div className={`absolute left-0 right-0 flex pointer-events-none z-[100] ${getPositionClass(displayPosition)}`}>
+    <div className={`absolute left-0 right-0 bottom-12 flex pointer-events-none z-[100] justify-center text-center`}>
       <motion.div 
-        drag
-        dragMomentum={false}
-        onDragEnd={handleDragEnd}
         animate={{
-          x: (style.x || 0) + floatingOffset.x,
-          y: (style.y || 0) + floatingOffset.y
+          x: 0,
+          y: 0
         }}
-        transition={{ type: 'spring', stiffness: 100, damping: 30 }}
-        style={{ 
-          cursor: 'grab'
-        }}
-        className="pointer-events-auto active:cursor-grabbing min-h-[100px] flex items-center justify-center"
+        className="pointer-events-none flex items-center justify-center w-full max-w-4xl"
       >
         {renderContent()}
       </motion.div>
@@ -1847,19 +1823,16 @@ function App() {
     const updateSmoothTime = () => {
       const activeRef = activeTab === 'captions' ? videoRef.current : audioRef.current;
       if (activeRef && !activeRef.paused) {
-        // Only update if the difference is meaningful (prevents jitter)
-        const diff = Math.abs(activeRef.currentTime - currentTime);
-        if (diff > 0.005) { 
-          setCurrentTime(activeRef.currentTime);
-          setAudioCurrentTime(activeRef.currentTime);
-        }
+        // Zero delay sync: Update every frame
+        setCurrentTime(activeRef.currentTime);
+        setAudioCurrentTime(activeRef.currentTime);
       }
       frameId = requestAnimationFrame(updateSmoothTime);
     };
     
     frameId = requestAnimationFrame(updateSmoothTime);
     return () => cancelAnimationFrame(frameId);
-  }, [activeTab, currentTime]);
+  }, [activeTab]);
   const [shadowColor, setShadowColor] = useState('#000000');
 
   // Auto-save feature
@@ -2348,7 +2321,7 @@ function App() {
       return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
     };
 
-    const alignment = style.position === 'top' ? 8 : style.position === 'middle' ? 5 : 2;
+    const alignment = 2; // LOCKED: Bottom-Center
     const fontName = 'Arial'; // Standard fallback
     
     // Calculate base position for {\pos(x,y)} if custom x/y is used
@@ -2358,14 +2331,13 @@ function App() {
       middle: { x: 640, y: 360 },
       bottom: { x: 640, y: 620 }
     };
-    const basePos = basePositions[style.position || 'bottom'];
+    const basePos = basePositions['bottom']; // LOCKED: Bottom
     
     // Normalize offsets. We assume preview container is roughly 640px wide for scaling
-    const scaleX = 1280 / 640; 
-    const scaleY = 720 / 360; // Assuming 16:9 preview
-    const customX = basePos.x + (style.x || 0) * scaleX;
-    const customY = basePos.y + (style.y || 0) * scaleY;
-    const posTag = (style.x !== undefined || style.y !== undefined) ? `{\\pos(${Math.round(customX)},${Math.round(customY)})}` : '';
+    // We ignore style.x/y for absolute stability unless explicitly requested
+    const customX = 640; 
+    const customY = 620; 
+    const posTag = `{\\pos(${Math.round(customX)},${Math.round(customY)})}`;
 
     const hexToAss = (hex: string) => {
       const cleanHex = hex.replace('#', '');
@@ -2594,7 +2566,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         },
         body: JSON.stringify({
           fileData,
-          voice_id: selectedVoice.name,
+          voice_id: selectedVoice.id,
           mode: 'dubbing', // Using dubbing mode for voice changing
           targetLanguage: language === 'hi' ? 'Hindi' : 'English'
         })
@@ -2614,7 +2586,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
       const data = await response.json();
       const audioBase64 = data.audioData;
-      const resultText = data.transcribedText || "";
+      const resultText = data.transcribedText || data.text || "";
       
       setVoiceChangingProgress(80);
       setVoiceChangingStep('Finalizing audio stream...');
@@ -2653,7 +2625,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       setVoiceChangingProgress(100);
       setVoiceChangingStep('Complete!');
       showToast("Voice changed successfully!");
-      if (auth.currentUser) fetchUserProfile(auth.currentUser);
+      if (auth.currentUser) {
+        fetchUserProfile(auth.currentUser);
+        fetchHistory(auth.currentUser);
+      }
     } catch (err: any) {
       console.error("Voice changer error:", err);
       setError(`Voice changer failed: ${err.message}`);
@@ -2897,14 +2872,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         headers,
         body: JSON.stringify({
           text: chunkText,
-          voice_name: selectedVoice.name,
+          voice_name: selectedVoice.id,
           style,
           speed,
           pitch,
           language,
           studioClarity,
           pause,
-          cloned_voice_traits: (selectedVoice as any).fingerprint || null
+          cloned_voice_traits: (selectedVoice as any).fingerprint || null,
+          script_type: text.toLowerCase().includes('motivation') ? 'motivational' : 
+                       text.toLowerCase().includes('story') ? 'storytelling' : 
+                       text.toLowerCase().includes('horror') ? 'horror' : 
+                       text.toLowerCase().includes('emotion') ? 'emotional' : 'neutral'
         })
       });
 

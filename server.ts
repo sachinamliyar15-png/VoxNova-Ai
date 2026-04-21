@@ -98,35 +98,42 @@ const buildSystemInstruction = (language: string, voice_name: string) => {
                   null;
 
   const isHeavyVoice = HEAVY_VOICES.includes((voice_name || '').toLowerCase());
-  
-  return `You are an elite, world-class professional voice actor and narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
-Your goal is to generate high-fidelity, natural, and expressive speech. 
+  return `You are an elite, world-class professional voice actor and narrator. Your task is to
+provide a stunningly realistic, human-like, and emotionally resonant performance in
+${language === 'hi' ? 'Hindi' : 'English'}.
+Your goal is to generate high-fidelity, natural, and expressive speech.
 Analyze the script’s category and tone to determine the best vocal characteristics:
 - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
 - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
 - ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
 - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
 - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
-
 VOCAL IDENTITY FOR ${voice_name.toUpperCase()}:
 ${profile ? `- CHARACTER DESCRIPTION: ${profile.description}
 - RESONANCE: ${profile.resonance}
 - ENERGY: ${profile.energy}
 - TIMBER: ${profile.timber}
 - PACING: ${profile.pacing}` : '- STATUS: Professional Cinematic Narrator'}
-
 PERFORMANCE GUIDELINES FOR MAXIMUM REALISM:
-- CRITICAL: VOICES MUST BE DISTINCT AND UNIQUE. Do not sound like a generic AI. 
-- USE A NATURAL HUMAN CONVERSATIONAL PACE. Avoid stretching syllables or "singing" words. The delivery must sound like a real person talking at a normal, clear speed, not a computer performing slowly.
-- CRITICAL: THE VOICE MUST BE OPEN ("Khuli Awaaz") AND POWERFUL ("Damdaar"). Avoid nasal or muffled tones.
-- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns or slow, dragging articulation.
-- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+- CRITICAL: VOICES MUST BE DISTINCT AND UNIQUE. Do not sound like a generic AI.
+- USE A NATURAL HUMAN CONVERSATIONAL PACE. Avoid stretching syllables or
+"singing" words. The delivery must sound like a real person talking at a normal, clear speed,
+not a computer performing slowly.
+- CRITICAL: THE VOICE MUST BE OPEN ("Khuli Awaaz") AND POWERFUL ("Damdaar").
+Avoid nasal or muffled tones.
+- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive
+"sing-song" patterns or slow, dragging articulation.
+- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated
+into every word.
 - 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
 ${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy) and "Gambhir" (Serious). Speak with absolute authority.' : '- CRITICAL: Use a professional, mature, and resonant voice with natural human textures.'}
-- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic variations in pitch.
-- Avoid robotic, monotone, or repetitive cadence. Every sentence should have its own unique melody.
-- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation and natural flow.
+- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic
+variations in pitch.
+- Avoid robotic, monotone, or repetitive cadence. Every sentence should have its own unique
+melody.
+- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation and natural
+flow.
 `;
 };
 
@@ -651,7 +658,7 @@ const checkGuestLimit = (ip: string, isPremium: boolean = false) => {
 // Generate Speech via Gemini API (Guest) - VOXNOVA_GUEST_EP
 app.post("/api/generate-speech-guest", async (req: any, res) => {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits } = req.body;
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type } = req.body;
 
   const premiumVoices = ['Documentary Pro', 'Virat', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'MAHARAJA', 'Sachinboy', 'Munna Bhai', 'Pankaj', 'Priyanka', 'ISHANI'];
   const isPremium = premiumVoices.includes(voice_name);
@@ -854,7 +861,7 @@ app.post("/api/analyze-voice", async (req, res) => {
 
 // Update the Generate Speech logic to handle cloned voices
 app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
-  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits } = req.body;
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
@@ -1152,9 +1159,9 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       }
 
       // Separate text from metadata for the TTS step
-      const logicMatch = fullTranscribedContent.match(/performance_metadata:?([\s\S]+)$/i);
+      const logicMatch = fullTranscribedContent.match(/(?:performance_metadata|PERFORMANCE METADATA):?([\s\S]+)$/i);
       const performanceTraits = logicMatch ? logicMatch[1].trim() : "Natural and engaging.";
-      const transcribedText = fullTranscribedContent.replace(/performance_metadata:?[\s\S]+$/i, '').trim();
+      const transcribedText = fullTranscribedContent.replace(/(?:performance_metadata|PERFORMANCE METADATA):?[\s\S]+$/i, '').trim();
 
       console.log(`[Voice Changer] Transcribed text: ${transcribedText.substring(0, 50)}...`);
       console.log(`[Voice Changer] Performance Traits detected: ${performanceTraits}`);
@@ -1229,7 +1236,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         }
       }
 
-      return res.json({ audioData: finalAudioData, text: transcribedText });
+      return res.json({ audioData: finalAudioData, transcribedText: transcribedText });
     } catch (error: any) {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Voice Changer Attempt ${attempt + 1} failed:`, errorMessage);
@@ -1660,7 +1667,9 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ? (scriptType === 'hinglish' ? "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto'." : "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.")
         : "";
 
-      const prompt = `Transcribe the ENTIRE video/audio with MILIMITER-PRECISION synchronization.
+      const prompt = `Transcribe the ENTIRE video/audio with ABSOLUTE MILLISECOND PRECISION. 
+      This is for professional cinema captions. DELAY IS FATAL.
+      
       CONTENT LANGUAGE: ${language}.
       ${scriptInstruction}
       ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions." : ""}
@@ -1668,12 +1677,13 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       OUTPUT FORMAT: You MUST return a JSON array of objects.
       Each object represents EXACTLY ONE word.
       
-      PRECISION GUIDELINES:
+      PRECISION GUIDELINES (STRICTLY ENFORCED):
       1. Every single word must have its own unique entry.
-      2. "start" timestamp MUST be the exact millisecond the word begins to be audible.
-      3. "end" timestamp MUST be the exact millisecond the word finish being audible.
-      4. DO NOT summarize. DO NOT skip words.
-      5. DO NOT apply any manual offsets. Return the RAW, TRUE timestamps as they exist in the file.
+      2. "start" timestamp MUST be the exact frame (down to milliseconds) the word begins.
+      3. "end" timestamp MUST be the exact frame (down to milliseconds) the word finishes.
+      4. DO NOT summarize. DO NOT skip or merge words.
+      5. DO NOT apply any manual offsets. Return TRUE, RAW timestamps.
+      6. If there is a silence between words, the timestamps must reflect that silence.
       
       Schema: {"word": string, "start": number, "end": number}[]
       Example: [{"word": "नमस्ते", "start": 0.520, "end": 0.880}, {"word": "दोस्तों", "start": 0.890, "end": 1.250}]
