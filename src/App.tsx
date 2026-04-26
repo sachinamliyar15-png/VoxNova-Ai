@@ -6,9 +6,11 @@ import {
   History, 
   Settings2, 
   Volume2, 
+  VolumeX,
   Trash2, 
   Loader2, 
   ChevronDown, 
+  MessageSquare,
   Check, 
   X,
   Library,
@@ -35,6 +37,7 @@ import {
   AlertCircle,
   Zap,
   Clock,
+  Timer,
   Mail,
   ExternalLink,
   PenTool,
@@ -68,9 +71,17 @@ import {
   AlignLeft,
   Clapperboard,
   Smartphone,
-  Layers
+  Layers,
+  FileCode,
+  CaseSensitive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+const CAPTION_COLORS = [
+  '#ffffff', '#000000', '#ffff00', '#00ff00', '#00ffff', '#ff00ff', '#ff0000', 
+  '#ffd700', '#ff6b00', '#ff1493', '#1e90ff', '#7fff00', '#4169e1', '#8a2be2',
+  '#ff4500', '#00ff7f', '#adff2f', '#00ced1', '#f0f0f0'
+];
 import { GoogleGenAI, Modality } from "@google/genai";
 import { 
   VOICES, 
@@ -101,14 +112,23 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db, auth, googleProvider, analytics, logEvent } from './firebase';
-import { testFirestoreConnection } from './lib/firebaseUtils';
+import { 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged, 
+  User as FirebaseUser,
+  GoogleAuthProvider
+} from 'firebase/auth';
+
+// Firebase connection check removed to prevent unnecessary warnings
+const testFirestoreConnection = async () => {};
 
 const BLOG_ARTICLES = [
   {
     title: "How AI Voice Generators are Changing Content Creation",
     excerpt: "AI voice technology has evolved significantly in recent years. From robotic voices to ultra-realistic human-like speech, the journey has been remarkable. VoxNova Text to Speech uses advanced neural networks to capture the nuances of human emotion...",
     date: "March 28, 2026",
-    img: "https://picsum.photos/seed/ai-voice/800/450",
+    img: "https://images.unsplash.com/photo-1589254065878-42c9da997008?auto=format&fit=crop&q=80&w=800&h=450",
     content: (
       <article className="space-y-6">
         <h2 className="text-4xl font-display font-bold text-zinc-900">How AI Voice Generators are Changing Content Creation</h2>
@@ -126,7 +146,7 @@ const BLOG_ARTICLES = [
     title: "Best Hindi AI Voices for YouTube Shorts and Reels",
     excerpt: "Hindi content is booming on social media. To stand out, you need high-quality voiceovers. VoxNova offers voices like 'Pankaj' and 'Sultan' which are perfect for motivational videos, news, and storytelling in Hindi...",
     date: "March 25, 2026",
-    img: "https://picsum.photos/seed/hindi/800/450",
+    img: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&q=80&w=800&h=450",
     content: (
       <article className="space-y-6">
         <h2 className="text-4xl font-display font-bold text-zinc-900">Best Hindi AI Voices for YouTube Shorts and Reels</h2>
@@ -143,7 +163,7 @@ const BLOG_ARTICLES = [
     title: "The Future of Text to Speech Technology in 2026",
     excerpt: "As we move further into 2026, AI voices are becoming indistinguishable from real humans. VoxNova is at the forefront of this revolution, providing tools for voice cloning, emotional modulation, and real-time dubbing...",
     date: "March 22, 2026",
-    img: "https://picsum.photos/seed/future/800/450",
+    img: "https://images.unsplash.com/photo-1516110833967-0b5716ca1387?auto=format&fit=crop&q=80&w=800&h=450",
     content: (
       <article className="space-y-6">
         <h2 className="text-4xl font-display font-bold text-zinc-900">The Future of Text to Speech Technology in 2026</h2>
@@ -159,7 +179,7 @@ const BLOG_ARTICLES = [
     title: "How to Create Professional Voiceovers with VoxNova",
     excerpt: "Creating a professional voiceover used to require expensive equipment and a recording studio. Now, with VoxNova Text to Speech, you can generate studio-quality audio in seconds. Learn how to fine-tune your scripts for the best results...",
     date: "March 18, 2026",
-    img: "https://picsum.photos/seed/studio/800/450",
+    img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&q=80&w=800&h=450",
     content: (
       <article className="space-y-6">
         <h2 className="text-4xl font-display font-bold text-zinc-900">How to Create Professional Voiceovers with VoxNova</h2>
@@ -302,16 +322,6 @@ const WelcomeScreen = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-
-declare global {
-  interface Window {
-    aistudio?: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
 
 // Helper to convert base64 to ArrayBuffer
 const fetchChunkedAudio = async (historyId: string, collectionName: string = 'voice_history'): Promise<string | null> => {
@@ -488,14 +498,14 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
       // Smart chunking: Group words if they are close in time and short in length
       if (nextWord) {
         const gap = nextWord.start - currentWord.end;
-        const totalLen = currentWord.word.length + nextWord.word.length;
+        const totalLen = (currentWord.word?.length || 0) + (nextWord.word?.length || 0);
         
         if (gap < 0.3 && totalLen < 12) {
           count = 2;
           
           if (nextNextWord) {
              const gap2 = nextNextWord.start - nextWord.end;
-             const totalLen2 = totalLen + nextNextWord.word.length;
+             const totalLen2 = totalLen + (nextNextWord.word?.length || 0);
              if (gap2 < 0.2 && totalLen2 < 18) {
                count = 3;
              }
@@ -534,6 +544,12 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
     if (gap > 0 && gap < 0.2) {
       current.end = next.start;
     }
+  }
+
+  // Handle Devanagari joined characters if needed (ensure whitespace is preserved)
+  const isHindi = /[\u0900-\u097F]/.test(words[0]?.word || '');
+  if (isHindi) {
+    // Hindi specific word joining logic can go here if needed
   }
 
   // Ensure the first caption starts at 0 if it's very close to the start
@@ -576,23 +592,20 @@ const CaptionOverlay = ({
   const currentWord = displayWords[currentWordIndex];
   
   // RE-INTRODUCED: Subtle "living" motion that is predictable and smooth
-  // REMOVED: Motion removed as per user request for STABILITY
-  const floatingOffset = { x: 0, y: 0 };
+  const floatingOffset = animation === 'float' ? { 
+    x: 0, 
+    y: [0, -5, 0] 
+  } : { x: 0, y: 0 };
 
   if (!currentWord) return null;
 
   const getDynamicColor = (index: number, word: CaptionWord) => {
+    if (style.alternatingColors) {
+      const globalIndex = words.findIndex(w => w.start === word.start && w.word === word.word);
+      return globalIndex % 2 === 0 ? (style.color1 || '#FFFFFF') : (style.color2 || '#FFFF00');
+    }
     if (style.isDynamic) {
       const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-      
-      // Professional Alternating Pattern (Side-by-Side)
-      // We use the word index within the current line for the alternating effect
-      const wordsInLine = word.word.split(' ');
-      if (wordsInLine.length > 1) {
-        // If the word itself contains multiple words (grouped), we can't easily color them differently
-        // unless we split them here. But for now, let's use the global index.
-      }
-      
       const globalIndex = words.findIndex(w => w.start === word.start && w.word === word.word);
       return colors[globalIndex % colors.length];
     }
@@ -641,7 +654,7 @@ const CaptionOverlay = ({
           transition: { 
             type: 'spring' as const, 
             stiffness: 700, 
-            damping: 15,
+            damping: 15, 
             mass: 0.5
           }
         };
@@ -666,8 +679,11 @@ const CaptionOverlay = ({
       case 'zoom':
         return {
           initial: { scale: 0, opacity: 0 },
-          animate: { scale: [0, 1.2, 1], opacity: 1 },
-          transition: { duration: 0.4 }
+          animate: { scale: 1, opacity: 1 },
+          transition: { 
+            duration: 0.2,
+            ease: "easeOut" as const
+          }
         };
       case 'glitch':
         return {
@@ -712,7 +728,7 @@ const CaptionOverlay = ({
           initial: { y: 20, opacity: 0 },
           animate: { y: [0, -10, 0], opacity: 1 },
           transition: { 
-            y: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+            y: { duration: 2, repeat: Infinity, ease: "easeInOut" as const },
             opacity: { duration: 0.5 }
           }
         };
@@ -756,21 +772,21 @@ const CaptionOverlay = ({
     color: style.color,
     fontFamily: style.font,
     textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
-    textShadow: style.shadow 
-      ? `2px 2px 0px ${style.shadowColor || 'rgba(0,0,0,0.5)'}` 
-      : style.glow 
-        ? `0 0 10px ${style.color}, 0 0 20px ${style.color}` 
-        : 'none',
-    WebkitTextStroke: style.border !== 'none' ? `${style.strokeWidth || 1}px ${style.outlineColor || '#000000'}` : 'none',
-    paintOrder: 'stroke fill markers',
-    ['WebkitPaintOrder' as any]: 'stroke fill markers',
+    textShadow: [
+      style.shadow ? `1.5px 1.5px 0px ${style.shadowColor || 'rgba(0,0,0,0.8)'}` : '',
+      style.glow ? `0 0 10px ${style.color}, 0 0 20px ${style.color}` : ''
+    ].filter(Boolean).join(', ') || 'none',
+    WebkitTextStroke: style.border !== 'none' ? `${style.strokeWidth || 3}px ${style.outlineColor || '#000000'}` : 'none',
+    paintOrder: 'stroke fill',
+    ['WebkitPaintOrder' as any]: 'stroke fill',
+    WebkitTextFillColor: style.color,
     backgroundColor: style.backgroundColor && style.backgroundColor !== 'transparent' ? style.backgroundColor : 'transparent',
     padding: style.backgroundColor && style.backgroundColor !== 'transparent' ? '4px 12px' : '0',
     borderRadius: '8px',
     display: 'inline-block',
     whiteSpace: 'pre-wrap',
     fontStyle: style.italic ? 'italic' : 'normal',
-    fontWeight: style.fontWeight || 'bold'
+    fontWeight: style.fontWeight || '700'
   };
 
   const getPositionClass = (pos?: string) => {
@@ -778,22 +794,22 @@ const CaptionOverlay = ({
     switch (p) {
       case 'top': return 'top-[15%] justify-center';
       case 'middle': return 'top-1/2 -translate-y-1/2 justify-center';
-      case 'bottom': return 'bottom-[15%] justify-center';
-      case 'left': return 'top-1/2 -translate-y-1/2 justify-start px-12';
-      case 'right': return 'top-1/2 -translate-y-1/2 justify-end px-12';
-      case 'top-left': return 'top-[15%] justify-start px-12';
-      case 'top-right': return 'top-[15%] justify-end px-12';
-      case 'bottom-left': return 'bottom-[15%] justify-start px-12';
-      case 'bottom-right': return 'bottom-[15%] justify-end px-12';
-      default: return 'bottom-[15%]';
+      case 'bottom': return 'bottom-[12%] justify-center';
+      case 'left': return 'top-1/2 -translate-y-1/2 justify-start pl-12';
+      case 'right': return 'top-1/2 -translate-y-1/2 justify-end pr-12';
+      case 'top-left': return 'top-[15%] justify-start pl-12';
+      case 'top-right': return 'top-[15%] justify-end pr-12';
+      case 'bottom-left': return 'bottom-[12%] justify-start pl-12';
+      case 'bottom-right': return 'bottom-[12%] justify-end pr-12';
+      default: return 'bottom-[12%] justify-center';
     }
   };
 
   const getAlignmentClass = (pos?: string) => {
     const p = pos || style.position;
-    if (p.includes('left')) return 'justify-start text-left';
-    if (p.includes('right')) return 'justify-end text-right';
-    return 'justify-center text-center';
+    if (p.includes('left')) return 'text-left justify-start';
+    if (p.includes('right')) return 'text-right justify-end';
+    return 'text-center justify-center';
   };
 
   const getWordStyle = (word: CaptionWord, index: number): React.CSSProperties => {
@@ -803,43 +819,52 @@ const CaptionOverlay = ({
       fontSize: `${word.fontSize || style.fontSize}px`,
       color: word.color || (style.isDynamic ? getDynamicColor(index, word) : style.color),
       textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
-      padding: style.padding || '0 4px',
-      borderRadius: style.borderRadius || '4px',
+      padding: style.padding || '0.1em 0.3em',
+      borderRadius: style.borderRadius || '0.2rem',
       letterSpacing: style.letterSpacing || 'normal',
       display: 'inline-block',
-      margin: '0 4px',
+      margin: '0.1em 0.25em',
       transition: 'all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
       fontStyle: style.italic ? 'italic' : 'normal',
-      fontWeight: style.fontWeight || 'bold'
+      fontWeight: style.fontWeight || '900', // Respect the style's font weight
+      textShadow: `0 2px 10px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.1)`, // Extra clarity and vibrancy
     };
 
     if (style.border === 'thin') {
-      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1}px ${style.outlineColor || '#000000'}`;
-      (baseStyle as any).paintOrder = 'stroke fill markers';
-      (baseStyle as any).WebkitPaintOrder = 'stroke fill markers';
+      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 1) * 0.4}px ${style.outlineColor || '#000000'}`;
+      (baseStyle as any).paintOrder = 'stroke fill';
+      (baseStyle as any).WebkitPaintOrder = 'stroke fill';
     } else if (style.border === 'thick') {
-      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 2.5) * 2}px ${style.outlineColor || '#000000'}`;
-      (baseStyle as any).paintOrder = 'stroke fill markers';
-      (baseStyle as any).WebkitPaintOrder = 'stroke fill markers';
+      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 3) * 0.8}px ${style.outlineColor || '#000000'}`;
+      (baseStyle as any).paintOrder = 'stroke fill';
+      (baseStyle as any).WebkitPaintOrder = 'stroke fill';
     }
 
     if (style.glow) {
-      baseStyle.textShadow = `0 0 10px ${style.color}, 0 0 20px ${style.color}`;
+      baseStyle.textShadow = `0 0 12px ${baseStyle.color}, 0 0 24px ${baseStyle.color}, 0 2px 8px rgba(0,0,0,0.4)`;
+      baseStyle.filter = `drop-shadow(0 0 8px ${baseStyle.color})`;
     }
 
     if (style.shadow) {
-      baseStyle.textShadow = `2px 2px 0px ${finalShadow}, -2px -2px 0px ${finalShadow}, 2px -2px 0px ${finalShadow}, -2px 2px 0px ${finalShadow}, 0px 4px 10px rgba(0,0,0,0.5)`;
+      baseStyle.textShadow = `1.5px 1.5px 0px ${finalShadow}, -1.5px -1.5px 0px ${finalShadow}, 1.5px -1.5px 0px ${finalShadow}, -1.5px 1.5px 0px ${finalShadow}, 0px 6px 15px rgba(0,0,0,0.7)`;
     }
     
+    if (style.background === 'box') {
+      baseStyle.backgroundColor = 'rgba(0,0,0,0.85)';
+      baseStyle.boxShadow = '0 8px 30px rgba(0,0,0,0.4)';
+    }
+
     // Highlight logic
     if (word.isHighlighted) {
       return {
         ...baseStyle,
-        backgroundColor: word.highlightColor || '#facc15', // Use custom color or default viral yellow
+        backgroundColor: word.highlightColor || '#facc15',
         color: '#000000',
         transform: 'rotate(-2deg) scale(1.15)',
-        fontWeight: '900',
-        boxShadow: `4px 4px 0px ${finalShadow}4D`,
+        fontWeight: '800',
+        boxShadow: `6px 6px 0px ${finalShadow}66`,
+        textShadow: 'none',
+        WebkitTextStroke: '0px',
       };
     }
 
@@ -901,24 +926,35 @@ const CaptionOverlay = ({
             };
 
             return (
-              <motion.span 
+              <motion.div 
                 key={`word-${w.start}-${i}-${animation}`}
-                initial={{ opacity: 1, scale: 1, y: 0 }}
-                animate={wordAnimation as any}
+                animate={isKaraoke ? {
+                  color: isActive ? (style.threeColors?.[0] || '#FFFF00') : (style.color || '#FFFFFF'),
+                } : animation === 'zeemo' ? {
+                  scale: isActive ? 1.25 : 1,
+                  y: isActive ? -8 : 0,
+                  color: isActive ? (style.threeColors?.[0] || '#FFD700') : (style.color || '#FFFFFF')
+                } : {
+                  opacity: isVisible ? 1 : 0,
+                  scale: isVisible ? 1 : 0.9,
+                  y: isVisible ? 0 : 5,
+                  color: (isActive || isVisible) ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.1)'
+                }}
                 transition={{ 
-                  duration: 0.01,
-                  ease: "linear"
+                  type: "spring", 
+                  stiffness: 400, 
+                  damping: 30,
+                  mass: 0.8
                 }}
                 style={{
                   ...getWordStyle(w, i),
                   display: 'inline-block',
-                  whiteSpace: 'nowrap', // Prevent awkward wrapping mid-word
-                  color: (isActive || isVisible) ? (w.color || (style.isDynamic ? getDynamicColor(i, w) : style.color)) : 'rgba(255,255,255,0.05)',
+                  whiteSpace: 'nowrap',
                   opacity: isVisible ? 1 : 0
                 }}
               >
                 {w.word}
-              </motion.span>
+              </motion.div>
             );
           })}
         </div>
@@ -959,7 +995,7 @@ const CaptionOverlay = ({
                           style={{
                             ...getWordStyle(w, i),
                             color: isActive ? '#FFD700' : '#FFFFFF',
-                            fontWeight: '900',
+                            fontWeight: '700',
                             transition: 'color 0.1s ease'
                           }}
                         >
@@ -1023,7 +1059,7 @@ const CaptionOverlay = ({
     // Glow animation
     if (animation === 'glow') {
       return (
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           <motion.div
             key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
             initial={{ opacity: 0, filter: 'blur(10px)' }}
@@ -1058,7 +1094,7 @@ const CaptionOverlay = ({
 
     // Default style
     return (
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout">
         <motion.div
           key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
           {...getAnimationProps()}
@@ -1090,15 +1126,20 @@ const CaptionOverlay = ({
   };
 
   return (
-    <div className={`absolute left-0 right-0 bottom-12 flex pointer-events-none z-[100] justify-center text-center`}>
+    <div className={`absolute inset-0 flex z-[100] ${positionClass} p-4 pointer-events-none`}>
       <motion.div 
+        drag
+        dragMomentum={false}
+        onDragEnd={handleDragEnd}
         animate={{
-          x: 0,
-          y: 0
+          x: style.x || 0,
+          y: style.y || 0
         }}
-        className="pointer-events-none flex items-center justify-center w-full max-w-4xl"
+        className="pointer-events-auto flex flex-col items-center justify-center cursor-move"
       >
-        {renderContent()}
+        <div className="w-full flex items-center justify-center min-h-[1.5em]">
+          {renderContent()}
+        </div>
       </motion.div>
     </div>
   );
@@ -1500,6 +1541,137 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'raj-classic-narrator': 'Charon', 'RAJ_CLASSIC_NARRATOR': 'Charon'
 };
 
+const VOICE_PROFILES: Record<string, { resonance: string; energy: string; timber: string; pacing: string; description: string }> = {
+  'Adam': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Deep, authoritative tone of a 45-year-old male leader. Resonant, commanding, and professional cinematic voice.' },
+  'Brian': { resonance: 'Chest', energy: 'Calm', timber: 'Smooth', pacing: 'Slow', description: 'Kind, trustworthy 30-year-old male with a soft, steady cadence and a friendly neighborhood vibe.' },
+  'Daniel': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Sharp', pacing: 'Fast', description: 'Energetic news anchor, mid-30s. Crisp, fast-paced, highly articulate broadcast professional.' },
+  'Josh': { resonance: 'Throat', energy: 'High', timber: 'Airy', pacing: 'Normal', description: 'Youthful, energetic 20-year-old male. Natural conversational tone with slight breathiness and upbeat delivery.' },
+  'Liam': { resonance: 'Mixed', energy: 'Calm', timber: 'Airy', pacing: 'Slow', description: 'Soft-spoken storyteller, mid-20s. Warm, empathetic, and gentle with distinct emotional depth.' },
+  'Michael': { resonance: 'Chest', energy: 'Calm', timber: 'Gravelly', pacing: 'Slow', description: 'Mature 60-year-old narrator. Wise, sophisticated, with a distinct gravelly texture in the lower range.' },
+  'Ryan': { resonance: 'Mixed', energy: 'Medium', timber: 'Gravelly', pacing: 'Normal', description: 'Casual, relatable mid-30s male. Authentic "guy-next-door" with slight rasp and conversational inflections.' },
+  'Matthew': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Normal', description: 'Intense 40-year-old action trailer narrator. Cinematic, dramatic, and intensely resonant.' },
+  'Bill': { resonance: 'Throat', energy: 'Medium', timber: 'Gravelly', pacing: 'Slow', description: 'Rugged 50-year-old farmer type. Experienced, husky, and character-rich performance with rough edges.' },
+  'Callum': { resonance: 'Frontal-Oral', energy: 'Medium', timber: 'Sharp', pacing: 'Normal', description: 'Elite British-style professor. Refined, precise, and sophisticated academic delivery.' },
+  'Frank': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Normal', description: 'Ultra-deep 55-year-old masculine icon. Powerful chest-voice with maximum bass resonance and authority.' },
+  'Marcus': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Normal', description: 'Strong, motivational army sergeant. Commanding, inspiring, loud, and impactful.' },
+  'Jessica': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Clear, professional 30-year-old corporate leader. Confident, friendly smile in the voice, and extremely crisp.' },
+  'Sarah': { resonance: 'Mixed', energy: 'Calm', timber: 'Airy', pacing: 'Slow', description: 'Ethereal, soft-spoken young female. Gentle, soothing, and very quiet with a dream-like quality.' },
+  'Matilda': { resonance: 'Frontal-Oral', energy: 'Medium', timber: 'Sharp', pacing: 'Normal', description: 'Intelligent, articulate university student. Professional, focused, and academic with clear delivery.' },
+  'Emily': { resonance: 'Mixed', energy: 'High', timber: 'Smooth', pacing: 'Fast', description: 'Youthful, bubbly 19-year-old girl. High-energy, cheerful, and friendly with rapid pacing.' },
+  'Bella': { resonance: 'Throat', energy: 'Medium', timber: 'Smooth', pacing: 'Slow', description: 'Elegant, sophisticated 40-year-old businesswoman. Premium, rich texture with a calm presence.' },
+  'Rachel': { resonance: 'Mixed', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Dynamic, wide-ranging female actor. Versatile, expressive, and clear with high emotional intelligence.' },
+  'Nicole': { resonance: 'Frontal-Oral', energy: 'Medium', timber: 'Sharp', pacing: 'Normal', description: 'Direct, confident 35-year-old journalist. No-nonsense, firm tone with broadcast standard clarity.' },
+  'Clara': { resonance: 'Chest', energy: 'Calm', timber: 'Smooth', pacing: 'Slow', description: 'Kind 45-year-old motherly figure. Approachable, warm, and natural with a nurturing tone.' },
+  'Documentary Pro': { resonance: 'Chest', energy: 'Medium', timber: 'Smooth', pacing: 'Normal', description: 'The absolute summit of documentary narration. Deep, mature, cinematic, and profoundly intelligent.' },
+  'Atlas (Do)': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Slow', description: 'Ultra-high fidelity cinematic voice. Deeply resonant with a legendary storytelling aura.' },
+  'Virat': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Normal', description: 'Realistic, high-energy Hindi-English mix professional. Masculine, thick, and commanding. Documentary standard.' },
+  'Priyanka': { resonance: 'Chest', energy: 'Medium', timber: 'Smooth', pacing: 'Normal', description: 'Powerful 40-year-old authoritative female. Perfect for documentaries and high-stakes narration.' },
+  'SULTAN': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Slow', description: 'The Warrior. Ancient king tone. Every word vibrates with massive bass resonance and vocal fry.' },
+  'Munna Bhai': { resonance: 'Throat', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Massive baritone Desi voice. Street-smart, energetic, and explosive power.' },
+  'Sachinboy': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Heavyweight sporting champion. Monstrous energy, chest-rattling baritone, and confidence.' },
+  'SHERA': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Normal', description: 'Alpha Motivator. Raw, aggressive, testosterone-driven masculine power. Extremely realistic.' },
+  'KAAL': { resonance: 'Throat', energy: 'Medium', timber: 'Gravelly', pacing: 'Slow', description: 'The Mystery Shadow. Dark, cinematic, ultra-low frequency with mysterious undertones. Villainous profile.' },
+  'BHEEM': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Slow', description: 'The Mythical Giant. Super-heavy baritone. The ground shakes with every word. Deepest human limit.' },
+  'SIKANDAR': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Normal', description: 'The Legend. Mature, wise warrior king. Rich bass for professional and epic narrations.' },
+  'VIKRAM': { resonance: 'Throat', energy: 'Medium', timber: 'Smooth', pacing: 'Normal', description: 'The Dark Master. Smooth, mysterious, and cinematic with a brooding intensity.' },
+  'EMPEROR PRO': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Slow', description: 'Absolute Sovereign. Legendary deep baritone with a regal and commanding presence.' },
+  'KABIR': { resonance: 'Chest', energy: 'Medium', timber: 'Smooth', pacing: 'Slow', description: 'Warm Poet and Storyteller. Wise, resonant, and deeply soulful storytelling tone.' },
+  'ARYAN': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Intense Fitness Coach. High-energy, sharp, commanding, and extremely loud.' },
+  'ZORAVAR': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Slow', description: 'The Heavy Tank. Ultra-deep, chest-rattling baritone built for trailer impact.' },
+  'RUDRA': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Normal', description: 'The Fearless Narrator. Gritty, serious, and extremely authoritative. Pure masculine grit.' },
+  'Leo': { resonance: 'Mixed', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Vibrant young male, early 20s. Energetic, expressive, and friendly conversationalist.' },
+  'Sophia': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Smooth', pacing: 'Normal', description: 'Intimate female storyteller. Deeply emotional, soft, and resonant narration.' },
+  'Hugo': { resonance: 'Chest', energy: 'Medium', timber: 'Smooth', pacing: 'Slow', description: 'Gravelly character actor. Mid-50s male with intense personality and rich tone.' },
+  'Elara': { resonance: 'Mixed', energy: 'Medium', timber: 'Airy', pacing: 'Normal', description: 'Enthusiastic female host. Bright, energetic, and highly engaging for modern content.' },
+  'Pankaj': { resonance: 'Chest', energy: 'Medium', timber: 'Gravelly', pacing: 'Slow', description: 'Ultra-authoritative male baritone. 100% realistic masculine grit with authority.' },
+  'ISHANI': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'High-class female presenter. Elegant, sophisticated, and flawlessly professional.' },
+  'VEER': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Normal', description: 'The Braveheart. High-energy, loud, and incredibly powerful warrior male.' },
+  'SHAKTI': { resonance: 'Frontal-Oral', energy: 'High', timber: 'Sharp', pacing: 'Normal', description: 'Female Power Leader. Strong, authoritative, and inspiring leadership voice.' },
+  'RAJA': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Normal', description: 'The Royal Prince. Youthful but powerful. Deep, resonant, and prestigious male.' },
+  'TOOFAN': { resonance: 'Throat', energy: 'High', timber: 'Sharp', pacing: 'Fast', description: 'The Storm. Extremely fast-paced, explosive energy, and rapid-fire delivery.' },
+  'BHAIRAV': { resonance: 'Chest', energy: 'High', timber: 'Gravelly', pacing: 'Slow', description: 'The Intense Sage. Gritty, impactful, and serious professional narration.' },
+  'ARAV_NEUTRAL_PRO': { resonance: 'Mixed', energy: 'Medium', timber: 'Smooth', pacing: 'Normal', description: 'Modern Indian Male. Balanced, confident, and grounded. Natural urban Hindi speaker.' },
+  'DEV_DEEP_REAL': { resonance: 'Chest', energy: 'Medium', timber: 'Smooth', pacing: 'Slow', description: 'Deep Mature Indian Elder. Stable, trustworthy, and authoritative traditional Hindi voice.' },
+  'NEEL_SOFT_CONNECT': { resonance: 'Mixed', energy: 'Medium', timber: 'Airy', pacing: 'Normal', description: 'Friendly Indian Friend. Warm, casual, and relatable with a soft Hindi-English touch.' },
+  'RAJ_CLASSIC_NARRATOR': { resonance: 'Chest', energy: 'High', timber: 'Smooth', pacing: 'Normal', description: 'Epic Hindi Narrator. Clear, composed, and formal. Built for grand stories and historical accounts.' }
+};
+
+const ActiveVoiceProfile = ({ voice, onPlaySample }: { voice: Voice, onPlaySample: () => void }) => {
+  const profile = VOICE_PROFILES[voice.name] || {
+    resonance: 'Mixed',
+    energy: 'Medium',
+    timber: 'Smooth',
+    pacing: 'Normal',
+    description: voice.description
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="bg-white border border-zinc-100 rounded-[2.5rem] p-8 shadow-2xl shadow-zinc-200/50 relative overflow-hidden group mb-8"
+    >
+      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-emerald-50 to-transparent rounded-full -mr-32 -mt-32 opacity-50 group-hover:scale-110 transition-transform duration-700" />
+      
+      <div className="relative flex flex-col md:flex-row gap-8 items-start">
+        <div className="relative shrink-0">
+          <div className={`w-32 h-32 md:w-40 md:h-40 rounded-[2.5rem] bg-gradient-to-br ${voice.color} flex items-center justify-center font-display font-black text-5xl md:text-6xl text-white shadow-2xl relative z-10 transition-transform duration-500 group-hover:scale-105 overflow-hidden`}>
+            <span>{voice.name[0]}</span>
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+               <Mic size={40} className="text-white opacity-20" />
+            </div>
+          </div>
+          <div className={`absolute inset-0 bg-gradient-to-br ${voice.color} blur-2xl opacity-20 -z-0 scale-110`} />
+          
+          <button 
+            onClick={onPlaySample}
+            className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-white text-zinc-900 border border-zinc-100 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all z-20 flex items-center gap-2 whitespace-nowrap"
+          >
+            <Play size={12} className="fill-current" />
+            Sample Audio
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-6 pt-2">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-3xl font-display font-black text-zinc-900 tracking-tight">{voice.name}</h3>
+              {voice.isPremium && (
+                <div className="px-3 py-1 bg-amber-50 text-amber-500 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1 border border-amber-100">
+                  <Crown size={12} />
+                  Elite
+                </div>
+              )}
+            </div>
+            <p className="text-zinc-400 text-xs font-bold uppercase tracking-[0.2em]">{voice.gender} • {voice.isCloned ? 'Custom Voice Print' : 'Neural Studio Model'}</p>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Resonance', value: profile.resonance, icon: Music },
+              { label: 'Energy', value: profile.energy, icon: Zap },
+              { label: 'Timber', value: profile.timber, icon: Mic },
+              { label: 'Pacing', value: profile.pacing, icon: Timer }
+            ].map((attr) => (
+              <div key={attr.label} className="space-y-1.5 p-3 rounded-2xl bg-zinc-50 border border-zinc-100/50 group/attr hover:bg-white hover:shadow-lg transition-all border shadow-sm">
+                <div className="flex items-center gap-2 text-zinc-400">
+                   <attr.icon size={10} />
+                   <span className="text-[9px] font-black uppercase tracking-widest">{attr.label}</span>
+                </div>
+                <p className="text-xs font-bold text-zinc-800">{attr.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-zinc-600 text-sm leading-relaxed font-medium bg-zinc-50/50 p-5 rounded-3xl border border-zinc-100/30">
+            {profile.description}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 function Sidebar({ 
   activeTab, 
   setActiveTab, 
@@ -1743,7 +1915,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'captions' | 'voice-changer' | 'library' | 'tts' | 'voice-clone'>('generate');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [targetLanguage, setTargetLanguage] = useState('English');
+  const [captionLanguage, setCaptionLanguage] = useState('All Languages');
   const [sourceLanguage, setSourceLanguage] = useState('Auto');
   const [isVoiceChanging, setIsVoiceChanging] = useState(false);
   const [voiceChangingStep, setVoiceChangingStep] = useState('');
@@ -1797,14 +1969,20 @@ function App() {
   const [showPricing, setShowPricing] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [playingId, setPlayingId] = useState<string | number | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [captionFile, setCaptionFile] = useState<File | null>(null);
   const [captionResult, setCaptionResult] = useState<any>(null);
   const [captionWords, setCaptionWords] = useState<CaptionWord[]>([]);
   const [captionScriptType, setCaptionScriptType] = useState<'hindi' | 'hinglish'>('hindi');
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('hindi-viral-yellow');
-  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(CAPTION_PRESETS[0].style);
-  const [captionAnimation, setCaptionAnimation] = useState<string>(CAPTION_PRESETS[0].animation);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('professional-three-color');
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>({
+    ...CAPTION_PRESETS.find(p => p.id === 'professional-three-color')?.style || CAPTION_PRESETS[0].style,
+    fontSize: 72,
+    wordsPerLine: 1,
+    isSmart: true
+  });
+  const [captionAnimation, setCaptionAnimation] = useState<string>(CAPTION_PRESETS.find(p => p.id === 'professional-three-color')?.animation || 'typewriter');
   const [isSettingsLocked, setIsSettingsLocked] = useState(false);
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -1882,6 +2060,16 @@ function App() {
       showToast("Failed to analyze script. Please select a voice manually.");
     } finally {
       setIsClassifying(false);
+    }
+  };
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+      } else {
+        videoRef.current.pause();
+      }
     }
   };
 
@@ -2129,8 +2317,8 @@ function App() {
   }, []);
 
   const checkApiKey = async () => {
-    if (window.aistudio?.hasSelectedApiKey) {
-      const selected = await window.aistudio.hasSelectedApiKey();
+    if ((window as any).aistudio?.hasSelectedApiKey) {
+      const selected = await (window as any).aistudio.hasSelectedApiKey();
       setHasApiKey(selected);
     }
   };
@@ -2200,7 +2388,11 @@ function App() {
       }
     }
     if (savedAnimation) setCaptionAnimation(savedAnimation);
-    if (savedPresetId) setSelectedPresetId(savedPresetId);
+    if (savedPresetId) {
+      setSelectedPresetId(savedPresetId);
+    } else {
+      setSelectedPresetId('professional-three-color');
+    }
     if (savedOffset) setCaptionOffset(parseInt(savedOffset));
   }, []);
 
@@ -2215,9 +2407,9 @@ function App() {
   }, [captionStyle, captionAnimation, selectedPresetId, captionOffset]);
 
   const resetCaptionSettings = () => {
-    setCaptionStyle(CAPTION_PRESETS[0].style);
-    setCaptionAnimation(CAPTION_PRESETS[0].animation);
-    setSelectedPresetId(CAPTION_PRESETS[0].id);
+    setCaptionStyle(CAPTION_PRESETS.find(p => p.id === 'professional-three-color')?.style || CAPTION_PRESETS[0].style);
+    setCaptionAnimation(CAPTION_PRESETS.find(p => p.id === 'professional-three-color')?.animation || 'typewriter');
+    setSelectedPresetId('professional-three-color');
     setCaptionOffset(0);
     localStorage.removeItem('voxnova_caption_style');
     localStorage.removeItem('voxnova_caption_animation');
@@ -2267,27 +2459,57 @@ function App() {
   };
 
   const ffmpegRef = useRef<any>(null);
+  const isFFmpegLoading = useRef(false);
   const [isFFmpegLoaded, setIsFFmpegLoaded] = useState(false);
 
   const loadFFmpeg = async () => {
     if (ffmpegRef.current) return;
+    if (isFFmpegLoading.current) {
+      // Wait for existing load to complete
+      let attempts = 0;
+      while (isFFmpegLoading.current && !ffmpegRef.current && attempts < 50) {
+        await new Promise(r => setTimeout(r, 200));
+        attempts++;
+      }
+      return;
+    }
+    
+    isFFmpegLoading.current = true;
     try {
-      console.log("Loading FFmpeg...");
+      console.log("Loading FFmpeg (VoxNova Engine)...");
       const { FFmpeg } = await import('@ffmpeg/ffmpeg');
       const { toBlobURL } = await import('@ffmpeg/util');
       const ffmpeg = new FFmpeg();
       
-      // Load ffmpeg.wasm from CDN for better performance and reliability
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      });
+      // Load ffmpeg.wasm from CDN for maximum reliability in this environment
+      let baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+      
+      try {
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+      } catch (loadError) {
+        console.warn("Primary FFmpeg CDN failed, trying fallback...", loadError);
+        baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+      }
       
       // Monitor progress for better UI feedback
       ffmpeg.on('progress', ({ progress }) => {
-        // Map 0-1 progress to 90%-100% of the overall voice changer progress
-        setVoiceChangingProgress(Math.floor(90 + (progress * 10)));
+        // Only update if we are in a phase that uses FFmpeg progress
+        if (isCaptioning) {
+          setCaptionProgress(Math.floor(progress * 100));
+        } else if (isVoiceChanging && voiceChangingProgress >= 80) {
+          // Voice changing uses manual progress until 80%, then FFmpeg takes over for the final merge
+          const advancedProgress = Math.floor(80 + (progress * 20));
+          if (advancedProgress > voiceChangingProgress) {
+            setVoiceChangingProgress(advancedProgress);
+          }
+        }
       });
 
       ffmpeg.on('log', ({ message }) => {
@@ -2300,6 +2522,8 @@ function App() {
     } catch (error) {
       console.error("Failed to load FFmpeg:", error);
       setError("Failed to load video engine. Please refresh and try again.");
+    } finally {
+      isFFmpegLoading.current = false;
     }
   };
 
@@ -2307,7 +2531,9 @@ function App() {
     loadFFmpeg();
   }, []);
 
-  const generateASS = (words: CaptionWord[], style: CaptionStyle) => {
+    const generateASS = (words: CaptionWord[], style: CaptionStyle, videoWidth: number = 1280, videoHeight: number = 720) => {
+    const isPortrait = videoHeight > videoWidth;
+    
     const displayWords = groupWordsIntoLines(words.map(w => ({
       ...w,
       start: Math.max(0, w.start - (captionOffset / 1000)),
@@ -2321,23 +2547,8 @@ function App() {
       return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
     };
 
-    const alignment = 2; // LOCKED: Bottom-Center
-    const fontName = 'Arial'; // Standard fallback
-    
-    // Calculate base position for {\pos(x,y)} if custom x/y is used
-    // We assume a 1280x720 canvas for ASS
-    const basePositions = {
-      top: { x: 640, y: 100 },
-      middle: { x: 640, y: 360 },
-      bottom: { x: 640, y: 620 }
-    };
-    const basePos = basePositions['bottom']; // LOCKED: Bottom
-    
-    // Normalize offsets. We assume preview container is roughly 640px wide for scaling
-    // We ignore style.x/y for absolute stability unless explicitly requested
-    const customX = 640; 
-    const customY = 620; 
-    const posTag = `{\\pos(${Math.round(customX)},${Math.round(customY)})}`;
+    const alignment = 2; // Bottom Center
+    const fontName = style.font || 'Inter';
 
     const hexToAss = (hex: string) => {
       const cleanHex = hex.replace('#', '');
@@ -2357,35 +2568,40 @@ function App() {
     const assOutlineColor = hexToAss(style.outlineColor || '#000000');
     const assShadowColor = hexToAss(style.shadowColor || '#000000');
     
-    const outline = style.strokeWidth || (style.border === 'thick' ? 2 : style.border === 'thin' ? 1 : 0);
+    const outline = style.strokeWidth || (style.border === 'thick' ? 3 : style.border === 'thin' ? 1.5 : 0);
     const shadow = style.shadow ? 2 : 0;
+    
+    // Scale Font size based on resolution
+    const baseResY = 720;
+    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY));
 
     let ass = `[Script Info]
 ScriptType: v4.00+
-PlayResX: 1280
-PlayResY: 720
+PlayResX: ${videoWidth}
+PlayResY: ${videoHeight}
+ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${style.fontSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,0,0,1,${outline},${shadow},${alignment},10,10,10,1
+Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,0,0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 150 : 80},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
     displayWords.forEach((w, idx) => {
-      let text = style.case === 'uppercase' ? w.word.toUpperCase() : style.case === 'lowercase' ? w.word.toLowerCase() : w.word;
+      // Disable automatic casing for Hindi/Devanagari to prevent Unicode issues or unwanted rendering
+      const isDevanagari = /[\u0900-\u097F]/.test(w.word);
+      let text = (style.case === 'uppercase' && !isDevanagari) ? w.word.toUpperCase() : (style.case === 'lowercase' && !isDevanagari) ? w.word.toLowerCase() : w.word;
       
       if (style.isDynamic) {
         const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-        // Alternating colors for professional look
         const color = colors[idx % colors.length];
-        
         const assWordColor = hexToAss(color);
         text = `{\\c${assWordColor}}${text}`;
       }
       
-      ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${posTag}${text}\n`;
+      ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${text}\n`;
     });
 
     return ass;
@@ -2420,9 +2636,27 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       console.warn("Font load failed, using fallback", e);
     }
     
-    setCaptionStep('Generating subtitle data...');
-    // We update generateASS to use the font we just loaded
-    const assContent = generateASS(words, style).replace(/Fontname, Arial/g, `Fontname, ${fontName}`);
+    setCaptionStep('Finalizing subtitle data...');
+    // Get actual video dimensions for accurate subtitle positioning
+    let videoWidth = 1280;
+    let videoHeight = 720;
+    try {
+      const videoElement = document.createElement('video');
+      videoElement.src = URL.createObjectURL(videoFile);
+      await new Promise((resolve) => {
+        videoElement.onloadedmetadata = () => {
+          videoWidth = videoElement.videoWidth;
+          videoHeight = videoElement.videoHeight;
+          resolve(true);
+        };
+      });
+      URL.revokeObjectURL(videoElement.src);
+    } catch (e) {
+      console.warn("Failed to get video metadata, using defaults", e);
+    }
+
+    // We update generateASS to use the font we just loaded and correct dimensions
+    const assContent = generateASS(words, style, videoWidth, videoHeight).replace(/Fontname, Inter/g, `Fontname, ${fontName}`);
     await ffmpeg.writeFile(assName, assContent);
     
     setCaptionStep('Burning captions (this may take a minute)...');
@@ -2435,26 +2669,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
  
     console.log("Executing FFmpeg command...");
     // Run ffmpeg command to burn subtitles
-    // We use libx264 and ensure the font path is handled
+    // We add scaling to 720p if needed to prevent memory crashes on mobile/browser
+    // Also use ultrafast to minimize processing time
     try {
       await ffmpeg.exec([
         '-i', inputName, 
-        '-vf', `ass=${assName}`, 
+        '-vf', `scale='if(gt(iw,ih),1280,-1)':'if(gt(iw,ih),-1,720)',subtitles=${assName}`,
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
-        '-crf', '23',
-        '-c:a', 'copy', 
+        '-crf', '28',
+        '-c:a', 'aac', 
+        '-b:a', '128k',
         outputName
       ]);
     } catch (e) {
       console.error("FFmpeg primary exec failed:", e);
-      // Fallback to subtitles filter if ass fails
+      // Fallback with even safer parameters
       await ffmpeg.exec([
         '-i', inputName, 
-        '-vf', `subtitles=${assName}`, 
+        '-vf', `scale=720:-1:force_original_aspect_ratio=decrease,subtitles=${assName}`, 
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
-        '-c:a', 'copy', 
+        '-crf', '32',
+        '-c:a', 'aac',
         outputName
       ]);
     }
@@ -2474,10 +2711,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   };
 
   const mergeAudioWithVideo = async (videoFile: File, audioData: string) => {
-    if (!ffmpegRef.current) await loadFFmpeg();
+    setVoiceChangingStep('Preparing engine...');
+    if (!ffmpegRef.current) {
+      await loadFFmpeg();
+      // Double check if it loaded
+      if (!ffmpegRef.current) throw new Error("FFmpeg could not be initialized. Please refresh.");
+    }
     const ffmpeg = ffmpegRef.current;
     
-    const fetchFile = (await import('@ffmpeg/util')).fetchFile;
+    // Set 81% to show we entered the FFmpeg phase
+    setVoiceChangingProgress(81);
+    
+    const { fetchFile } = await import('@ffmpeg/util');
     const inputVideo = 'video.mp4';
     const inputAudio = 'audio.wav';
     const outputName = 'processed.mp4';
@@ -2487,15 +2732,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       await ffmpeg.deleteFile(inputVideo);
       await ffmpeg.deleteFile(inputAudio);
       await ffmpeg.deleteFile(outputName);
-    } catch (e) {
-      // Ignore errors if files don't exist
-    }
+    } catch (e) { /* Ignore */ }
     
     setVoiceChangingStep('Writing video track...');
-    await ffmpeg.writeFile(inputVideo, await fetchFile(videoFile));
-    setVoiceChangingProgress(85);
+    setVoiceChangingProgress(82);
+    // Use an intermediate variable to avoid potential fetchFile hang in writeFile
+    const videoData = await fetchFile(videoFile);
+    await ffmpeg.writeFile(inputVideo, videoData);
     
     setVoiceChangingStep('Preparing audio track...');
+    setVoiceChangingProgress(85);
     // Gemini TTS returns raw PCM (24kHz, 16-bit mono). FFmpeg needs a WAV header to read it correctly as .wav
     const pcmBuffer = base64ToArrayBuffer(audioData);
     const wavHeader = createWavHeader(pcmBuffer, 24000);
@@ -2504,26 +2750,44 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     fullAudioBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
     
     await ffmpeg.writeFile(inputAudio, fullAudioBuffer);
-    setVoiceChangingProgress(90);
+    setVoiceChangingProgress(88);
     
     setVoiceChangingStep('Merging audio and video...');
-    // Merge audio and video, replacing original audio
-    // Use -c:a aac for better compatibility and to ensure output plays everywhere
-    // Add -preset ultrafast for faster processing in the browser
-    await ffmpeg.exec([
-      '-i', inputVideo, 
-      '-i', inputAudio, 
-      '-c:v', 'copy', 
-      '-c:a', 'aac', 
-      '-b:a', '128k',
-      '-map', '0:v:0', 
-      '-map', '1:a:0', 
-      '-shortest',
-      '-preset', 'ultrafast',
-      outputName
-    ]);
+    // ffmpeg-progress listener will handle 88% -> 99%
     
-    setVoiceChangingProgress(98);
+    // Optimized merge command for speed and compatibility
+    try {
+      await ffmpeg.exec([
+        '-i', inputVideo, 
+        '-i', inputAudio, 
+        '-y',
+        '-c:v', 'copy', 
+        '-c:a', 'aac', 
+        '-b:a', '192k', // Better audio quality
+        '-map', '0:v:0', 
+        '-map', '1:a:0', 
+        '-shortest',
+        '-threads', '0',
+        '-movflags', '+faststart',
+        outputName
+      ]);
+    } catch (e) {
+      console.warn("FFmpeg copy failed, falling back to re-encode...", e);
+      setVoiceChangingStep('Encoding video (fallback)...');
+      await ffmpeg.exec([
+        '-i', inputVideo, 
+        '-i', inputAudio, 
+        '-y',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '32', // Higher compression for speed
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-shortest',
+        outputName
+      ]);
+    }
+    setVoiceChangingProgress(99);
     setVoiceChangingStep('Finalizing file...');
     const data = await ffmpeg.readFile(outputName);
     
@@ -2648,22 +2912,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
   };
 
-  const handleCaptioning = async () => {
+  const handleGenerateCaptions = async () => {
     if (!captionFile) return;
-    const limit = currentUser ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB for logged in, 100MB for guest
+    
+    // File size limit to prevent request failures
+    const limit = currentUser ? 300 * 1024 * 1024 : 50 * 1024 * 1024; // 300MB for Pro, 50MB for Guest
     if (captionFile.size > limit) {
-      setError(`Video file is too large (> ${currentUser ? '1GB' : '100MB'}). Please upload a smaller video for captioning.`);
+      setError(`Video file is too large (> ${currentUser ? '300MB' : '50MB'}). Please upload a smaller video or compress it.`);
       return;
     }
+
     setIsCaptioning(true);
+    setError(null);
     setCaptionProgress(0);
-    setCaptionStep('Preparing video data...');
+    setCaptionStep('Reading video file...');
     
     try {
       const videoData = await fileToBase64(captionFile);
       setCaptionProgress(20);
       setCaptionStep('Uploading to AI engine...');
-
+ 
       const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
       const response = await fetch('/api/generate-captions', {
         method: 'POST',
@@ -2673,106 +2941,31 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         },
         body: JSON.stringify({
           videoData,
-          language: targetLanguage,
+          language: captionLanguage,
           scriptType: captionScriptType,
           translateToEnglish
         })
       });
-
-      const contentType = response.headers.get('content-type');
+ 
       if (!response.ok) {
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          if (errorData.code === 'AUTH_CONFIG_MISSING') {
-            setShowConfigError(true);
-            return;
-          }
-          throw new Error(errorData.error || 'Failed to generate captions');
-        } else {
-          const text = await response.text();
-          console.error('[Captions] Non-JSON error response:', text.substring(0, 200));
-          throw new Error(`The AI caption engine returned an unexpected response (${response.status}). It might be restarting or overloaded.`);
-        }
+        const errorData = await response.json().catch(() => ({ error: 'Processing Failed. Possible size limit.' }));
+        throw new Error(errorData.error || 'Failed to generate captions');
       }
-
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error("Server did not return a valid JSON response for captions.");
-      }
-
-      setCaptionProgress(70);
-      setCaptionStep('Processing word timestamps...');
-
+ 
       const data = await response.json();
-      setCaptionWords(data.words);
-      
-      // Generate a basic SRT for download compatibility
-      let srt = '';
-      data.words.forEach((w: any, i: number) => {
-        const formatTime = (seconds: number) => {
-          const date = new Date(0);
-          date.setSeconds(seconds);
-          return date.toISOString().substr(11, 12).replace('.', ',');
-        };
-        srt += `${i + 1}\n${formatTime(w.start)} --> ${formatTime(w.end)}\n${w.word}\n\n`;
-      });
+      if (!data.words) throw new Error("AI could not find any speech in video.");
 
+      setCaptionWords(data.words);
       setCaptionResult({
         videoUrl: URL.createObjectURL(captionFile),
-        srt,
+        srt: '',
         words: data.words
       });
-
-      // Save to History
-      const newGen: Generation = {
-        id: `cap-${Date.now()}`,
-        text: `${data.words.length} words transcribed`,
-        voice_name: 'Captions',
-        style: 'Default',
-        created_at: new Date().toISOString(),
-        type: 'caption',
-        words: data.words,
-        timestamp: { _seconds: Math.floor(Date.now() / 1000) }
-      };
-
-      setHistory(prev => [newGen, ...prev]);
-
-      if (currentUser) {
-        try {
-          const token = await currentUser.getIdToken();
-          await fetch('/api/save', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              text: `${data.words.length} words transcribed`,
-              type: 'caption',
-              words: data.words,
-              creditCost: 10 // Fixed cost for captioning for now
-            })
-          });
-          fetchHistory(currentUser);
-        } catch (saveErr) {
-          console.error("Failed to save caption history:", saveErr);
-        }
-      } else {
-        const guestHistory = localStorage.getItem('voxnova_guest_history');
-        let historyArray: Generation[] = [];
-        if (guestHistory) {
-          try {
-            historyArray = JSON.parse(guestHistory);
-          } catch (e) {}
-        }
-        historyArray.unshift(newGen);
-        if (historyArray.length > 20) historyArray = historyArray.slice(0, 20);
-        localStorage.setItem('voxnova_guest_history', JSON.stringify(historyArray));
-      }
       
       setCaptionProgress(100);
       setCaptionStep('Captions ready!');
-      if (auth.currentUser) fetchUserProfile(auth.currentUser);
     } catch (err: any) {
+      console.error("[Captions] Error:", err);
       setError(`Captioning failed: ${err.message}`);
     } finally {
       setIsCaptioning(false);
@@ -2789,10 +2982,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const videoBlob = await burnCaptions(captionFile, captionWords, captionStyle);
       const url = URL.createObjectURL(videoBlob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
-      a.download = `VoxNova Text to Speech - Captions - ${captionFile.name}`;
+      a.download = `VoxNova-Captions-${captionFile.name}`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
       showToast("Video exported successfully!");
     } catch (err: any) {
       setError(`Export failed: ${err.message}`);
@@ -3944,7 +4142,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             >
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-2">
-                  <h2 className="text-3xl font-display font-bold">Speech Synthesis</h2>
+                  <h2 className="text-3xl font-bold tracking-tighter">Speech Synthesis</h2>
                   <p className="text-zinc-400">Transform your text into lifelike professional audio.</p>
                 </div>
                 
@@ -4034,24 +4232,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </div>
                 </div>
 
-                <button 
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !text || !selectedVoice}
-                  className="w-full py-5 px-6 bg-emerald-500 text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/20 group"
-                >
-                  {isGenerating ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="animate-spin" size={24} />
-                      <span>Generating {generationProgress}%</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Sparkles size={24} className="group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" />
-                      <span>Generate Voice</span>
-                    </>
-                  )}
-                </button>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="glass-panel p-4 rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
@@ -4123,19 +4303,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         <div className="flex gap-2 mb-2">
                           <button 
                             onClick={() => setSpeed(1.6)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.6 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            className={`flex-1 py-1 px-2 rounded-md text-[10px] border ${speed === 1.6 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             (U Fast)
                           </button>
                           <button 
                             onClick={() => setSpeed(1.0)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.0 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            className={`flex-1 py-1 px-2 rounded-md text-[10px] border ${speed === 1.0 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Normal
                           </button>
                           <button 
                             onClick={() => setSpeed(1.4)}
-                            className={`flex-1 py-1 rounded-md text-[10px] border ${speed === 1.4 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                            className={`flex-1 py-1 px-2 rounded-md text-[10px] border ${speed === 1.4 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Fast
                           </button>
@@ -4233,7 +4413,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     ) : (
                       <div className="flex items-center gap-3 relative z-10">
                         <div className="relative group/icon">
-                          <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur opacity-40 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
+                          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-full blur opacity-40 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
                           <Sparkles size={24} className="relative text-white transition-transform duration-500 group-hover:scale-110 group-hover:rotate-12" />
                         </div>
                         <span>Generate Voice</span>
@@ -4242,7 +4422,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   </button>
                 </div>
 
-                {lastGeneration && currentAudio && !isGenerating && (
+              {lastGeneration && currentAudio && !isGenerating && (
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -4414,26 +4594,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-6xl mx-auto space-y-8"
+              className="max-w-6xl mx-auto space-y-8 pb-32"
             >
               <div className="flex justify-between items-end">
                 <div className="space-y-2">
-                  <h2 className="text-3xl font-display font-bold text-zinc-900">Auto Caption</h2>
-                  <p className="text-zinc-500">Generate stylish, time-synced captions for your videos automatically.</p>
+                  <h2 className="text-4xl font-display font-black text-zinc-900 tracking-tighter leading-none">Caption <span className="text-emerald-500">Studio</span></h2>
+                  <p className="text-zinc-500 font-bold text-sm uppercase tracking-widest opacity-70">Professional Viral Workspace</p>
                 </div>
                 {captionResult && (
                   <div className="flex gap-2">
                     <button 
                       onClick={() => setIsEditingCaptions(!isEditingCaptions)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${isEditingCaptions ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${isEditingCaptions ? 'bg-emerald-500 text-white shadow-lg' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
                     >
                       <Edit2 size={16} />
-                      {isEditingCaptions ? 'Finish Editing' : 'Edit Captions'}
+                      {isEditingCaptions ? 'Finish Editing' : 'Edit Words'}
                     </button>
                     <button 
                       onClick={handleExportCaptions}
                       disabled={isCaptioning}
-                      className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 min-w-[120px] justify-center"
+                      className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 min-w-[140px] justify-center shadow-xl shadow-zinc-900/20"
                     >
                       {isCaptioning ? (
                         <>
@@ -4453,11 +4633,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = 'VoxNova Text to Speech - captions.srt';
+                        a.download = `VoxNova_Captions_${Date.now()}.srt`;
                         a.click();
                         URL.revokeObjectURL(url);
                       }}
-                      className="flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-bold hover:bg-zinc-200 transition-all"
+                      className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-zinc-900 text-zinc-900 rounded-xl text-sm font-bold hover:bg-zinc-50 transition-all shadow-sm"
                     >
                       <FileText size={16} />
                       SRT
@@ -4469,15 +4649,41 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
                   {/* Video Preview Area */}
-                  <div className="glass-panel p-4 rounded-[2.5rem] border-zinc-100 bg-zinc-900 relative overflow-hidden aspect-video flex items-center justify-center">
-                    {captionFile ? (
-                        <div ref={videoContainerRef} className="relative w-full h-full group bg-black">
+                    <div className="bg-white p-4 md:p-6 rounded-[2.5rem] md:rounded-[3rem] border border-zinc-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all relative">
+                      {captionFile && (
+                        <div className="flex justify-between items-center mb-6 px-2">
+                           <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center shadow-sm">
+                               <Video size={20} />
+                             </div>
+                             <div>
+                               <h3 className="font-bold text-zinc-900 leading-none">Video Preview</h3>
+                               <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-1">Real-time Rendering</p>
+                             </div>
+                           </div>
+                           <button 
+                             onClick={() => document.getElementById('video-upload-captions')?.click()}
+                             className="px-5 py-2.5 bg-zinc-100 text-zinc-600 rounded-2xl flex items-center gap-2 text-xs font-black hover:bg-zinc-200 transition-all border border-zinc-200 shadow-sm uppercase tracking-wider"
+                           >
+                             <RotateCcw size={14} />
+                             Change Video
+                           </button>
+                        </div>
+                      )}
+                      {captionFile ? (
+                        <div className="relative w-full aspect-auto max-h-[70vh] bg-zinc-950 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden group shadow-2xl flex items-center justify-center border border-zinc-800">
                           <video 
                             ref={videoRef}
                             src={captionResult ? captionResult.videoUrl : URL.createObjectURL(captionFile)} 
                             onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                            controls 
-                            className="w-full h-full object-contain" 
+                            className="w-full h-full object-contain cursor-pointer" 
+                            muted={isMuted}
+                            onClick={() => {
+                              if (videoRef.current) {
+                                if (videoRef.current.paused) videoRef.current.play();
+                                else videoRef.current.pause();
+                              }
+                            }}
                           />
                           {captionWords.length > 0 && (
                             <CaptionOverlay 
@@ -4489,48 +4695,145 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               onUpdateStyle={(updates) => setCaptionStyle(prev => ({ ...prev, ...updates }))}
                             />
                           )}
-                          <button 
-                            onClick={toggleFullScreen}
-                            className="absolute bottom-4 right-12 p-3 bg-zinc-900/80 text-white rounded-xl transition-all z-[110] hover:bg-zinc-900 shadow-xl border border-white/10 flex items-center gap-2 font-bold text-xs"
-                            title="Toggle Full Screen (with Captions)"
-                          >
-                            <Maximize size={18} />
-                            Full Screen
-                          </button>
-                          <button 
-                            onClick={() => document.getElementById('video-upload-captions')?.click()}
-                            className="absolute top-4 right-4 p-3 bg-white/10 text-white rounded-xl transition-all z-[110] hover:bg-white/20 backdrop-blur-md border border-white/20 flex items-center gap-2 font-bold text-xs group"
-                            title="Change Video"
-                          >
-                            <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
-                            Change Video
-                          </button>
+                          
+                          {/* Video Overlay Actions */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all">
+                            {!isPlaying && (
+                              <button className="w-20 h-20 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white pointer-events-none border border-white/20 shadow-2xl">
+                                <Play size={36} fill="currentColor" className="ml-1" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Video Controls Overlay */}
+                          <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between z-20 pointer-events-none">
+                            <div className="flex items-center gap-3 pointer-events-auto">
+                              <button 
+                                onClick={() => setIsMuted(!isMuted)}
+                                className="w-12 h-12 bg-black/40 backdrop-blur-md rounded-2xl text-white hover:bg-emerald-500 transition-all flex items-center justify-center shadow-lg border border-white/10"
+                              >
+                                {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                              </button>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 pointer-events-auto">
+                              <button 
+                                onClick={toggleFullScreen}
+                                className="w-12 h-12 bg-black/40 backdrop-blur-md rounded-2xl text-white hover:bg-emerald-500 transition-all flex items-center justify-center shadow-lg border border-white/10"
+                              >
+                                <Maximize size={22} strokeWidth={2.5} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
                     ) : (
                       <div 
                         onClick={() => document.getElementById('video-upload-captions')?.click()}
-                        className="flex flex-col items-center justify-center gap-4 cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="flex flex-col items-center justify-center gap-8 cursor-pointer group py-16 px-6 bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-[3rem] hover:border-emerald-500/50 hover:bg-emerald-50/20 transition-all duration-500"
                       >
-                        <div className="p-6 bg-zinc-800 rounded-3xl">
-                          <Upload size={48} />
+                        <div className="w-28 h-28 bg-zinc-900 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl group-hover:scale-110 transition-all duration-500 relative overflow-hidden">
+                           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                           <div className="relative z-10 flex flex-col items-center gap-1">
+                             <Upload size={42} className="group-hover:-translate-y-1 transition-transform" />
+                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" />
+                           </div>
                         </div>
-                        <p className="font-bold">Click to upload video</p>
-                        <p className="text-xs opacity-50">MP4, MOV or WEBM (Max 500MB)</p>
+                        <div className="text-center space-y-3">
+                           <p className="text-2xl font-black text-zinc-900 tracking-tight">Drop video here or <span className="text-emerald-500">browse</span></p>
+                           <p className="text-[11px] text-zinc-400 font-black uppercase tracking-[0.2em] opacity-80">MP4, MOV OR WEBM (MAX 500MB)</p>
+                        </div>
                       </div>
                     )}
                     <input 
                       type="file" id="video-upload-captions" hidden accept="video/*" 
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
-                        if (file && file.size > 500 * 1024 * 1024) {
-                          showToast("File too large (max 500MB)");
-                          return;
+                        if (file) {
+                          setCaptionFile(file);
+                          setCaptionResult(null);
+                          setCaptionWords([]);
                         }
-                        setCaptionFile(file);
-                        setCaptionResult(null);
-                        setCaptionWords([]);
                       }}
                     />
+                  </div>
+
+                  {/* Translate & Generate Actions */}
+                  <div className="space-y-4">
+                    <div className="bg-white p-6 rounded-[2.5rem] border border-zinc-100 shadow-sm flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                          <Languages size={24} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-zinc-900">Translate to English</p>
+                          <p className="text-xs text-zinc-500 font-medium">Convert Hindi to English</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setTranslateToEnglish(!translateToEnglish)}
+                        className={`w-14 h-8 rounded-full transition-all relative ${translateToEnglish ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                      >
+                        <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${translateToEnglish ? 'left-7' : 'left-1'}`} />
+                      </button>
+                    </div>
+
+                            <button 
+                              onClick={handleGenerateCaptions}
+                              disabled={isCaptioning}
+                              className="w-full py-5 bg-emerald-500 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-emerald-500/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
+                            >
+                              {isCaptioning ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                              Generate AI Captions
+                            </button>
+                  </div>
+
+                  {/* Language Support Section */}
+                  <div className="bg-white p-6 rounded-[2.5rem] border border-zinc-100 shadow-sm space-y-6">
+                    <div className="flex items-center gap-2.5 px-1">
+                      <div className="w-5 h-5 text-[#22C55E]">
+                        <Globe size={18} />
+                      </div>
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">Caption Language</h3>
+                    </div>
+                    
+                    <div className="relative group">
+                      <select 
+                        className="w-full bg-zinc-50 border border-zinc-100 rounded-2xl py-3.5 px-5 text-sm font-bold text-zinc-900 appearance-none hover:border-zinc-300 transition-all cursor-pointer shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        defaultValue="All Languages"
+                        onChange={(e) => setCaptionLanguage(e.target.value)}
+                      >
+                        <option value="All Languages">All Languages (Auto)</option>
+                        <option value="English">English</option>
+                        <option value="Hindi">Hindi (हिंदी)</option>
+                        <option value="Marathi">Marathi (मराठी)</option>
+                        <option value="Telugu">Telugu (తెలుగు)</option>
+                        <option value="Tamil">Tamil (தமிழ்)</option>
+                        <option value="Bengali">Bengali (বাংলা)</option>
+                        <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+                        <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+                        <option value="Malayalam">Malayalam (മലയാളം)</option>
+                        <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+                        <option value="Urdu">Urdu (اردو)</option>
+                        <option value="Odia">Odia (ଓଡ଼ିଆ)</option>
+                        <option value="Japanese">Japanese (日本語)</option>
+                        <option value="Korean">Korean (한국어)</option>
+                        <option value="Spanish">Spanish (Español)</option>
+                        <option value="French">French (Français)</option>
+                        <option value="German">German (Deutsch)</option>
+                        <option value="Portuguese">Portuguese (Português)</option>
+                        <option value="Italian">Italiano (Italiano)</option>
+                        <option value="Russian">Russian (Русский)</option>
+                        <option value="Arabic">Arabic (العربية)</option>
+                        <option value="Turkish">Turkish (Türkçe)</option>
+                        <option value="Indonesian">Indonesian (Bahasa)</option>
+                      </select>
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400 group-hover:text-zinc-600 transition-colors">
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 font-medium px-2 leading-relaxed">
+                      Selecting your video language helps our AI generate more accurate and localized captions for your content.
+                    </p>
                   </div>
 
                   {/* Controls & Editor */}
@@ -4538,14 +4841,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="glass-panel p-8 rounded-[2.5rem] border-zinc-100 space-y-6"
+                      className="bg-white p-8 rounded-[2.5rem] border border-zinc-100 shadow-xl space-y-6"
                     >
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-bold flex items-center gap-2">
                           <PenTool size={20} className="text-emerald-500" />
-                          Edit Word Timestamps
+                          Word Timing Studio
                         </h3>
-                        <p className="text-xs text-zinc-400">Changes are saved locally for preview</p>
+                        <p className="text-xs text-zinc-400">Drag sliders to adjust word synchronization</p>
                       </div>
                       <CaptionEditor 
                         words={captionWords} 
@@ -4561,45 +4864,61 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   {!captionResult && !isCaptioning && captionFile && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center justify-between p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                              <Languages size={20} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-blue-900">Translate to English</p>
-                              <p className="text-[10px] text-blue-600 font-medium">Convert Hindi to English</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setTranslateToEnglish(!translateToEnglish)}
-                            className={`w-12 h-6 rounded-full transition-all relative ${translateToEnglish ? 'bg-blue-500' : 'bg-zinc-200'}`}
-                          >
-                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${translateToEnglish ? 'translate-x-6' : 'translate-x-0'}`} />
-                          </button>
-                        </div>
+                         <div className="flex items-center justify-between p-5 bg-zinc-50 rounded-[2rem] border border-zinc-100">
+                           <div className="flex items-center gap-4">
+                             <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                               <Clock size={20} />
+                             </div>
+                             <div>
+                               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Timing</p>
+                               <p className="text-[12px] text-zinc-900 font-black">{captionOffset}ms Delay</p>
+                             </div>
+                           </div>
+                           <div className="flex items-center gap-2">
+                             <button onClick={() => setCaptionOffset(prev => prev - 50)} className="w-9 h-9 flex items-center justify-center bg-white border border-zinc-200 rounded-xl text-zinc-600 hover:border-zinc-900 hover:text-zinc-900 active:scale-90 transition-all font-black">-</button>
+                             <button onClick={() => setCaptionOffset(prev => prev + 50)} className="w-9 h-9 flex items-center justify-center bg-white border border-zinc-200 rounded-xl text-zinc-600 hover:border-zinc-900 hover:text-zinc-900 active:scale-90 transition-all font-black">+</button>
+                           </div>
+                         </div>
+                         
+                         <div className="flex items-center justify-between p-5 bg-emerald-50/50 rounded-[2rem] border border-emerald-100/50">
+                           <div className="flex items-center gap-4">
+                             <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                               <Zap size={20} />
+                             </div>
+                             <div>
+                               <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Pro Logic</p>
+                               <p className="text-[12px] text-emerald-900 font-black">Smart Motion</p>
+                             </div>
+                           </div>
+                           <button
+                             onClick={() => setCaptionStyle({...captionStyle, isSmart: !captionStyle.isSmart})}
+                             className={`w-11 h-6 rounded-full transition-all relative ${captionStyle.isSmart ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                           >
+                             <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all ${captionStyle.isSmart ? 'left-5.5' : 'left-0.5'}`} />
+                           </button>
+                         </div>
                       </div>
 
                       <button 
-                        onClick={handleCaptioning}
-                        className="w-full py-5 bg-emerald-500 text-white rounded-3xl font-bold text-xl hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3"
+                        onClick={handleGenerateCaptions}
+                        className="w-full py-6 bg-emerald-500 text-white rounded-[2.5rem] font-bold text-xl hover:bg-emerald-600 transition-all shadow-2xl shadow-emerald-500/20 flex items-center justify-center gap-3 active:scale-95 group"
                       >
-                        <Sparkles size={24} />
-                        {currentUser ? 'Generate AI Captions' : 'Try for Free'}
+                        <Sparkles size={24} className="group-hover:rotate-12 transition-transform" />
+                        Generate AI Captions
                       </button>
                     </div>
                   )}
 
-                  {isCaptioning && !captionWords.length && (
-                    <div className="glass-panel p-8 rounded-[2.5rem] border-zinc-100 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <Loader2 className="animate-spin text-emerald-500" size={24} />
-                          <span className="font-bold text-zinc-900">{captionStep}</span>
+                  {isCaptioning && (
+                    <div className="bg-white p-10 rounded-[2.5rem] border border-zinc-100 shadow-xl space-y-6">
+                      <div className="flex justify-between items-center px-2">
+                        <div className="flex items-center gap-4">
+                          <Loader2 className="animate-spin text-emerald-500" size={28} />
+                          <span className="font-black text-zinc-900 text-xl tracking-tight">{captionStep}</span>
                         </div>
-                        <span className="font-mono text-emerald-600 font-bold">{captionProgress}%</span>
+                        <span className="font-mono text-emerald-600 font-black text-2xl">{captionProgress}%</span>
                       </div>
-                      <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                      <div className="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden shadow-inner">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${captionProgress}%` }}
@@ -4611,519 +4930,478 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 </div>
 
                 <div className="space-y-6">
-                  {/* Style Sidebar */}
-                  <div className="glass-panel p-6 rounded-[2.5rem] border-zinc-100 space-y-8">
-                    <div className="space-y-4">
-                      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                        <Globe size={14} className="text-emerald-500" /> Language & Script
-                      </label>
-                      <div className="grid grid-cols-1 gap-2">
-                        <select 
-                          value={targetLanguage}
-                          onChange={(e) => setTargetLanguage(e.target.value)}
-                          className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-3 text-xs font-bold focus:outline-none"
-                        >
-                          {LANGUAGES.map(lang => (
-                            <option key={lang.code} value={lang.name}>{lang.name}</option>
-                          ))}
-                        </select>
-                        
-                        {targetLanguage === 'Hindi' && (
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => setCaptionScriptType('hindi')}
-                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${captionScriptType === 'hindi' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
-                            >
-                              Hindi Script
-                            </button>
-                            <button 
-                              onClick={() => setCaptionScriptType('hinglish')}
-                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${captionScriptType === 'hinglish' ? 'bg-zinc-900 text-white shadow-lg' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
-                            >
-                              Hinglish
-                            </button>
-                          </div>
-                        )}
+                  {/* Style Sidebar with Folders */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-6 pt-2 pb-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-[#E1F9EF] text-[#22C55E] rounded-2xl flex items-center justify-center">
+                          <Sparkles size={22} />
+                        </div>
+                        <h3 className="text-xl font-bold text-zinc-900 tracking-tight">Caption Studio</h3>
                       </div>
+                      <button 
+                        onClick={resetCaptionSettings}
+                        className="flex items-center gap-2 px-2 py-1 bg-[#FEF2F2] text-[#EF4444] rounded-lg hover:bg-rose-100 transition-all border border-rose-100 shadow-sm font-bold text-[10px]"
+                      >
+                        <RotateCcw size={11} />
+                        Reset
+                      </button>
                     </div>
 
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                            <Sparkles size={20} />
+                    <div className="space-y-4">
+                      {/* Style Presets Section */}
+                      <details className="group bg-white border border-emerald-100 rounded-[2rem] overflow-hidden shadow-[0_8px_25px_rgb(16,185,129,0.08)]" open>
+                        <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none border-b border-emerald-50 bg-emerald-50/30">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                              <Sparkles size={18} />
+                            </div>
+                            <div>
+                               <span className="text-sm font-bold text-zinc-900 block">Style Presets</span>
+                               <span className="text-[10px] text-emerald-600 font-medium tracking-tight">One-tap Professional Styles</span>
+                            </div>
                           </div>
-                          <h3 className="text-xl font-display font-bold text-zinc-900">Caption Studio</h3>
+                          <ChevronDown size={20} className="text-emerald-500 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="p-6 grid grid-cols-2 gap-4 bg-white">
+                           {CAPTION_PRESETS.map(preset => (
+                             <motion.button
+                               key={preset.id}
+                               whileHover={{ scale: 1.05 }}
+                               whileTap={{ scale: 0.95 }}
+                               onClick={() => {
+                                 setCaptionStyle(preset.style);
+                                 setCaptionAnimation(preset.animation);
+                                 setSelectedPresetId(preset.id);
+                               }}
+                               className={`flex flex-col items-center gap-2 p-1.5 rounded-3xl border-2 transition-all group relative ${
+                                 selectedPresetId === preset.id 
+                                   ? 'border-emerald-500 bg-emerald-50/80 shadow-md scale-[1.02]' 
+                                   : 'bg-white border-zinc-100 hover:border-emerald-100'
+                               }`}
+                             >
+                                <div className="w-full aspect-[1.7/1] bg-zinc-950 rounded-xl flex items-center justify-center p-2.5 relative overflow-hidden shadow-lg border border-zinc-800">
+                                   <motion.div 
+                                     animate={preset.animation === 'glow' ? { opacity: [1, 0.7, 1] } : 
+                                              preset.animation === 'pop' ? { scale: [0.9, 1.1, 0.9] } : 
+                                              preset.animation === 'bounce' ? { y: [0, -3, 0] } : {}}
+                                     transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                     className="text-center uppercase font-black text-[11px] select-none leading-tight transition-all"
+                                     style={{
+                                       color: preset.style.color || '#FFFFFF',
+                                       fontFamily: preset.style.font || 'Inter',
+                                       WebkitTextStroke: preset.style.border !== 'none' ? `1.2px ${preset.style.outlineColor || '#000'}` : 'none',
+                                       paintOrder: 'stroke fill',
+                                       fontWeight: preset.style.fontWeight || '900',
+                                       fontStyle: preset.style.italic ? 'italic' : 'normal',
+                                       textShadow: preset.style.glow ? `0 0 5px ${preset.style.color}` : preset.style.shadow ? `1px 1px 0px ${preset.style.shadowColor || 'rgba(0,0,0,0.8)'}` : 'none'
+                                     }}
+                                   >
+                                     {preset.name}
+                                   </motion.div>
+                                </div>
+                                <span className={`text-[10px] font-bold ${selectedPresetId === preset.id ? 'text-emerald-600' : 'text-zinc-400 group-hover:text-zinc-600'}`}>{preset.name}</span>
+                             </motion.button>
+                           ))}
                         </div>
-                        <button 
-                          onClick={resetCaptionSettings}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold hover:bg-red-100 transition-all"
-                        >
-                          <RotateCcw size={12} /> Reset
-                        </button>
-                      </div>
+                      </details>
 
-                      <div className="space-y-3">
-                        {/* Presets Folder */}
-                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm" open>
-                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center">
-                                <Sparkles size={16} />
-                              </div>
-                              <span className="text-sm font-bold text-zinc-900">Style Presets</span>
+                      {/* Typography & Layout Section */}
+                      <details open className="group bg-white border border-emerald-50 rounded-[2rem] overflow-hidden shadow-[0_8px_25px_rgb(16,185,129,0.05)]">
+                        <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none border-b border-emerald-50 bg-emerald-50/30">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                              <Type size={18} />
                             </div>
-                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
-                          </summary>
-                          <div className="p-4 pt-0">
-                            <div className="grid grid-cols-2 gap-2">
-                              {CAPTION_PRESETS.map(preset => (
-                                <button
-                                  key={preset.id}
-                                  onClick={() => {
-                                    if (isSettingsLocked) {
-                                      setCaptionAnimation(preset.animation);
-                                      setCaptionStyle({
-                                        ...captionStyle,
-                                        isSmart: preset.style.isSmart,
-                                        isDynamic: preset.style.isDynamic,
-                                        threeColors: preset.style.threeColors,
-                                        position: preset.style.position,
-                                        case: preset.style.case,
-                                        wordsPerLine: preset.style.wordsPerLine
-                                      });
-                                    } else {
-                                      setCaptionStyle(preset.style);
-                                      setCaptionAnimation(preset.animation);
-                                    }
-                                    setSelectedPresetId(preset.id);
-                                  }}
-                                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl text-xs font-bold transition-all border ${
-                                    selectedPresetId === preset.id 
-                                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-700 ring-2 ring-emerald-500/20' 
-                                      : 'bg-white border-zinc-100 text-zinc-600 hover:border-emerald-200 hover:bg-emerald-50/30'
-                                  } group`}
-                                >
-                                  <div className="w-full aspect-video bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-lg flex items-center justify-center overflow-hidden relative group-hover:from-emerald-900 group-hover:to-zinc-900 transition-all duration-500">
-                                     <motion.div 
-                                       animate={{ 
-                                         scale: [1, 1.1, 1],
-                                         rotate: preset.animation === 'rotate' ? [0, 5, -5, 0] : 0,
-                                         y: preset.animation === 'bounce' ? [0, -5, 0] : 0,
-                                         x: preset.animation === 'shake' ? [0, -3, 3, -3, 3, 0] : 0,
-                                         opacity: preset.animation === 'fade' ? [0.5, 1, 0.5] : 1
-                                       }}
-                                       transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                       className="font-bold text-[10px] text-center px-2 py-1 rounded shadow-lg"
-                                       style={{
-                                         color: preset.style.color,
-                                         fontFamily: preset.style.font,
-                                         textTransform: preset.style.case === 'uppercase' ? 'uppercase' : preset.style.case === 'lowercase' ? 'lowercase' : 'none',
-                                         backgroundColor: preset.style.backgroundColor !== 'transparent' ? preset.style.backgroundColor : 'transparent',
-                                         textShadow: preset.style.shadow 
-                                           ? `${preset.style.shadowColor} 1px 1px 2px` 
-                                           : preset.style.glow 
-                                             ? `0 0 5px ${preset.style.color}` 
-                                             : 'none',
-                                         WebkitTextStroke: preset.style.border !== 'none' ? `${(preset.style.strokeWidth || 1) / 2}px ${preset.style.outlineColor}` : 'none',
-                                         paintOrder: 'stroke fill',
-                                         ['WebkitPaintOrder' as any]: 'stroke fill',
-                                         fontStyle: preset.style.italic ? 'italic' : 'normal',
-                                       }}
-                                     >
-                                       {preset.name}
-                                     </motion.div>
-                                  </div>
-                                  <span className={selectedPresetId === preset.id ? 'text-emerald-700' : 'group-hover:text-emerald-600'}>
-                                    {preset.name}
-                                  </span>
-                                </button>
-                              ))}
+                            <div>
+                               <span className="text-sm font-bold text-zinc-900 block">Typography & Layout</span>
+                               <span className="text-[10px] text-blue-600 font-medium">Font, size and layout</span>
                             </div>
                           </div>
-                        </details>
+                          <ChevronDown size={20} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="p-6 pt-0 space-y-6">
+                          {/* Font Family Selector */}
+                          <div className="space-y-2 pt-4">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">FONT FAMILY</label>
+                            <select 
+                              value={captionStyle.font}
+                              onChange={(e) => setCaptionStyle({...captionStyle, font: e.target.value})}
+                              className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+                            >
+                              <option value="Inter">Inter</option>
+                              <option value="Poppins">Poppins</option>
+                              <option value="Montserrat">Montserrat</option>
+                              <option value="Rajdhani">Rajdhani (Elite Hindi)</option>
+                              <option value="Kalam">Kalam (Handwritten)</option>
+                              <option value="Hind">Hind (Classic Devanagari)</option>
+                              <option value="Bangers">Bangers (Impact)</option>
+                              <option value="Luckiest Guy">Luckiest Guy (Funky)</option>
+                              <option value="Outfit">Outfit Pro</option>
+                              <option value="Fredoka One">Fredoka One</option>
+                            </select>
+                          </div>
 
-                        {/* Typography Folder */}
-                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
-                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-                                <Type size={16} />
-                              </div>
-                              <span className="text-sm font-bold text-zinc-900">Typography & Layout</span>
-                            </div>
-                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
-                          </summary>
-                          <div className="p-4 pt-0 space-y-4">
+                          {/* Case & Style Controls */}
+                          <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-2">
-                              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Font Family</span>
-                              <select 
-                                value={captionStyle.font}
-                                onChange={(e) => setCaptionStyle({...captionStyle, font: e.target.value})}
-                                className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                              >
-                                {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
-                              </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Case</span>
-                                <div className="flex gap-1 p-1 bg-white rounded-xl border border-zinc-100">
-                                  {(['original', 'uppercase'] as const).map(c => (
-                                    <button
-                                      key={c}
-                                      onClick={() => setCaptionStyle({...captionStyle, case: c})}
-                                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.case === c ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
-                                    >
-                                      {c}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Style</span>
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => setCaptionStyle({...captionStyle, fontWeight: captionStyle.fontWeight === '900' ? '400' : '900'})}
-                                    className={`flex-1 py-1.5 rounded-xl border text-[10px] font-bold transition-all ${captionStyle.fontWeight === '900' ? 'bg-zinc-900 border-zinc-900 text-white shadow-sm' : 'bg-white border-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
+                              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">CASE</label>
+                              <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-100 shadow-sm">
+                                {(['original', 'uppercase'] as const).map(c => (
+                                  <button 
+                                    key={c}
+                                    onClick={() => setCaptionStyle({...captionStyle, case: c})}
+                                    className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all ${captionStyle.case === c ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
                                   >
-                                    Bold
-                                  </button>
-                                  <button
-                                    onClick={() => setCaptionStyle({...captionStyle, italic: !captionStyle.italic})}
-                                    className={`flex-1 py-1.5 rounded-xl border text-[10px] font-bold transition-all ${captionStyle.italic ? 'bg-zinc-900 border-zinc-900 text-white shadow-sm' : 'bg-white border-zinc-100 text-zinc-400 hover:text-zinc-600'}`}
-                                  >
-                                    Italic
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-[10px] text-zinc-500">
-                                <span className="font-bold uppercase tracking-wider">Font Size</span>
-                                <span className="font-mono text-emerald-600 font-bold">{captionStyle.fontSize}px</span>
-                              </div>
-                              <input 
-                                type="range" min="16" max="120" 
-                                value={captionStyle.fontSize} 
-                                onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
-                                className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-[10px] text-zinc-500">
-                                <span className="font-bold uppercase tracking-wider">Words Per Line</span>
-                                <span className="font-mono text-emerald-600 font-bold">{captionStyle.wordsPerLine}</span>
-                              </div>
-                              <input 
-                                type="range" min="1" max="10" 
-                                value={captionStyle.wordsPerLine} 
-                                onChange={(e) => setCaptionStyle({...captionStyle, wordsPerLine: parseInt(e.target.value)})}
-                                className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Position</span>
-                              <div className="flex gap-1 p-1 bg-white rounded-xl border border-zinc-100">
-                                {(['top', 'middle', 'bottom'] as const).map(pos => (
-                                  <button
-                                    key={pos}
-                                    onClick={() => setCaptionStyle({...captionStyle, position: pos})}
-                                    className={`flex-1 py-2 rounded-lg text-[10px] font-bold capitalize transition-all ${captionStyle.position === pos ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
-                                  >
-                                    {pos}
+                                    {c === 'original' ? 'Original' : 'Uppercase'}
                                   </button>
                                 ))}
                               </div>
                             </div>
-                          </div>
-                        </details>
-
-                        {/* Animation Folder */}
-                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
-                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
-                                <Activity size={16} />
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">STYLE</label>
+                              <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-100 shadow-sm">
+                                <button 
+                                  onClick={() => setCaptionStyle({...captionStyle, fontWeight: captionStyle.fontWeight === '900' ? '400' : '900'})}
+                                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all ${captionStyle.fontWeight === '900' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                >
+                                  Bold
+                                </button>
+                                <button 
+                                  onClick={() => setCaptionStyle({...captionStyle, italic: !captionStyle.italic})}
+                                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all ${captionStyle.italic ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                >
+                                  Italic
+                                </button>
                               </div>
-                              <span className="text-sm font-bold text-zinc-900">Animations</span>
                             </div>
-                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
-                          </summary>
-                          <div className="p-4 pt-0 grid grid-cols-1 gap-1.5">
-                            {['pop', 'professional', 'snappy', 'snappy-pop', 'shake', 'bounce', 'slide', 'zoom', 'glitch', 'rotate', 'flip', 'skate', 'heartbeat', 'float', 'fade', 'glow', 'karaoke', 'zeemo', 'kinetic', 'typewriter'].map(anim => (
-                              <button 
-                                key={anim}
-                                onClick={() => setCaptionAnimation(anim)}
-                                className={`px-4 py-2.5 rounded-xl border text-[11px] font-bold transition-all text-left flex items-center justify-between capitalize ${captionAnimation === anim ? 'bg-zinc-900 border-zinc-900 text-white shadow-lg' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}
-                              >
-                                {anim.replace('-', ' ')}
-                                {captionAnimation === anim && <Check size={12} />}
-                              </button>
-                            ))}
                           </div>
-                        </details>
 
-                        {/* Effects Folder */}
-                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
-                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center">
-                                <Palette size={16} />
+                          {/* Font Size & Words Per Line */}
+                          <div className="space-y-6">
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">
+                                <span>FONT SIZE</span>
+                                <span className="text-emerald-500 font-bold">{captionStyle.fontSize}px</span>
                               </div>
-                              <span className="text-sm font-bold text-zinc-900">Colors & Effects</span>
+                              <input 
+                                type="range" min="16" max="150" 
+                                value={captionStyle.fontSize} 
+                                onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
+                                className="w-full accent-zinc-900 h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer"
+                              />
                             </div>
-                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
-                          </summary>
-                          <div className="p-4 pt-0 space-y-4">
-                            {!captionStyle.isDynamic && (
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Text Color</span>
-                                  <div className="relative">
-                                    <input 
-                                      type="color"
-                                      value={captionStyle.color}
-                                      onChange={(e) => setCaptionStyle({...captionStyle, color: e.target.value})}
-                                      className="w-full h-10 rounded-xl cursor-pointer opacity-0 absolute inset-0 z-10"
-                                    />
-                                    <div 
-                                      className="w-full h-10 rounded-xl border-2 border-white shadow-md"
-                                      style={{ backgroundColor: captionStyle.color }}
-                                    />
-                                  </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Background</span>
-                                  <div className="relative">
-                                    <input 
-                                      type="color"
-                                      value={captionStyle.backgroundColor === 'transparent' ? '#000000' : captionStyle.backgroundColor}
-                                      onChange={(e) => setCaptionStyle({...captionStyle, backgroundColor: e.target.value})}
-                                      className="w-full h-10 rounded-xl cursor-pointer opacity-0 absolute inset-0 z-10"
-                                    />
-                                    <div 
-                                      className={`w-full h-10 rounded-xl border-2 border-white shadow-md flex items-center justify-center ${captionStyle.backgroundColor === 'transparent' ? 'bg-zinc-100' : ''}`}
-                                      style={{ backgroundColor: captionStyle.backgroundColor }}
-                                    >
-                                      {captionStyle.backgroundColor === 'transparent' && <span className="text-[8px] text-zinc-400 font-bold">NONE</span>}
-                                    </div>
-                                    <button 
-                                      onClick={() => setCaptionStyle({...captionStyle, backgroundColor: 'transparent'})}
-                                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center z-20 hover:bg-red-600"
-                                    >
-                                      <X size={8} />
-                                    </button>
-                                  </div>
-                                </div>
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">
+                                <span>WORDS PER LINE</span>
+                                <span className="text-emerald-500 font-bold">{captionStyle.wordsPerLine || 1}</span>
                               </div>
-                            )}
+                              <input 
+                                type="range" min="1" max="10" 
+                                value={captionStyle.wordsPerLine || 1} 
+                                onChange={(e) => setCaptionStyle({...captionStyle, wordsPerLine: parseInt(e.target.value)})}
+                                className="w-full accent-zinc-900 h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer"
+                              />
+                            </div>
+                          </div>
 
-                            <div className="space-y-4 pt-4 border-t border-zinc-100">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-2"> Stroke & Outline </span>
-                                <div className="flex gap-1 p-1 bg-white rounded-xl border border-zinc-100">
-                                  {(['none', 'thin', 'thick'] as const).map(b => (
-                                    <button
-                                      key={b}
-                                      onClick={() => setCaptionStyle({...captionStyle, border: b})}
-                                      className={`px-3 py-1 rounded-lg text-[8px] font-bold capitalize transition-all ${captionStyle.border === b ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
-                                    >
-                                      {b}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              
-                              {captionStyle.border !== 'none' && (
-                                <div className="space-y-3 p-3 bg-white rounded-2xl border border-zinc-100 animate-in fade-in slide-in-from-top-2">
-                                  <div className="flex gap-4">
-                                    <div className="flex-1 space-y-1.5">
-                                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Outline Color</span>
-                                      <div className="relative">
-                                        <input 
-                                          type="color"
-                                          value={captionStyle.outlineColor || '#000000'}
-                                          onChange={(e) => setCaptionStyle({...captionStyle, outlineColor: e.target.value})}
-                                          className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
+                          {/* Position Selector */}
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">POSITION</label>
+                             <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-100 shadow-sm">
+                                {(['top', 'middle', 'bottom'] as const).map(p => (
+                                  <button 
+                                    key={p}
+                                    onClick={() => setCaptionStyle({...captionStyle, yPos: p === 'top' ? 20 : p === 'middle' ? 50 : 85})}
+                                    className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold transition-all capitalize ${
+                                      (p === 'top' && captionStyle.yPos <= 30) || (p === 'middle' && captionStyle.yPos > 30 && captionStyle.yPos < 70) || (p === 'bottom' && captionStyle.yPos >= 70)
+                                        ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'
+                                    }`}
+                                  >
+                                    {p}
+                                  </button>
+                                ))}
+                             </div>
+                          </div>
+
+                          {/* Extra Smart Buttons - Bottom of Typography Section */}
+                          <div className="pt-6 border-t border-zinc-100 space-y-4">
+                             <div className="flex gap-3">
+                                <button 
+                                  onClick={() => setCaptionScriptType(captionScriptType === 'hindi' ? 'hinglish' : 'hindi')}
+                                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${captionScriptType === 'hinglish' ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                                >
+                                  {captionScriptType === 'hinglish' ? 'Hinglish Script' : 'Hindi Script'}
+                                </button>
+                                <button 
+                                  onClick={() => setTranslateToEnglish(!translateToEnglish)}
+                                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${translateToEnglish ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                                >
+                                  {translateToEnglish ? 'Translated' : 'Original Lang'}
+                                </button>
+                             </div>
+                             <button 
+                               onClick={() => setCaptionStyle({...captionStyle, isSmart: !captionStyle.isSmart})}
+                               className={`w-full py-4 rounded-3xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-3 ${captionStyle.isSmart ? 'bg-zinc-900 border-zinc-900 text-white shadow-xl' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                             >
+                               <Sparkles size={14} className={captionStyle.isSmart ? 'text-emerald-400' : ''} />
+                               {captionStyle.isSmart ? 'Smart Highlights: ON' : 'Smart Highlights: OFF'}
+                             </button>
+                          </div>
+                        </div>
+                      </details>
+
+                      {/* Animations Folder */}
+                      <details className="group bg-white border border-zinc-100 rounded-[2rem] overflow-hidden shadow-[0_4px_15px_rgb(0,0,0,0.03)]">
+                        <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-[#F5F3FF] text-[#8B5CF6] rounded-xl flex items-center justify-center">
+                              <Activity size={18} />
+                            </div>
+                            <span className="text-sm font-bold text-zinc-900">Animations</span>
+                          </div>
+                          <ChevronDown size={20} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="p-6 pt-0 border-t border-zinc-50/50 grid grid-cols-2 gap-2">
+                           {['pop', 'snappy', 'bounce', 'slide', 'glitch', 'fade', 'rotate', 'flip', 'skate', 'heartbeat', 'float', 'glow', 'karaoke', 'zeemo', 'kinetic', 'typewriter', 'professional'].map(anim => (
+                             <button
+                               key={anim}
+                               onClick={() => setCaptionAnimation(anim)}
+                               className={`py-2 px-1 rounded-lg border text-[8px] font-black uppercase tracking-widest border-2 transition-all ${captionAnimation === anim ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'}`}
+                             >
+                               {anim}
+                             </button>
+                           ))}
+                        </div>
+                      </details>
+
+                      {/* Colors & Effects Folder */}
+                      <details className="group bg-white border border-zinc-100 rounded-[2rem] overflow-hidden shadow-[0_4px_15px_rgb(0,0,0,0.03)]">
+                        <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-[#FFF7ED] text-[#F97316] rounded-xl flex items-center justify-center">
+                              <Palette size={18} />
+                            </div>
+                            <span className="text-sm font-bold text-zinc-900">Colors & Effects</span>
+                          </div>
+                          <ChevronDown size={20} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="p-6 pt-0 border-t border-zinc-50/50 space-y-6">
+                           {/* Stroke & Outline Section */}
+                           <div className="space-y-4">
+                             <div className="flex items-center justify-between">
+                               <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Structure</label>
+                               <div className="flex bg-zinc-200/50 p-0.5 rounded-xl">
+                                 {(['none', 'thin', 'thick'] as const).map(b => (
+                                   <button 
+                                     key={b}
+                                     onClick={() => setCaptionStyle({...captionStyle, border: b})}
+                                     className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${captionStyle.border === b ? 'bg-emerald-500 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100'}`}
+                                   >
+                                     {b}
+                                   </button>
+                                 ))}
+                               </div>
+                             </div>
+
+                               <div className="grid grid-cols-5 gap-2.5 p-3.5 bg-zinc-50 rounded-2xl border border-zinc-100 shadow-inner">
+                                 {CAPTION_COLORS.map(c => (
+                                   <button
+                                     key={`preset-color-${c}`}
+                                     onClick={() => setCaptionStyle({...captionStyle, color: c})}
+                                     className={`w-full aspect-square rounded-full border-2 transition-all relative group ${captionStyle.color === c ? 'border-zinc-900 scale-110 shadow-md ring-2 ring-emerald-100' : 'border-white hover:scale-105 shadow-sm'}`}
+                                     style={{ backgroundColor: c }}
+                                   >
+                                     {captionStyle.color === c && (
+                                       <div className="absolute inset-0 flex items-center justify-center">
+                                         <Check size={12} className={c === '#ffffff' ? 'text-zinc-900' : 'text-white'} strokeWidth={4} />
+                                       </div>
+                                     )}
+                                   </button>
+                                 ))}
+                                 <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-white shadow-sm group">
+                                   <input 
+                                     type="color" 
+                                     value={captionStyle.color}
+                                     onChange={(e) => setCaptionStyle({...captionStyle, color: e.target.value})}
+                                     className="absolute inset-0 w-full h-full scale-150 cursor-pointer opacity-0 z-10"
+                                   />
+                                   <div className="absolute inset-0 flex items-center justify-center bg-white group-hover:bg-zinc-50 transition-colors">
+                                     <Plus size={14} className="text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                                   </div>
+                                 </div>
+                               </div>
+                             </div>
+
+                             <div className="p-4 bg-white rounded-3xl border border-zinc-100 shadow-sm space-y-4">
+                               <div className="flex gap-4 items-center">
+                                  <div className="space-y-2">
+                                    <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block px-1">Outline</span>
+                                    <div className="grid grid-cols-4 gap-1.5">
+                                      {['#000000', '#ffffff', '#ff0000', '#00ff00'].map(c => (
+                                        <button 
+                                          key={`out-${c}`}
+                                          onClick={() => setCaptionStyle({...captionStyle, outlineColor: c})}
+                                          className={`w-7 h-7 rounded-lg border-2 transition-all ${captionStyle.outlineColor === c ? 'border-emerald-500 scale-110' : 'border-zinc-50'}`}
+                                          style={{ backgroundColor: c }}
                                         />
-                                        <div 
-                                          className="w-full h-8 rounded-lg border border-zinc-100 shadow-sm"
-                                          style={{ backgroundColor: captionStyle.outlineColor || '#000000' }}
-                                        />
-                                      </div>
+                                      ))}
                                     </div>
-                                    <div className="flex-[2] space-y-1.5">
-                                      <div className="flex justify-between text-[10px] text-zinc-400 font-bold uppercase">
-                                        <span>Thickness</span>
-                                        <span>{captionStyle.strokeWidth || 0}px</span>
-                                      </div>
+                                  </div>
+                                  <div className="flex-1 space-y-2">
+                                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest px-1">
+                                      <span className="text-zinc-400">Thickness</span>
+                                      <span className="text-zinc-900 font-bold">{captionStyle.strokeWidth || 4}PX</span>
+                                    </div>
+                                    <div className="pt-1">
                                       <input 
-                                        type="range" min="0" max="10" step="0.5"
-                                        value={captionStyle.strokeWidth || 0} 
-                                        onChange={(e) => setCaptionStyle({...captionStyle, strokeWidth: parseFloat(e.target.value)})}
-                                        className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
+                                        type="range" min="0" max="15" 
+                                        value={captionStyle.strokeWidth || 4} 
+                                        onChange={(e) => setCaptionStyle({...captionStyle, strokeWidth: parseInt(e.target.value)})}
+                                        className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-full appearance-none cursor-pointer"
                                       />
                                     </div>
                                   </div>
-                                </div>
-                              )}
+                               </div>
+                             </div>
 
+                             {/* Alternating Colors Section */}
+                           <div className="space-y-4 pt-2">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-2">
-                                  <Sparkles size={12} className="text-emerald-500" /> Alternating Colors
-                                </span>
-                                <button 
+                                <div className="flex items-center gap-2 text-emerald-500">
+                                  <Sparkles size={14} />
+                                  <label className="text-[10px] font-black uppercase tracking-widest leading-none">Auto-Coloring</label>
+                                </div>
+                                <button
                                   onClick={() => setCaptionStyle({...captionStyle, isDynamic: !captionStyle.isDynamic})}
-                                  className={`w-10 h-5 rounded-full transition-all relative ${captionStyle.isDynamic ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                                  className={`w-11 h-5.5 rounded-full transition-all relative ${captionStyle.isDynamic ? 'bg-emerald-500 shadow-sm' : 'bg-zinc-200'}`}
                                 >
-                                  <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${captionStyle.isDynamic ? 'left-6' : 'left-1'}`} />
+                                  <div className={`absolute top-0.75 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${captionStyle.isDynamic ? 'left-6.25' : 'left-0.75'}`} />
                                 </button>
                               </div>
-                              
-                              {captionStyle.isDynamic && (
-                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                  <p className="text-[10px] text-zinc-400">Alternates colors every word for a professional viral look.</p>
-                                  <div className="flex gap-4">
-                                    {[0, 1].map(idx => (
-                                      <div key={`dynamic-color-input-${idx}`} className="flex-1 space-y-1.5">
-                                        <span className="text-[8px] text-zinc-400 font-bold uppercase">Color {idx + 1}</span>
-                                        <div className="relative">
-                                          <input 
-                                            type="color"
-                                            value={(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx]}
-                                            onChange={(e) => {
-                                              const newColors = [...(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
-                                              newColors[idx] = e.target.value;
-                                              setCaptionStyle({...captionStyle, threeColors: newColors});
-                                            }}
-                                            className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
-                                          />
-                                          <div 
-                                            className="w-full h-8 rounded-lg border border-zinc-200 shadow-sm"
-                                            style={{ backgroundColor: (captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])[idx] }}
-                                          />
-                                        </div>
-                                      </div>
-                                    ))}
+                              <p className="text-[9.5px] text-zinc-400 font-medium leading-relaxed max-w-[240px] px-0.5">Alternates colors every word for a professional viral look.</p>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-3">
+                                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest px-2">Color 1</label>
+                                  <div className="relative h-10 group">
+                                    <input 
+                                      type="color" 
+                                      value={captionStyle.threeColors?.[0] || '#ffffff'}
+                                      onChange={(e) => {
+                                        const colors = [...(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
+                                        colors[0] = e.target.value;
+                                        setCaptionStyle({...captionStyle, threeColors: colors});
+                                      }}
+                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                    />
+                                    <div className="w-full h-full rounded-2xl border-2 border-zinc-50 shadow-sm transition-transform group-hover:scale-[1.02]" style={{ backgroundColor: captionStyle.threeColors?.[0] || '#ffffff' }} />
                                   </div>
                                 </div>
-                              )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 pt-2">
-                              <div className="space-y-3">
-                                <button
-                                  onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
-                                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
-                                    captionStyle.glow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
-                                  }`}
-                                >
-                                  <Sparkles size={14} /> Glow
-                                </button>
-                              </div>
-                              <div className="space-y-3">
-                                <button
-                                  onClick={() => setCaptionStyle({...captionStyle, shadow: !captionStyle.shadow})}
-                                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all border ${
-                                    captionStyle.shadow ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200'
-                                  }`}
-                                >
-                                  <Monitor size={14} /> Shadow
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {captionStyle.shadow && (
-                              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Shadow Color</span>
-                                <div className="relative">
-                                  <input 
-                                    type="color"
-                                    value={captionStyle.shadowColor || '#000000'}
-                                    onChange={(e) => setCaptionStyle({...captionStyle, shadowColor: e.target.value})}
-                                    className="w-full h-8 rounded-lg cursor-pointer opacity-0 absolute inset-0 z-10"
-                                  />
-                                  <div 
-                                    className="w-full h-8 rounded-lg border border-zinc-100 shadow-sm"
-                                    style={{ backgroundColor: captionStyle.shadowColor || '#000000' }}
-                                  />
+                                <div className="space-y-3">
+                                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest px-2">Accent</label>
+                                  <div className="relative h-10 group">
+                                    <input 
+                                      type="color" 
+                                      value={captionStyle.threeColors?.[1] || '#ffff00'}
+                                      onChange={(e) => {
+                                        const colors = [...(captionStyle.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
+                                        colors[1] = e.target.value;
+                                        setCaptionStyle({...captionStyle, threeColors: colors});
+                                      }}
+                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                    />
+                                    <div className="w-full h-full rounded-2xl border-2 border-zinc-50 shadow-sm transition-transform group-hover:scale-[1.02]" style={{ backgroundColor: captionStyle.threeColors?.[1] || '#ffff00' }} />
+                                  </div>
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        </details>
+                           </div>
 
-                        {/* Timing Folder */}
-                        <details className="group bg-zinc-50 rounded-2xl border border-zinc-100 overflow-hidden shadow-sm">
-                          <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-                                <Clock size={16} />
-                              </div>
-                              <span className="text-sm font-bold text-zinc-900">Timing & Sync</span>
+                           <div className="grid grid-cols-2 gap-4 pt-2">
+                              <button 
+                                onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
+                                className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 text-[10px] font-black uppercase tracking-widest transition-all ${captionStyle.glow ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                              >
+                                <Sparkles size={16} />
+                                Glow Effect
+                              </button>
+                              <button 
+                                onClick={() => setCaptionStyle({...captionStyle, shadow: !captionStyle.shadow})}
+                                className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 text-[10px] font-black uppercase tracking-widest transition-all ${captionStyle.shadow ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                              >
+                                <Monitor size={16} />
+                                3D Shadow
+                              </button>
+                           </div>
+
+                           <div className="space-y-3 pt-2">
+                             <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Shadow Color</label>
+                             <div className="relative h-12 w-full group">
+                               <input 
+                                 type="color" 
+                                 value={shadowColor}
+                                 onChange={(e) => setShadowColor(e.target.value)}
+                                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                               />
+                               <div className="w-full h-full rounded-2xl border-2 border-zinc-100 shadow-sm" style={{ backgroundColor: shadowColor }} />
+                             </div>
+                           </div>
+                        </div>
+                      </details>
+
+                      {/* Timing Folder */}
+                      <details className="group bg-transparent rounded-2xl overflow-visible">
+                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-zinc-100/50 transition-all list-none">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-sky-100 text-sky-600 rounded-lg flex items-center justify-center">
+                              <Clock size={16} />
                             </div>
-                            <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
-                          </summary>
-                          <div className="p-4 pt-0 space-y-4">
-                            <div className="space-y-3">
-                              <div className="flex justify-between text-[10px] text-zinc-500">
-                                <span className="font-bold uppercase tracking-wider">Caption Offset</span>
-                                <span className="font-mono text-emerald-600 font-bold">{captionOffset}ms</span>
-                              </div>
-                              <input 
-                                type="range" min="-2000" max="2000" step="50"
-                                value={captionOffset} 
-                                onChange={(e) => setCaptionOffset(parseInt(e.target.value))}
-                                className="w-full accent-zinc-900 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
-                              />
-                              <p className="text-[9px] text-zinc-400 leading-relaxed">
-                                Adjust if captions are appearing too early or too late. Positive values delay captions, negative values make them appear earlier.
-                              </p>
-                            </div>
+                            <span className="text-xs font-black uppercase tracking-widest text-zinc-900">Timing</span>
                           </div>
-                        </details>
-                      </div>
+                          <ChevronDown size={16} className="text-zinc-400 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="p-4 pt-1 space-y-4">
+                           <div className="space-y-4">
+                             <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                               <span>Caption Offset</span>
+                               <span className="text-emerald-500">{captionOffset}ms</span>
+                             </div>
+                             <input 
+                               type="range" min="-1000" max="1000" step="10" 
+                               value={captionOffset} onChange={(e) => setCaptionOffset(parseInt(e.target.value))}
+                               className="w-full accent-zinc-900 h-1.5 bg-zinc-200 rounded-full appearance-none cursor-pointer"
+                             />
+                           </div>
+                        </div>
+                      </details>
                     </div>
 
                     {captionResult && (
                       <div className="pt-6 border-t border-zinc-100 space-y-4">
                         <button 
-                          onClick={() => {
-                            const blob = new Blob([captionResult.srt], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `VoxNova Text to Speech - Captions - ${Date.now()}.srt`;
-                            a.click();
-                          }}
-                          className="w-full py-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
+                           onClick={handleExportCaptions}
+                           className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20 flex items-center justify-center gap-3"
                         >
-                          <Download size={14} />
-                          Download SRT
+                           <Video size={18} />
+                           Export HD Video
                         </button>
                         <button 
-                          onClick={handleExportCaptions}
-                          disabled={isCaptioning}
-                          className="w-full py-4 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 shadow-xl shadow-zinc-900/20 disabled:opacity-50"
+                           onClick={() => setCaptionResult(null)}
+                           className="w-full py-3 bg-zinc-100 text-zinc-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
                         >
-                          <Video size={18} />
-                          Export Video
+                           <RefreshCw size={14} />
+                           Re-generate
                         </button>
                       </div>
                     )}
                   </div>
 
-                  <div className="p-6 bg-emerald-50 rounded-[2rem] border border-emerald-100">
-                    <h4 className="text-sm font-bold mb-2 flex items-center gap-2 text-emerald-900">
-                      <Sparkles size={16} className="text-emerald-500" /> Pro Tip
+                  <div className="p-6 bg-emerald-50 rounded-[2.5rem] border border-emerald-100/50 shadow-sm">
+                    <h4 className="text-[12px] font-black text-emerald-900 uppercase tracking-widest mb-2 flex items-center gap-2">
+                       <Sparkles size={16} className="text-emerald-500" /> Professional Setup
                     </h4>
-                    <p className="text-xs text-emerald-700 leading-relaxed">
-                      Use "Uppercase" and "Pop Up" animation for viral reel style captions. Our AI handles Hindi script perfectly!
+                    <p className="text-xs text-emerald-700/80 leading-relaxed font-medium italic">
+                      "Uppercase" + "Pop Up" is recommended for high-engagement viral reels. Adjust timing if voice sync feels off.
                     </p>
                   </div>
                 </div>
@@ -5132,14 +5410,40 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           ) : activeTab === 'voice-changer' ? (
             <motion.div 
               key="voice-changer"
+              id="voice-changer-tab-root"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto space-y-8"
+              className="max-w-6xl mx-auto space-y-8"
             >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold text-zinc-900">Voice Changer</h2>
-                <p className="text-zinc-500">Transform your voice into any of our professional AI characters while maintaining emotion and tone.</p>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-zinc-100 pb-8 mb-4">
+                <div className="space-y-1.5" id="voice-changer-header">
+                  <h2 className="text-4xl font-display font-bold text-zinc-900 tracking-tight">Voice Changer <span className="text-emerald-500 text-sm font-mono align-top ml-2">PRO</span></h2>
+                  <p className="text-zinc-500 text-sm font-medium">Transform any audio or video with professional AI character conversion.</p>
+                </div>
+                
+                <div className="flex items-center gap-3 bg-zinc-50 p-2 rounded-[2rem] border border-zinc-100" id="voice-changer-actions">
+                  <button 
+                    onClick={() => setShowHistoryModal(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-2xl text-xs font-bold hover:bg-zinc-100 transition-all shadow-sm"
+                  >
+                    <History size={14} />
+                    History
+                  </button>
+
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-white border border-zinc-200 rounded-2xl shadow-sm group">
+                    <button 
+                      onClick={() => setShowVoiceLibrary(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-[10px] font-black text-white shadow-sm`}>
+                        {selectedVoice.name[0]}
+                      </div>
+                      <span className="text-sm font-bold text-zinc-800">{selectedVoice.name}</span>
+                      <ChevronDown size={14} className="text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -5452,286 +5756,273 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         <div className="mt-12 pt-12 border-t border-white/5 max-w-4xl mx-auto pb-12">
         </div>
 
-        {/* SEO Content Section (The "Boxes") - Moved to Bottom */}
+        {/* SEO Content Section (The "Boxes") - Always Visible */}
         <section className="bg-white">
-          <div className="max-w-6xl mx-auto py-24 px-6 space-y-16">
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900 tracking-tight">Why Choose VoxNova Text to Speech?</h2>
-              <p className="text-zinc-500 max-w-2xl mx-auto text-lg">VoxNova is the world's most advanced AI voice generation platform, designed for creators who demand cinematic quality.</p>
-            </div>
+              <div className="max-w-6xl mx-auto py-24 px-6 space-y-16">
+                <div className="text-center space-y-4">
+                  <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900 tracking-tight">Why Choose VoxNova Text to Speech?</h2>
+                  <p className="text-zinc-500 max-w-2xl mx-auto text-lg">VoxNova is the world's most advanced AI voice generation platform, designed for creators who demand cinematic quality.</p>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-emerald-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-inner">
-                  <Sparkles size={32} />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-zinc-900">Ultra-Realistic Voices</h3>
-                  <p className="text-zinc-500 leading-relaxed">Our neural networks are trained on thousands of hours of professional studio recordings to capture the subtle nuances of human speech, including breath, rhythm, and emotion.</p>
-                </div>
-              </div>
-
-              <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-blue-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
-                <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-inner">
-                  <Globe size={32} />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-zinc-900">Multilingual Support</h3>
-                  <p className="text-zinc-500 leading-relaxed">Generate high-quality voiceovers in English and Hindi with perfect native accents. Our AI understands cultural nuances and provides localized performances for global audiences.</p>
-                </div>
-              </div>
-
-              <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-purple-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
-                <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300 shadow-inner">
-                  <Clapperboard size={32} />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-zinc-900">Cinematic Narration</h3>
-                  <p className="text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-zinc-50/80 py-24">
-          <div className="max-w-6xl mx-auto px-4 md:px-6 space-y-16">
-            <div className="glass-panel p-6 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border-zinc-100 bg-white shadow-sm space-y-10">
-              <div className="text-center space-y-2">
-                <h3 className="text-3xl font-bold text-zinc-900">Professional Grade AI Tools</h3>
-                <p className="text-zinc-500">Everything you need to create world-class audio content.</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                <div className="flex gap-6">
-                  <div className="w-12 h-12 shrink-0 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                    <Mic size={24} />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-emerald-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-inner">
+                      <Sparkles size={32} />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-2xl font-bold text-zinc-900">Ultra-Realistic Voices</h3>
+                      <p className="text-zinc-500 leading-relaxed">Our neural networks are trained on thousands of hours of professional studio recordings to capture the subtle nuances of human speech, including breath, rhythm, and emotion.</p>
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    <h4 className="text-xl font-bold text-zinc-900">AI Voice Cloning</h4>
-                    <p className="text-zinc-500 leading-relaxed">Clone any voice with just a few seconds of audio. Perfect for maintaining consistency across long-running series or dubbing content while keeping the original actor's essence.</p>
+
+                  <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-blue-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
+                    <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-inner">
+                      <Globe size={32} />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-2xl font-bold text-zinc-900">Multilingual Support</h3>
+                      <p className="text-zinc-500 leading-relaxed">Generate high-quality voiceovers in English and Hindi with perfect native accents. Our AI understands cultural nuances and provides localized performances for global audiences.</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-6">
-                  <div className="w-12 h-12 shrink-0 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-                    <Layers size={24} />
-                  </div>
-                  <div className="space-y-3">
-                    <h4 className="text-xl font-bold text-zinc-900">Advanced Style Modulation</h4>
-                    <p className="text-zinc-500 leading-relaxed">Go beyond simple pitch and speed. Our AI allows you to control the emotional intensity, gravitas, and storytelling style of every generation, giving you full creative control.</p>
+
+                  <div className="glass-panel p-10 rounded-[2.5rem] space-y-6 border-zinc-100 hover:border-purple-500/20 transition-all group bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 duration-300">
+                    <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300 shadow-inner">
+                      <Clapperboard size={32} />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-2xl font-bold text-zinc-900">Cinematic Narration</h3>
+                      <p className="text-zinc-500 leading-relaxed">From deep movie trailer voices to calm documentary narrators, VoxNova provides the perfect tone for any project. Use our advanced style controls to fine-tune the performance.</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-16">
-              <div className="text-center space-y-4">
-                <h3 className="text-4xl font-display font-bold text-zinc-900">How VoxNova Text to Speech Works</h3>
-                <p className="text-zinc-500 max-w-xl mx-auto">Four simple steps to transform your text into professional audio.</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                {[
-                  { step: '01', title: 'Input Text', desc: 'Paste your script into our advanced editor. We support long-form content up to 5,000 characters.', img: 'https://picsum.photos/seed/editor/400/300' },
-                  { step: '02', title: 'Select Voice', desc: 'Browse our library of 50+ professional AI voices, each with unique traits and characteristics.', img: 'https://picsum.photos/seed/voices/400/300' },
-                  { step: '03', title: 'Fine-Tune', desc: 'Adjust pitch, speed, and emotional style to get the perfect performance for your project.', img: 'https://picsum.photos/seed/settings/400/300' },
-                  { step: '04', title: 'Generate', desc: 'Our neural engines process your request in seconds, delivering studio-quality 48kHz audio.', img: 'https://picsum.photos/seed/audio/400/300' }
-                ].map((item, i) => (
-                  <div key={`step-en-${i}`} className="space-y-6 group">
-                    <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-zinc-100 border border-zinc-200 shadow-sm group-hover:shadow-md transition-all duration-300">
-                      <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" referrerPolicy="no-referrer" />
-                      <div className="absolute inset-0 bg-emerald-500/0 group-hover:bg-emerald-500/5 transition-colors duration-500" />
-                      <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-xl font-display font-bold text-zinc-900 shadow-sm">
-                        {item.step}
+            <section className="bg-zinc-50/80 py-24">
+              <div className="max-w-6xl mx-auto px-4 md:px-6 space-y-16">
+                <div className="glass-panel p-6 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border-zinc-100 bg-white shadow-sm space-y-10">
+                  <div className="text-center space-y-2">
+                    <h3 className="text-3xl font-bold text-zinc-900">Professional Grade AI Tools</h3>
+                    <p className="text-zinc-500">Everything you need to create world-class audio content.</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="flex gap-6">
+                      <div className="w-12 h-12 shrink-0 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                        <Mic size={24} />
+                      </div>
+                      <div className="space-y-3">
+                        <h4 className="text-xl font-bold text-zinc-900">AI Voice Cloning</h4>
+                        <p className="text-zinc-500 leading-relaxed">Clone any voice with just a few seconds of audio. Perfect for maintaining consistency across long-running series or dubbing content while keeping the original actor's essence.</p>
                       </div>
                     </div>
-                    <div className="space-y-2 px-2">
-                      <h4 className="text-xl font-bold text-zinc-900">{item.title}</h4>
-                      <p className="text-sm text-zinc-500 leading-relaxed">{item.desc}</p>
+                    <div className="flex gap-6">
+                      <div className="w-12 h-12 shrink-0 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                        <Layers size={24} />
+                      </div>
+                      <div className="space-y-3">
+                        <h4 className="text-xl font-bold text-zinc-900">Advanced Style Modulation</h4>
+                        <p className="text-zinc-500 leading-relaxed">Go beyond simple pitch and speed. Our AI allows you to control the emotional intensity, gravitas, and storytelling style of every generation, giving you full creative control.</p>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+                </div>
 
-        <section className="bg-white py-24">
-          <div className="max-w-6xl mx-auto px-6 space-y-16">
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl font-display font-bold text-zinc-900">Latest from our AI Voice Blog</h2>
-              <p className="text-zinc-500 max-w-2xl mx-auto text-lg">Explore the latest trends in AI voice technology, text to speech tips, and content creation strategies.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-10">
-              {BLOG_ARTICLES.map((article, i) => (
-                <div 
-                  key={`article-${i}`} 
-                  className="group cursor-pointer space-y-6" 
-                  onClick={() => { setSelectedArticle(i); setShowBlog(true); }}
-                >
-                  <div className="aspect-video rounded-[2rem] overflow-hidden border border-zinc-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-500 relative">
-                    <motion.div
-                      className="w-full h-full"
-                      animate={{ 
-                        scale: [1, 1.02, 1],
-                        filter: ["brightness(1)", "brightness(1.1)", "brightness(1)"]
-                      }}
-                      transition={{ 
-                        duration: 4, 
-                        repeat: Infinity, 
-                        ease: "easeInOut" 
-                      }}
+                <div className="space-y-16">
+                  <div className="text-center space-y-4">
+                    <h3 className="text-4xl font-display font-bold text-zinc-900">How VoxNova Text to Speech Works</h3>
+                    <p className="text-zinc-500 max-w-xl mx-auto">Four simple steps to transform your text into professional audio.</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    {[
+                      { step: '01', title: 'Input Text', desc: 'Paste your script into our advanced editor. We support long-form content up to 5,000 characters.', img: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&q=80&w=400&h=300' },
+                      { step: '02', title: 'Select Voice', desc: 'Browse our library of 50+ professional AI voices, each with unique traits and characteristics.', img: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&q=80&w=400&h=300' },
+                      { step: '03', title: 'Fine-Tune', desc: 'Adjust pitch, speed, and emotional style to get the perfect performance for your project.', img: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&q=80&w=400&h=300' },
+                      { step: '04', title: 'Generate', desc: 'Our neural engines process your request in seconds, delivering studio-quality 48kHz audio.', img: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400&h=300' }
+                    ].map((item, i) => (
+                      <div key={`step-en-${i}`} className="space-y-6 group">
+                        <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-zinc-100 border border-zinc-200 shadow-sm group-hover:shadow-md transition-all duration-300">
+                          <motion.div
+                            className="w-full h-full"
+                            animate={{ 
+                              scale: [1, 1.05, 1],
+                              rotate: [0, 1, -1, 0]
+                            }}
+                            transition={{ 
+                              duration: 6, 
+                              repeat: Infinity, 
+                              ease: "easeInOut" 
+                            }}
+                          >
+                            <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-700" referrerPolicy="no-referrer" />
+                          </motion.div>
+                          <div className="absolute inset-0 bg-emerald-500/0 group-hover:bg-emerald-500/5 transition-colors duration-500" />
+                          <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-xl font-display font-bold text-zinc-900 shadow-sm">
+                            {item.step}
+                          </div>
+                        </div>
+                        <div className="space-y-2 px-2">
+                          <h4 className="text-xl font-bold text-zinc-900">{item.title}</h4>
+                          <p className="text-sm text-zinc-500 leading-relaxed">{item.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white py-24">
+              <div className="max-w-6xl mx-auto px-6 space-y-16">
+                <div className="text-center space-y-4">
+                  <h2 className="text-4xl font-display font-bold text-zinc-900">Latest from our AI Voice Blog</h2>
+                  <p className="text-zinc-500 max-w-2xl mx-auto text-lg">Explore the latest trends in AI voice technology, text to speech tips, and content creation strategies.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-10">
+                  {BLOG_ARTICLES.map((article, i) => (
+                    <div 
+                      key={`article-${i}`} 
+                      className="group cursor-pointer space-y-6" 
+                      onClick={() => { setSelectedArticle(i); setShowBlog(true); }}
                     >
-                      <img src={article.img} alt={article.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
-                    </motion.div>
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500 flex items-center justify-center">
-                      <div className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-zinc-900 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-500 shadow-xl">
-                        <Play size={32} fill="currentColor" className="ml-1" />
+                      <div className="aspect-video rounded-[2rem] overflow-hidden border border-zinc-100 shadow-sm group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-500 relative">
+                        <motion.div
+                          className="w-full h-full"
+                          animate={{ 
+                            scale: [1, 1.02, 1],
+                            filter: ["brightness(1)", "brightness(1.1)", "brightness(1)"]
+                          }}
+                          transition={{ 
+                            duration: 4, 
+                            repeat: Infinity, 
+                            ease: "easeInOut" 
+                          }}
+                        >
+                          <img src={article.img} alt={article.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" referrerPolicy="no-referrer" />
+                        </motion.div>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500 flex items-center justify-center">
+                          <div className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-zinc-900 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-500 shadow-xl">
+                            <Play size={32} fill="currentColor" className="ml-1" />
+                          </div>
+                        </div>
+                        <div className="absolute bottom-4 left-4 right-4 h-1 bg-white/20 rounded-full overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                          <motion.div 
+                            className="h-full bg-emerald-500"
+                            initial={{ width: 0 }}
+                            whileInView={{ width: "100%" }}
+                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-3 px-2">
+                        <div className="flex items-center gap-3">
+                          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider">{article.date}</span>
+                          <span className="text-zinc-300">•</span>
+                          <span className="text-zinc-400 text-[10px] font-bold uppercase tracking-wider">AI Technology</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors leading-tight">{article.title}</h3>
+                        <p className="text-zinc-500 leading-relaxed line-clamp-2">{article.excerpt}</p>
+                        <div className="pt-2 flex items-center gap-2 text-emerald-600 font-bold text-sm group-hover:gap-3 transition-all">
+                          Read Article <ArrowRight size={18} />
+                        </div>
                       </div>
                     </div>
-                    <div className="absolute bottom-4 left-4 right-4 h-1 bg-white/20 rounded-full overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <motion.div 
-                        className="h-full bg-emerald-500"
-                        initial={{ width: 0 }}
-                        whileInView={{ width: "100%" }}
-                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-3 px-2">
-                    <div className="flex items-center gap-3">
-                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider">{article.date}</span>
-                      <span className="text-zinc-300">•</span>
-                      <span className="text-zinc-400 text-[10px] font-bold uppercase tracking-wider">AI Technology</span>
-                    </div>
-                    <h3 className="text-2xl font-bold text-zinc-900 group-hover:text-emerald-600 transition-colors leading-tight">{article.title}</h3>
-                    <p className="text-zinc-500 leading-relaxed line-clamp-2">{article.excerpt}</p>
-                    <div className="pt-2 flex items-center gap-2 text-emerald-600 font-bold text-sm group-hover:gap-3 transition-all">
-                      Read Article <ArrowRight size={18} />
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-emerald-50/50 py-24">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="glass-panel p-12 md:p-20 rounded-[4rem] border-zinc-100 bg-white shadow-xl shadow-emerald-900/5 space-y-12 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-              <div className="text-center space-y-4 relative z-10">
-                <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900">VoxNova Text to Speech: Professional Hindi Voiceovers</h2>
-                <p className="text-zinc-600 max-w-2xl mx-auto text-lg">VoxNova is a premium AI voice generator that enables you to create high-quality Hindi voiceovers with ease.</p>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-16 relative z-10">
-                <div className="space-y-6">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-                    <Video size={28} />
+            </section>
+
+            <section className="bg-emerald-50/50 py-24">
+              <div className="max-w-6xl mx-auto px-6">
+                <div className="glass-panel p-12 md:p-20 rounded-[4rem] border-zinc-100 bg-white shadow-xl shadow-emerald-900/5 space-y-12 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+                  <div className="text-center space-y-4 relative z-10">
+                    <h2 className="text-4xl md:text-5xl font-display font-bold text-zinc-900">VoxNova Text to Speech: Professional Hindi Voiceovers</h2>
+                    <p className="text-zinc-600 max-w-2xl mx-auto text-lg">VoxNova is a premium AI voice generator that enables you to create high-quality Hindi voiceovers with ease.</p>
                   </div>
-                  <div className="space-y-3">
-                    <h4 className="text-2xl font-bold text-zinc-900">Perfect for YouTube and Reels</h4>
-                    <p className="text-zinc-600 leading-relaxed text-lg">
-                      Whether you're creating YouTube videos or Instagram Reels, our voices will make your content more engaging. Voices like 'Pankaj' and 'Sultan' are perfect for motivational and news content.
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-6">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-                    <Zap size={28} />
-                  </div>
-                  <div className="space-y-3">
-                    <h4 className="text-2xl font-bold text-zinc-900">Fast and Easy Voice Generation</h4>
-                    <p className="text-zinc-600 leading-relaxed text-lg">
-                      Simply type your text, choose your favorite voice, and click 'Generate'. Your professional voiceover will be ready in seconds. You can also customize the pitch and speed to suit your needs.
-                    </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-16 relative z-10">
+                    <div className="space-y-6">
+                      <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                        <Video size={28} />
+                      </div>
+                      <div className="space-y-3">
+                        <h4 className="text-2xl font-bold text-zinc-900">Perfect for YouTube and Reels</h4>
+                        <p className="text-zinc-600 leading-relaxed text-lg">
+                          Whether you're creating YouTube videos or Instagram Reels, our voices will make your content more engaging. Voices like 'Pankaj' and 'Sultan' are perfect for motivational and news content.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-6">
+                      <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                        <Zap size={28} />
+                      </div>
+                      <div className="space-y-3">
+                        <h4 className="text-2xl font-bold text-zinc-900">Fast and Easy Voice Generation</h4>
+                        <p className="text-zinc-600 leading-relaxed text-lg">
+                          Simply type your text, choose your favorite voice, and click 'Generate'. Your professional voiceover will be ready in seconds. You can also customize the pitch and speed to suit your needs.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
+            </section>
 
-        <section className="bg-white py-24">
-          <div className="max-w-6xl mx-auto px-6 space-y-16">
-            <div className="text-center space-y-4">
-              <h3 className="text-4xl font-display font-bold text-zinc-900">Frequently Asked Questions</h3>
-              <p className="text-zinc-500">Everything you need to know about VoxNova.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {[
-                { q: "What is VoxNova Text to Speech?", a: "VoxNova is an advanced AI voice generation platform that converts text into realistic, human-like speech using neural networks." },
-                { q: "Is VoxNova free to use?", a: "We offer both free and premium plans. Free users get a daily credit limit, while premium users enjoy unlimited generations and high-fidelity voices." },
-                { q: "Can I use VoxNova voices for commercial projects?", a: "Yes, all audio generated with VoxNova can be used for commercial projects, including YouTube, social media, and professional presentations." },
-                { q: "How many languages does VoxNova support?", a: "Currently, we specialize in high-quality English and Hindi voices, with more languages being added regularly." },
-                { q: "How do I get the best quality AI voice?", a: "For the best results, use proper punctuation in your scripts and adjust the 'Style' and 'Pitch' settings to match your content's mood." },
-                { q: "Does VoxNova support voice cloning?", a: "Yes, our premium plan includes AI voice cloning technology that allows you to create a digital version of any voice from a short sample." }
-              ].map((faq, i) => (
-                <div key={`faq-${i}`} className="p-8 bg-zinc-50/50 rounded-[2rem] border border-zinc-100 space-y-3 hover:bg-white hover:shadow-lg transition-all duration-300">
-                  <h4 className="text-lg font-bold text-zinc-900 flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    {faq.q}
-                  </h4>
-                  <p className="text-zinc-500 leading-relaxed pl-5">{faq.a}</p>
+            <section className="bg-white py-24">
+              <div className="max-w-6xl mx-auto px-6 space-y-16">
+                <div className="text-center space-y-4">
+                  <h3 className="text-4xl font-display font-bold text-zinc-900">Frequently Asked Questions</h3>
+                  <p className="text-zinc-500">Everything you need to know about VoxNova.</p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-zinc-50 py-24">
-          <div className="max-w-6xl mx-auto px-6 space-y-16">
-            <div className="text-center space-y-4">
-              <h3 className="text-4xl font-display font-bold text-zinc-900">How VoxNova Works?</h3>
-              <p className="text-zinc-500">Create your voice in four simple steps.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-              {[
-                { step: '01', title: 'Enter Text', desc: 'Paste your script into our editor. We support long-form content up to 5,000 characters.', img: 'https://picsum.photos/seed/hi-step1/400/300' },
-                { step: '02', title: 'Select Voice', desc: 'Choose your preferred voice from our library of 50+ professional AI voices.', img: 'https://picsum.photos/seed/hi-step2/400/300' },
-                { step: '03', title: 'Adjust Settings', desc: 'Fine-tune pitch, speed, and emotional style to perfect your audio output.', img: 'https://picsum.photos/seed/hi-step3/400/300' },
-                { step: '04', title: 'Generate Audio', desc: 'Our advanced AI engine will deliver studio-quality audio in just a few seconds.', img: 'https://picsum.photos/seed/hi-step4/400/300' }
-              ].map((item, i) => (
-                <div key={`step-hi-${i}`} className="space-y-6 group">
-                  <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-white border border-zinc-200 shadow-sm group-hover:shadow-md transition-all duration-300">
-                    <img src={item.img} alt={item.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" referrerPolicy="no-referrer" />
-                    <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-xl font-display font-bold text-white shadow-lg shadow-emerald-200">
-                      {item.step}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {[
+                    { q: "What is VoxNova Text to Speech?", a: "VoxNova is an advanced AI voice generation platform that converts text into realistic, human-like speech using neural networks." },
+                    { q: "Is VoxNova free to use?", a: "We offer both free and premium plans. Free users get a daily credit limit, while premium users enjoy unlimited generations and high-fidelity voices." },
+                    { q: "Can I use VoxNova voices for commercial projects?", a: "Yes, all audio generated with VoxNova can be used for commercial projects, including YouTube, social media, and professional presentations." },
+                    { q: "How many languages does VoxNova support?", a: "Currently, we specialize in high-quality English and Hindi voices, with more languages being added regularly." },
+                    { q: "How do I get the best quality AI voice?", a: "For the best results, use proper punctuation in your scripts and adjust the 'Style' and 'Pitch' settings to match your content's mood." },
+                    { q: "Does VoxNova support voice cloning?", a: "Yes, our premium plan includes AI voice cloning technology that allows you to create a digital version of any voice from a short sample." }
+                  ].map((faq, i) => (
+                    <div key={`faq-${i}`} className="p-8 bg-zinc-50/50 rounded-[2rem] border border-zinc-100 space-y-3 hover:bg-white hover:shadow-lg transition-all duration-300">
+                      <h4 className="text-lg font-bold text-zinc-900 flex items-center gap-3">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        {faq.q}
+                      </h4>
+                      <p className="text-zinc-500 leading-relaxed pl-5">{faq.a}</p>
                     </div>
-                  </div>
-                  <div className="space-y-2 px-2">
-                    <h4 className="text-xl font-bold text-zinc-900">{item.title}</h4>
-                    <p className="text-sm text-zinc-500 leading-relaxed">{item.desc}</p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
+              </div>
+            </section>
+        
+        {/* End of SEO/Blog sections */}
 
         {/* Footer */}
-        <footer className="max-w-6xl mx-auto py-12 px-6 border-t border-zinc-100">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
-                <Mic className="text-white" size={18} />
+        <footer className="max-w-6xl mx-auto py-24 px-6 border-t border-zinc-100">
+          <div className="flex flex-col items-center gap-12">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center shadow-lg">
+                  <Mic className="text-white" size={22} />
+                </div>
+                <div className="flex flex-col text-center">
+                  <span className="text-2xl font-display font-bold tracking-tighter text-zinc-900">VOXNOVA</span>
+                  <span className="text-[10px] text-emerald-500 font-black tracking-[0.2em] -mt-1 uppercase">Text to Speech</span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-display font-bold tracking-tighter text-zinc-900">VOXNOVA</span>
-                <span className="text-[10px] text-emerald-500 font-medium tracking-widest -mt-1 uppercase">Text to Speech</span>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap justify-center gap-6 text-sm text-zinc-500">
-              <button onClick={() => setShowAbout(true)} className="hover:text-zinc-900 transition-colors">About Us</button>
-              <button onClick={() => setShowContact(true)} className="hover:text-zinc-900 transition-colors">Contact Us</button>
-              <button onClick={() => setShowBlog(true)} className="hover:text-zinc-900 transition-colors">Blog</button>
-              <button onClick={() => setShowPrivacy(true)} className="hover:text-zinc-900 transition-colors">Privacy Policy</button>
-              <button onClick={() => setShowTerms(true)} className="hover:text-zinc-900 transition-colors">Terms of Service</button>
             </div>
 
-            <div className="text-xs text-zinc-400">
-              © 2026 VoxNova Text to Speech. All rights reserved.
+            <div className="flex flex-wrap justify-center gap-8 md:gap-12 text-[11px] md:text-xs font-black uppercase tracking-[0.2em] text-zinc-500">
+              <button onClick={() => setShowAbout(true)} className="hover:text-emerald-500 transition-colors cursor-pointer">About Us</button>
+              <a href="mailto:robotlinkan@gmail.com" className="hover:text-emerald-500 transition-colors cursor-pointer">Contact Us</a>
+              <button onClick={() => setShowBlog(true)} className="hover:text-emerald-500 transition-colors cursor-pointer">Blog</button>
+              <button onClick={() => setShowPrivacy(true)} className="hover:text-emerald-500 transition-colors cursor-pointer">Privacy Policy</button>
+              <button onClick={() => setShowTerms(true)} className="hover:text-emerald-500 transition-colors cursor-pointer">Terms of Service</button>
+            </div>
+
+            <div className="text-center space-y-2">
+              <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">© 2026 VoxNova Text to Speech. All rights reserved.</p>
             </div>
           </div>
         </footer>
@@ -6081,15 +6372,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       </AnimatePresence>
 
       </main>
-
-      {/* Footer / Status */}
-      <footer className="fixed bottom-0 left-0 right-0 md:left-64 p-4 border-t border-zinc-100 bg-white/80 backdrop-blur-md flex items-center justify-between text-[10px] text-zinc-400 uppercase tracking-[0.2em] z-40">
-        <div className="flex items-center gap-4">
-        </div>
-        <div className="hidden md:block">
-          VoxNova Text to Speech &copy; 2026
-        </div>
-      </footer>
 
       {/* Mobile Overlay */}
       <AnimatePresence>

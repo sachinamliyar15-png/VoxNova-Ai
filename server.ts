@@ -92,54 +92,61 @@ const saveToHistory = async (collectionName: string, data: any) => {
 };
 
 const buildSystemInstruction = (language: string, voice_name: string) => {
-  const lookupVoice = (voice_name || '').trim();
-  const profile = VOICE_PROFILES[lookupVoice] || 
-                  VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
-                  null;
+  const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat',
+  'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR',
+  'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
 
-  const isHeavyVoice = HEAVY_VOICES.includes((voice_name || '').toLowerCase());
+  return `You are an elite, world-class professional voice actor and
+narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant
+performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
-  return `You are an elite, world-class professional voice actor and narrator. Your task is to
-provide a stunningly realistic, human-like, and emotionally resonant performance in
-${language === 'hi' ? 'Hindi' : 'English'}.
-
-SOUND ARCHITECTURE (MANDATORY):
-- OUTWARD PROJECTION: Project your voice forward with clarity and force. Direct delivery. Imagine a professional performance in a grand hall.
-- STUDIO ACOUSTICS: Imagine an acoustically treated pro-studio. Zero reverb, zero echo, zero "indoor" or "band kamre" sound quality. Direct microphone placement.
-- CLEAR ARTICULATION: Every syllable must be crisp, pushed forward, and articulate. Do not swallow endings or mumble words.
-
-Your goal is to generate high-fidelity, natural, and expressive speech.
-Analyze the script’s category and tone to determine the best vocal characteristics:
+Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+Analyze the script's category and tone to determine the best vocal characteristics:
 - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
 - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
 - ADVERTISEMENT: Energetic, persuasive, upbeat, clear call to action.
 - CONVERSATIONAL: Natural, relaxed, includes subtle breaths and realistic pauses.
 - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
-VOCAL IDENTITY FOR ${voice_name.toUpperCase()}:
-${profile ? `- CHARACTER DESCRIPTION: ${profile.description}
-- RESONANCE: ${profile.resonance}
-- ENERGY: ${profile.energy}
-- TIMBER: ${profile.timber}
-- PACING: ${profile.pacing}` : '- STATUS: Professional Cinematic Narrator'}
-PERFORMANCE GUIDELINES FOR MAXIMUM REALISM:
-- CRITICAL: VOICES MUST BE DISTINCT AND UNIQUE. Do not sound like a generic AI.
-- USE A NATURAL HUMAN CONVERSATIONAL PACE. Avoid stretching syllables or
-"singing" words. The delivery must sound like a real person talking at a normal, clear speed,
-not a computer performing slowly.
-- CRITICAL: THE VOICE MUST BE OPEN ("Khuli Awaaz") AND POWERFUL ("Damdaar").
-Avoid nasal or muffled tones.
+
+PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
+- CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any
+"nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
+- The voice should sound like it's coming from an open throat and mouth, with full lung
+support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
 - Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive
-"sing-song" patterns or slow, dragging articulation.
+"sing-song" patterns.
 - Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated
-into every word.
-- 100% REALISM AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy) and "Gambhir" (Serious). Speak with absolute authority.' : '- CRITICAL: Use a professional, mature, and resonant voice with natural human textures.'}
+into every word, not just added on top.
+- 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE
+MANDATORY.
+- THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR
+WEAK TONES.
+- USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A
+PROFESSIONAL SPEAKER.
+${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
+- Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100%
+mature and authoritative.
 - Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic
-variations in pitch.
-- Avoid robotic, monotone, or repetitive cadence. Every sentence should have its own unique
-melody.
-- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation and natural
-flow.
+variations in pitch and volume to achieve 100% realism.
+- Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own
+unique melody.
+- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural
+flow, and cultural nuance.
+- Sound like a real person speaking in a high-end professional studio, not a computer.
+- Pay close attention to the emotional weight of the text. If the text is sad, the voice should
+sound heavy; if exciting, it should sound bright and energetic.
+- Use natural emphasis on key words to convey meaning and emotion.
+- Ensure smooth, fluid transitions between sentences and ideas.
+${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
+
+TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
+- NO background noise, hums, hissing, or digital artifacts.
+- NO robotic glitches, metallic sounds, or synthetic "buzzing".
+- NO background music, bell-like sounds, or hallucinations in the background.
+- ZERO background noise is mandatory. Audio must be 100% clean and professional.
+- Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts
+throughout the entire generation.
+- If the script is long, maintain consistent tone, energy, and quality from start to finish.
 `;
 };
 
@@ -157,14 +164,14 @@ let firestore: admin.firestore.Firestore;
 const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'Adam': 'Puck', 'Brian': 'Charon', 'Daniel': 'Fenrir', 'Josh': 'Puck',
   'Liam': 'Charon', 'Michael': 'Fenrir', 'Ryan': 'Puck', 'Matthew': 'Charon',
-  'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Fenrir', 'Marcus': 'Charon',
+  'Bill': 'Fenrir', 'Callum': 'Puck', 'Frank': 'Zephyr', 'Marcus': 'Charon',
   'Jessica': 'Kore', 'Sarah': 'Zephyr', 'Matilda': 'Kore', 'Emily': 'Zephyr',
   'Bella': 'Kore', 'Rachel': 'Zephyr', 'Nicole': 'Kore', 'Clara': 'Zephyr',
   'Documentary Pro': 'Charon', 'Atlas (Do)': 'Fenrir', 'Priyanka': 'Zephyr', 'Virat': 'Charon',
   'Leo': 'Puck', 'Sophia': 'Kore', 'Hugo': 'Charon', 'Elara': 'Zephyr', 'Pankaj': 'Fenrir', 'Original Voice': 'Zephyr',
   'adam': 'Puck', 'brian': 'Charon', 'daniel': 'Fenrir', 'josh': 'Puck',
   'liam': 'Charon', 'michael': 'Fenrir', 'ryan': 'Puck', 'matthew': 'Charon',
-  'bill': 'Fenrir', 'callum': 'Puck', 'frank': 'Fenrir', 'marcus': 'Charon',
+  'bill': 'Fenrir', 'callum': 'Puck', 'frank': 'Zephyr', 'marcus': 'Charon',
   'jessica': 'Kore', 'sarah': 'Zephyr', 'matilda': 'Kore', 'emily': 'Zephyr',
   'bella': 'Kore', 'rachel': 'Zephyr', 'nicole': 'Kore', 'clara': 'Zephyr',
   'doc-pro': 'Charon', 'atlas-do': 'Fenrir', 'priyanka': 'Zephyr', 'virat-male': 'Charon',
@@ -172,7 +179,7 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
   'sultan': 'Fenrir', 'vikram': 'Charon', 'bharat': 'Fenrir', 'titan': 'Puck',
   'shera': 'Fenrir', 'kaal': 'Charon', 'bheem': 'Fenrir', 'sikandar': 'Charon',
   'SULTAN': 'Fenrir', 'SHERA': 'Fenrir', 'KAAL': 'Charon', 'BHEEM': 'Fenrir', 'SIKANDAR': 'Charon', 'VIKRAM': 'Charon',
-  'munna-bhai': 'Fenrir', 'sachinboy': 'Fenrir', 'Munna Bhai': 'Fenrir', 'Sachinboy': 'Fenrir',
+  'munna-bhai': 'Zephyr', 'sachinboy': 'Fenrir', 'Munna Bhai': 'Zephyr', 'Sachinboy': 'Fenrir',
   'maharaja': 'Fenrir', 'MAHARAJA': 'Fenrir', 'emperor-pro': 'Fenrir', 'EMPEROR PRO': 'Fenrir',
   'kabir': 'Charon', 'KABIR': 'Charon', 'aryan': 'Puck', 'ARYAN': 'Puck',
   'ishani': 'Kore', 'ISHANI': 'Kore', 'zoravar': 'Fenrir', 'ZORAVAR': 'Fenrir',
@@ -187,75 +194,54 @@ const INTERNAL_VOICE_MAPPING: Record<string, string> = {
 };
 
 interface VoiceProfile {
-  resonance: 'Chest' | 'Throat' | 'Frontal-Oral' | 'Mixed';
-  energy: 'High' | 'Medium' | 'Calm';
-  pitch_shift: number; // Offset from base model default
-  timber: 'Smooth' | 'Gravelly' | 'Sharp' | 'Airy';
-  pacing: 'Fast' | 'Normal' | 'Slow';
+  resonance?: string;
+  energy?: string;
+  pitch_shift?: number;
+  timber?: string;
+  pacing?: string;
   description: string;
-}const VOICE_PROFILES: Record<string, VoiceProfile> = {
-  // Global/English Voices
-  'Adam': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Deep, authoritative tone of a 45-year-old male leader. Resonant, commanding, and professional cinematic voice.' },
-  'Brian': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Kind, trustworthy 30-year-old male with a soft, steady cadence and a friendly neighborhood vibe.' },
-  'Daniel': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.02, timber: 'Sharp', pacing: 'Fast', description: 'Energetic news anchor, mid-30s. Crisp, fast-paced, highly articulate broadcast professional.' },
-  'Josh': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Airy', pacing: 'Normal', description: 'Youthful, energetic 20-year-old male. Natural conversational tone with slight breathiness and upbeat delivery.' },
-  'Liam': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.00, timber: 'Airy', pacing: 'Slow', description: 'Soft-spoken storyteller, mid-20s. Warm, empathetic, and gentle with distinct emotional depth.' },
-  'Michael': { resonance: 'Chest', energy: 'Calm', pitch_shift: 0.85, timber: 'Gravelly', pacing: 'Slow', description: 'Mature 60-year-old narrator. Wise, sophisticated, with a distinct gravelly texture in the lower range.' },
-  'Ryan': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Gravelly', pacing: 'Normal', description: 'Casual, relatable mid-30s male. Authentic "guy-next-door" with slight rasp and conversational inflections.' },
-  'Matthew': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Intense 40-year-old action trailer narrator. Cinematic, dramatic, and intensely resonant.' },
-  'Bill': { resonance: 'Throat', energy: 'Medium', pitch_shift: 1.02, timber: 'Gravelly', pacing: 'Slow', description: 'Rugged 50-year-old farmer type. Experienced, husky, and character-rich performance with rough edges.' },
-  'Callum': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Elite British-style professor. Refined, precise, and sophisticated academic delivery.' },
-  'Frank': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'Ultra-deep 55-year-old masculine icon. Powerful chest-voice with maximum bass resonance and authority.' },
-  'Marcus': { resonance: 'Chest', energy: 'High', pitch_shift: 0.94, timber: 'Gravelly', pacing: 'Normal', description: 'Strong, motivational army sergeant. Commanding, inspiring, loud, and impactful.' },
-  'Jessica': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.08, timber: 'Sharp', pacing: 'Normal', description: 'Clear, professional 30-year-old corporate leader. Confident, friendly smile in the voice, and extremely crisp.' },
-  'Sarah': { resonance: 'Mixed', energy: 'Calm', pitch_shift: 1.05, timber: 'Airy', pacing: 'Slow', description: 'Ethereal, soft-spoken young female. Gentle, soothing, and very quiet with a dream-like quality.' },
-  'Matilda': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Intelligent, articulate university student. Professional, focused, and academic with clear delivery.' },
-  'Emily': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.12, timber: 'Smooth', pacing: 'Fast', description: 'Youthful, bubbly 19-year-old girl. High-energy, cheerful, and friendly with rapid pacing.' },
-  'Bella': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.96, timber: 'Smooth', pacing: 'Slow', description: 'Elegant, sophisticated 40-year-old businesswoman. Premium, rich texture with a calm presence.' },
-  'Rachel': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Dynamic, wide-ranging female actor. Versatile, expressive, and clear with high emotional intelligence.' },
-  'Nicole': { resonance: 'Frontal-Oral', energy: 'Medium', pitch_shift: 0.98, timber: 'Sharp', pacing: 'Normal', description: 'Direct, confident 35-year-old journalist. No-nonsense, firm tone with broadcast standard clarity.' },
-  'Clara': { resonance: 'Chest', energy: 'Calm', pitch_shift: 1.02, timber: 'Smooth', pacing: 'Slow', description: 'Kind 45-year-old motherly figure. Approachable, warm, and natural with a nurturing tone.' },
-  
-  // Documentary & Cinematic
-  'Documentary Pro': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'The absolute summit of documentary narration. Deep, mature, cinematic, and profoundly intelligent.' },
-  'Atlas (Do)': { resonance: 'Chest', energy: 'High', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Ultra-high fidelity cinematic voice. Deeply resonant with a legendary storytelling aura.' },
-  'Virat': { resonance: 'Chest', energy: 'High', pitch_shift: 0.92, timber: 'Gravelly', pacing: 'Normal', description: 'Realistic, high-energy Hindi-English mix professional. Masculine, thick, and commanding. Documentary standard.' },
-  'Priyanka': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.95, timber: 'Smooth', pacing: 'Normal', description: 'Powerful 40-year-old authoritative female. Perfect for documentaries and high-stakes narration.' },
-  
-  // Character/Indian Power Voices
-  'SULTAN': { resonance: 'Chest', energy: 'High', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'The Warrior. Ancient king tone. Every word vibrates with massive bass resonance and vocal fry.' },
-  'MAHARAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Slow', description: 'The Emperor. Royal, resonant, and expansive male voice. Grand and prestigious delivery.' },
-  'Munna Bhai': { resonance: 'Throat', energy: 'High', pitch_shift: 1.00, timber: 'Sharp', pacing: 'Normal', description: 'Massive baritone Desi voice. Street-smart, energetic, and explosive power.' },
-  'Sachinboy': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.03, timber: 'Sharp', pacing: 'Normal', description: 'Heavyweight sporting champion. Monstrous energy, chest-rattling baritone, and confidence.' },
-  'SHERA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Gravelly', pacing: 'Normal', description: 'Alpha Motivator. Raw, aggressive, testosterone-driven masculine power. Extremely realistic.' },
-  'KAAL': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Mystery Shadow. Dark, cinematic, ultra-low frequency with mysterious undertones. Villainous profile.' },
-  'BHEEM': { resonance: 'Chest', energy: 'High', pitch_shift: 0.70, timber: 'Gravelly', pacing: 'Slow', description: 'The Mythical Giant. Super-heavy baritone. The ground shakes with every word. Deepest human limit.' },
-  'SIKANDAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Legend. Mature, wise warrior king. Rich bass for professional and epic narrations.' },
-  'VIKRAM': { resonance: 'Throat', energy: 'Medium', pitch_shift: 0.86, timber: 'Smooth', pacing: 'Normal', description: 'The Dark Master. Smooth, mysterious, and cinematic with a brooding intensity.' },
-  'EMPEROR PRO': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Smooth', pacing: 'Slow', description: 'Absolute Sovereign. Legendary deep baritone with a regal and commanding presence.' },
-  'KABIR': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Warm Poet and Storyteller. Wise, resonant, and deeply soulful storytelling tone.' },
-  'ARYAN': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Intense Fitness Coach. High-energy, sharp, commanding, and extremely loud.' },
-  'ZORAVAR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.72, timber: 'Gravelly', pacing: 'Slow', description: 'The Heavy Tank. Ultra-deep, chest-rattling baritone built for trailer impact.' },
-  'RUDRA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.84, timber: 'Smooth', pacing: 'Normal', description: 'The Fearless Narrator. Gritty, serious, and extremely authoritative. Pure masculine grit.' },
-  // Versatile Male/Female
-  'Leo': { resonance: 'Mixed', energy: 'High', pitch_shift: 1.10, timber: 'Sharp', pacing: 'Normal', description: 'Vibrant young male, early 20s. Energetic, expressive, and friendly conversationalist.' },
-  'Sophia': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Smooth', pacing: 'Normal', description: 'Intimate female storyteller. Deeply emotional, soft, and resonant narration.' },
-  'Hugo': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.90, timber: 'Smooth', pacing: 'Slow', description: 'Gravelly character actor. Mid-50s male with intense personality and rich tone.' },
-  'Elara': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.02, timber: 'Airy', pacing: 'Normal', description: 'Enthusiastic female host. Bright, energetic, and highly engaging for modern content.' },
-  'Pankaj': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.78, timber: 'Gravelly', pacing: 'Slow', description: 'Ultra-authoritative male baritone. 100% realistic masculine grit with authority.' },
-  'ISHANI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'High-class female presenter. Elegant, sophisticated, and flawlessly professional.' },
-  'VEER': { resonance: 'Chest', energy: 'High', pitch_shift: 0.80, timber: 'Gravelly', pacing: 'Normal', description: 'The Braveheart. High-energy, loud, and incredibly powerful warrior male.' },
-  'SHAKTI': { resonance: 'Frontal-Oral', energy: 'High', pitch_shift: 1.05, timber: 'Sharp', pacing: 'Normal', description: 'Female Power Leader. Strong, authoritative, and inspiring leadership voice.' },
-  'RAJA': { resonance: 'Chest', energy: 'High', pitch_shift: 0.82, timber: 'Smooth', pacing: 'Normal', description: 'The Royal Prince. Youthful but powerful. Deep, resonant, and prestigious male.' },
-  'TOOFAN': { resonance: 'Throat', energy: 'High', pitch_shift: 1.15, timber: 'Sharp', pacing: 'Fast', description: 'The Storm. Extremely fast-paced, explosive energy, and rapid-fire delivery.' },
-  'BHAIRAV': { resonance: 'Chest', energy: 'High', pitch_shift: 0.75, timber: 'Gravelly', pacing: 'Slow', description: 'The Intense Sage. Gritty, impactful, and serious professional narration.' },
+}
 
-  // Specialized Hindi Profiles
-  'ARAV_NEUTRAL_PRO': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.00, timber: 'Smooth', pacing: 'Normal', description: 'Modern Indian Male. Balanced, confident, and grounded. Natural urban Hindi speaker.' },
-  'DEV_DEEP_REAL': { resonance: 'Chest', energy: 'Medium', pitch_shift: 0.85, timber: 'Smooth', pacing: 'Slow', description: 'Deep Mature Indian Elder. Stable, trustworthy, and authoritative traditional Hindi voice.' },
-  'NEEL_SOFT_CONNECT': { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.05, timber: 'Airy', pacing: 'Normal', description: 'Friendly Indian Friend. Warm, casual, and relatable with a soft Hindi-English touch.' },
-  'RAJ_CLASSIC_NARRATOR': { resonance: 'Chest', energy: 'High', pitch_shift: 0.88, timber: 'Smooth', pacing: 'Normal', description: 'Epic Hindi Narrator. Clear, composed, and formal. Built for grand stories and historical accounts.' }
+const VOICE_TRAITS: Record<string, string> = {
+  'Adam': 'Deep, resonant, and authoritative. A professional cinematic voice with a slight gravelly texture.',
+  'Brian': 'Calm, steady, and trustworthy. High-fidelity studio quality with a neutral, clear tone.',
+  'Daniel': 'Clear, news-like, and highly articulate. Fast-paced broadcast standard.',
+  'Josh': 'Young, energetic, and friendly. Natural conversational tone with a slight upward inflection.',
+  'Liam': 'Warm, empathetic, and gentle. Soft-spoken storytelling with emotional depth.',
+  'Michael': 'Mature, wise, and sophisticated. Slow, deliberate professional narration.',
+  'Ryan': 'Casual, upbeat, and conversational. Relatable, authentic, and slightly breathy.',
+  'Matthew': 'Deep, cinematic, and dramatic. Movie trailer quality with intense resonance.',
+  'Bill': 'Gravelly, experienced, and rugged. Character-rich performance with a rough edge.',
+  'Callum': 'Refined, polite, and sophisticated. Elite British-style professional tone.',
+  'Frank': 'Ultra-deep, heavy, and masculine. A powerful chest-voice with maximum bass resonance and a professional narrator tone.',
+  'Marcus': 'Strong, motivational, and powerful. Commanding, inspiring, and loud.',
+  'Jessica': 'Clear, bright, and professional. Modern corporate standard with a friendly smile.',
+  'Sarah': 'Soft, soothing, and gentle. Ethereal, calm, and very quiet.',
+  'Matilda': 'Intelligent, articulate, and formal. Academic precision with a sharp, crisp delivery.',
+  'Emily': 'Youthful, cheerful, and friendly. High-energy realism with a bubbly personality.',
+  'Bella': 'Elegant, smooth, and professional. Premium quality with a sophisticated, rich texture.',
+  'Rachel': 'Dynamic, expressive, and clear. Versatile performance with wide emotional range.',
+  'Nicole': 'Direct, confident, and professional. Business standard with a firm, no-nonsense tone.',
+  'Clara': 'Kind, helpful, and natural. Approachable realism with a warm, motherly feel.',
+  'Documentary Pro': 'The ultimate documentary narrator. Deep, mature, cinematic, and incredibly intelligent.',
+  'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
+  'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
+  'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
+  'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. High speaker projection, open-mouthed and fearless. 100% Realistic.',
+  'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, loud and energetic. 100% Realistic.',
+  'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. Open throat resonance. 100% Realistic.',
+  'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. High speaker volume. 100% Realistic.',
+  'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. Open and clear projection. 100% Realistic.',
+  'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. Clear and confident. 100% Realistic.',
+  'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. High speaker projection, energetic and loud. 100% Realistic and Professional.',
+  'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. High speaker projection, open and majestic. 100% Realistic.',
+  'KABIR': 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives and soulful storytelling. 100% Realistic.',
+  'ARYAN': 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation and sports commentary. 100% Realistic.',
+  'ISHANI': 'The Elegant Narrator. Smooth, sophisticated, and professional female voice. Ideal for luxury brands and high-end documentaries. 100% Realistic.',
+  'ZORAVAR': 'The Heavyweight. An ultra-deep, chest-rattling baritone with immense power. 100% Realistic.',
+  'RUDRA': 'The Intense Narrator. Gritty, serious, and highly authoritative. Best for crime thrillers and investigative content. 100% Realistic.'
 };
+
 
 if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
   try {
@@ -348,7 +334,13 @@ try {
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '100mb' })); // Increased limit for video files
+app.use((req, res, next) => {
+  res.header('Cross-Origin-Opener-Policy', 'same-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'require-corp');
+  next();
+});
+
+app.use(express.json({ limit: '500mb' })); // Increased limit for video and audio files to match frontend expectations
 app.use(cookieParser());
 
 // Initialize Database
@@ -708,23 +700,8 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       const systemInstruction = buildSystemInstruction(language, voice_name);
       
       let promptPrefix = "";
-      if (studioClarity) {
-        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
-      }
-
-      const lookupVoice = (voice_name || '').trim();
-      const profile = VOICE_PROFILES[lookupVoice] || 
-                      VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
-                      null;
-
-      if (profile) promptPrefix += `${profile.description} `;
-
-      // Voice-specific speed normalization
-      if (['Puck', 'Charon'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
-      } else if (['Fenrir'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
-      }
+      const currentVoiceTrait = VOICE_TRAITS[voice_name] || '';
+      if (currentVoiceTrait) promptPrefix += `${currentVoiceTrait} `;
 
       if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
@@ -743,7 +720,7 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       } else if (speed < 1.0) {
         promptPrefix += "PERFORMANCE: Deliver a calm, relaxed, and clear narration. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced - exactly like a real person talking in a room. Avoid any singing-like or slow stretching of vowels unless specifically asked for narration. ";
+        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced. ";
       }
 
       if (pause > 0.1) {
@@ -758,18 +735,14 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
       `;
 
       const currentPrompt = attempt === 0 
-        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
+        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. Respect all punctuation and deliver the script with natural, professional flow.`
         : `CRITICAL: The previous attempt sounded slightly robotic or off-pacing. Please deliver a MORE HUMAN, MORE REALISTIC, and MORE RESONANT performance in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
-;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-tts-preview",
+        model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: currentPrompt }] }],
         config: {
           responseModalities: [Modality.AUDIO],
-          temperature: 0.7,
-          topP: 0.95,
-          topK: 40,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: targetVoice as any },
@@ -778,7 +751,8 @@ app.post("/api/generate-speech-guest", async (req: any, res) => {
         },
       });
 
-      const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+      const audioData = (response as any).audioData || (response as any).inlineData?.data || response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (audioData) {
         const pcmBuffer = Buffer.from(audioData, 'base64');
         const wavBuffer = addWavHeader(pcmBuffer, 24000);
@@ -845,8 +819,7 @@ app.post("/api/analyze-voice", async (req, res) => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
-        { text: prompt },
-        { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }
+        { parts: [{ text: prompt }, { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }] }
       ]
     });
 
@@ -913,23 +886,8 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         YOU MUST OVERRIDE YOUR DEFAULT VOCAL CHARACTERISTICS ENTIRELY TO MATCH THIS FINGERPRINT. Sound 100% like this description. `;
       }
       
-      if (studioClarity) {
-        promptPrefix += "CRITICAL: Apply professional noise reduction and denoising. Ensure zero background hum, zero robotic artifacts, and zero background music. The audio must be crystal clear and studio-quality. ";
-      }
-
-      const lookupVoice = (voice_name || '').trim();
-      const profile = VOICE_PROFILES[lookupVoice] || 
-                      VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
-                      null;
-
-      if (profile) promptPrefix += `${profile.description} `;
-
-      // Voice-specific speed normalization
-      if (['Puck', 'Charon'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally brisk, so ensure the pacing feels controlled and not rushed. ";
-      } else if (['Fenrir'].includes(targetVoice)) {
-        promptPrefix += "Note: This voice is naturally slow and deep, so ensure it doesn't become too sluggish. ";
-      }
+      const currentVoiceTrait = VOICE_TRAITS[voice_name] || '';
+      if (currentVoiceTrait) promptPrefix += `${currentVoiceTrait} `;
 
       if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
@@ -948,7 +906,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       } else if (speed < 1.0) {
         promptPrefix += "PERFORMANCE: Deliver a calm, relaxed, and clear narration. ";
       } else {
-        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced - exactly like a real person talking in a room. Avoid any singing-like or slow stretching of vowels unless specifically asked for narration. ";
+        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced. ";
       }
 
       if (pause > 0) {
@@ -963,7 +921,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       `;
 
       // Split text into chunks for parallel processing if it's long
-      const CHUNK_SIZE = 1000; // characters
+      const CHUNK_SIZE = 800; // characters as per PDF
       const chunks: string[] = [];
       if (text.length > CHUNK_SIZE) {
         const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
@@ -988,17 +946,14 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         const batch = chunks.slice(i, i + CONCURRENCY);
         const batchPromises = batch.map(async (chunk, idx) => {
           const currentPrompt = attempt === 0 
-            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. If the voice is naturally slow, speed it up more; if naturally fast, slow it down to hit the target pace. Respect all punctuation and deliver the script with natural, professional flow.`
+            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. Respect all punctuation and deliver the script with natural, professional flow.`
             : `CRITICAL: The previous attempt sounded slightly robotic or off-pacing. Please deliver a MORE HUMAN, MORE REALISTIC, and MORE RESONANT performance in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-3.1-flash-tts-preview",
+            model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text: currentPrompt }] }],
             config: {
               responseModalities: [Modality.AUDIO],
-              temperature: 0.6,
-              topP: 0.9,
-              topK: 40,
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: { voiceName: targetVoice as any },
@@ -1007,7 +962,8 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
             },
           });
 
-          const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+          const base64 = (response as any).audioData || (response as any).inlineData?.data || response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
           if (base64) return Buffer.from(base64, 'base64');
           return null;
         });
@@ -1172,12 +1128,10 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       // Step 2: Generate Speech in Target Voice
       const currentTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
       
-      const defaultProfile: VoiceProfile = { resonance: 'Mixed', energy: 'Medium', pitch_shift: 1.0, timber: 'Smooth', pacing: 'Normal', description: 'Balanced professional voice.' };
-      
       const lookupVoice = (voice_id || '').trim();
-      const profile = VOICE_PROFILES[lookupVoice] || 
-                      VOICE_PROFILES[Object.keys(VOICE_PROFILES).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
-                      defaultProfile;
+      const profile_desc = VOICE_TRAITS[lookupVoice] || 
+                      VOICE_TRAITS[Object.keys(VOICE_TRAITS).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
+                      "Balanced professional voice.";
 
       const userPitch = req.body.pitch || 1.0;
       const ttsSystemInstruction = buildSystemInstruction(targetLanguage === 'Hindi' ? 'hi' : 'en', voice_id);
@@ -1190,22 +1144,19 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       YOU MUST ADAPT THE ABOVE PERFORMANCE INTO THE VOICE OF ${voice_id}.
       - DO NOT keep the original speaker's vocal tone.
       - YOU MUST change the vocal identity ENTIRELY to ${voice_id}.
-      - CHARACTER DNA: ${profile.description}
+      - CHARACTER DNA: ${profile_desc}
       - MIMIC the timing and emotion, but VOICED BY ${voice_id}.
       
       The result must be: The EMOTION of the original speaker, but 100% THE VOICE of ${voice_id}.
       
-      CRITICAL: Use a very natural, balanced pace. Do not drag. Do not shout. Deliver a professional studio performance.
+      CRITICAL: Use a very natural, balanced pace. PROJECT the voice forward as if exhaling naturally while speaking. Do NOT pull the voice inward or swallow it. Speak with an open, projected tone. Do not drag. Do not shout. Deliver a professional studio performance.
       `;
 
       const ttsResponse = await ai.models.generateContent({
-        model: "gemini-3.1-flash-tts-preview",
+        model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\n${performancePrompt}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
-          temperature: 0.5,
-          topP: 0.85,
-          topK: 40,
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: currentTargetVoice as any }
@@ -1214,7 +1165,8 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         }
       });
 
-      const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+      const audioData = (ttsResponse as any).audioData || (ttsResponse as any).inlineData?.data || ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!audioData) throw new Error("Failed to generate speech in target voice");
 
       // Convert PCM to WAV
@@ -1415,7 +1367,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
       const previewText = languagePreviews[voice_id] || (req.body.language === 'ta' ? languagePreviews['tamil-preview'] : `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`);
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: previewText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1660,35 +1612,23 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ? (scriptType === 'hinglish' ? "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto'." : "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.")
         : "";
 
-      const prompt = `Transcribe the ENTIRE video/audio with ABSOLUTE MILLISECOND PRECISION. 
-      This is for professional cinema captions. DELAY IS FATAL.
+      const prompt = `Transcribe this video precisely with word-level timestamps in seconds.
       
       CONTENT LANGUAGE: ${language}.
       ${scriptInstruction}
-      ${translateToEnglish ? "CRITICAL: Translate the spoken content into English for the captions." : ""}
+      ${translateToEnglish ? "CRITICAL: Output the transcription translated in English." : ""}
       
-      OUTPUT FORMAT: You MUST return a JSON array of objects.
-      Each object represents EXACTLY ONE word.
+      OUTPUT FORMAT: A JSON array of word objects.
+      Schema: [{"word": string, "start": number, "end": number}]
       
-      PRECISION GUIDELINES (STRICTLY ENFORCED):
-      1. Every single word must have its own unique entry.
-      2. "start" timestamp MUST be the exact frame (down to milliseconds) the word begins.
-      3. "end" timestamp MUST be the exact frame (down to milliseconds) the word finishes.
-      4. DO NOT summarize. DO NOT skip or merge words.
-      5. DO NOT apply any manual offsets. Return TRUE, RAW timestamps.
-      6. If there is a silence between words, the timestamps must reflect that silence.
-      
-      Schema: {"word": string, "start": number, "end": number}[]
-      Example: [{"word": "नमस्ते", "start": 0.520, "end": 0.880}, {"word": "दोस्तों", "start": 0.890, "end": 1.250}]
-      
-      Strictly return JSON array ONLY.`;
+      Return ONLY the JSON array. NO MARKDOWN. NO text outside the array.`;
 
-      const mimeType = videoData.startsWith('data:') 
-        ? videoData.split(';')[0].split(':')[1] 
-        : "video/mp4";
+      const videoBase64 = videoData.split(',')[1] || videoData;
+      
+      console.log(`[Captions] Processing with Gemini 3 for ${language}...`);
 
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3-flash-preview", 
         contents: [
           {
             role: "user",
@@ -1696,52 +1636,93 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
               { text: prompt },
               {
                 inlineData: {
-                  mimeType,
-                  data: videoData.split(',')[1] || videoData
+                  mimeType: "video/mp4",
+                  data: videoBase64
                 }
               }
             ]
           }
         ],
         config: {
-          responseMimeType: "application/json"
+          temperature: 0.1,
+          responseMimeType: "application/json",
         }
       });
 
-      const responseText = result.text || "";
-      if (!responseText) {
-        throw new Error("Failed to transcribe video: AI returned empty response");
+
+      let responseText = "";
+      try {
+        // Handle GenerateContentResponse structure
+        const anyResult = result as any;
+        if (typeof anyResult.text === 'function') {
+          responseText = anyResult.text();
+        } else if (anyResult.response && typeof anyResult.response.text === 'function') {
+           responseText = anyResult.response.text();
+        } else {
+           responseText = anyResult.text || "";
+        }
+      } catch (e) {
+         console.error("[Captions] AI Content extraction error:", e);
+         responseText = (result as any).text || "";
       }
 
-      // Extract JSON array from response
-      const jsonStr = responseText.replace(/```json|```/g, "").trim();
-      const words = JSON.parse(jsonStr);
+      if (!responseText) {
+        throw new Error("AI returned empty transcription result.");
+      }
+
+      let words;
+      try {
+        // Find the broad JSON array pattern
+        const jsonMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/);
+        if (jsonMatch) {
+          words = JSON.parse(jsonMatch[0]);
+        } else {
+          // Try cleaning markdown
+          const cleaned = responseText.trim().replace(/^```json\s*|```$/g, '');
+          words = JSON.parse(cleaned);
+        }
+      } catch (e) {
+        console.error("[Captions] Parsing failed. Raw response:", responseText.substring(0, 500));
+        throw new Error("Transcription format error. Please try again.");
+      }
 
       if (!Array.isArray(words)) {
-        throw new Error("Invalid format returned by AI: Expected array");
+        throw new Error("Invalid format: AI response was not an array.");
       }
 
-      // Save to Firestore history (Background)
+      console.log(`[Captions] Successfully generated ${words.length} words.`);
+      
+      // Save to history (Background)
       if (firestore) {
         saveToHistory('caption_history', {
           userId,
           words,
           language,
           created_at: admin.firestore.FieldValue.serverTimestamp()
-        }).catch(err => console.error("Failed to save caption history:", err));
+        }).catch(e => console.error("History save failed:", e));
       }
 
-      return res.json({ words });
+      return res.status(200).json({ words });
     } catch (error: any) {
       console.error(`[Captions] Attempt ${attempt + 1} failed:`, error.message);
-      if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("503") || error.message.includes("UNAVAILABLE")) {
+      
+      if (error.message?.includes("Resource has been exhausted") || error.message?.includes("429")) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        const waitTime = (error.message.includes("503") || error.message.includes("UNAVAILABLE")) ? 2000 : 500;
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise(r => setTimeout(r, 1000));
         continue;
       }
-      return res.status(500).json({ error: error.message });
+
+      if (error.message?.includes("deadlines") || error.message?.includes("timeout") || error.message?.includes("504")) {
+         attempt++;
+         await new Promise(r => setTimeout(r, 2000));
+         continue;
+      }
+      
+      return res.status(500).json({ 
+        error: "Transcription failed", 
+        message: error.message || "An unexpected error occurred during processing."
+      });
     }
   }
 

@@ -1,9 +1,10 @@
 export const FONTS = [
+  'Hind',
+  'Poppins',
   'Inter', 
   'Roboto', 
   'Montserrat', 
   'Open Sans', 
-  'Poppins', 
   'Bebas Neue', 
   'Oswald', 
   'Playfair Display', 

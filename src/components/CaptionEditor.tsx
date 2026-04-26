@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import React, { useState } from 'react';
 import { 
   Edit3, 
@@ -37,7 +38,8 @@ const CAPTION_COLORS = [
   '#c084fc', '#a855f7', '#9333ea', // Purples
   '#fb923c', '#f97316', '#ea580c', // Oranges
   '#2dd4bf', '#14b8a6', '#0d9488', // Teals
-  '#f472b6', '#ec4899', '#db2777'  // Pinks
+  '#f472b6', '#ec4899', '#db2777', // Pinks
+  '#ff8c00', '#ff1493', '#7fff00', '#4169e1', '#8a2be2'  // Additional
 ];
 
 const CaptionEditor: React.FC<CaptionEditorProps> = ({ 
@@ -248,8 +250,10 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
   const renderPresetsTab = () => (
     <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-300 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
       {CAPTION_PRESETS.map((preset) => (
-        <button
+        <motion.button
           key={preset.id}
+          whileHover={{ scale: 1.05, transition: { duration: 0.2 } }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => {
             onUpdateStyle(preset.style);
             onUpdateAnimation(preset.animation);
@@ -278,7 +282,7 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
               <Check size={8} className="text-white" />
             </div>
           )}
-        </button>
+        </motion.button>
       ))}
     </div>
   );
@@ -304,11 +308,29 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
 
       <div className="min-h-[250px]">
         {activeStyleSubTab === 'font' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Style Font (Weight & Tilt)</label>
+              <div className="flex gap-2">
+                 <button 
+                   onClick={() => updateStyle({ italic: !style.italic })}
+                   className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${style.italic ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'bg-white border-zinc-100 text-zinc-500'}`}
+                 >
+                   Italic Style
+                 </button>
+                 <button 
+                   onClick={() => updateStyle({ fontWeight: style.fontWeight === '900' ? '400' : '900' })}
+                   className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${style.fontWeight === '900' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'bg-white border-zinc-100 text-zinc-500'}`}
+                 >
+                   {style.fontWeight === '900' ? 'Ultra Bold' : 'Regular Text'}
+                 </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Font Size</span>
-                <span className="text-xs font-bold text-zinc-900">{style.fontSize}px</span>
+                <span className="text-xs font-bold text-emerald-600">{style.fontSize}px</span>
               </div>
               <input 
                 type="range" min="12" max="160" step="1"
@@ -317,61 +339,77 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
                 className="w-full h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-emerald-500"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
-              {FONTS.map(f => (
-                <button
-                  key={f}
-                  onClick={() => updateStyle({ font: f })}
-                  className={`p-2.5 rounded-xl border-2 text-xs font-medium transition-all ${style.font === f ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-zinc-100 bg-white hover:border-zinc-200 text-zinc-600'}`}
-                  style={{ fontFamily: f }}
-                >
-                  {f}
-                </button>
-              ))}
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Handwriting Style</label>
+              <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                {FONTS.map(f => (
+                  <button
+                    key={f}
+                    onClick={() => updateStyle({ font: f })}
+                    className={`p-3 rounded-xl border-2 text-[10px] font-black transition-all hover:scale-[1.02] active:scale-[0.98] ${style.font === f ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md' : 'border-zinc-100 bg-white hover:border-zinc-200 text-zinc-500'}`}
+                    style={{ fontFamily: f }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {activeStyleSubTab === 'color' && (
           <div className="space-y-4">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Main Text Color</span>
-            <div className="grid grid-cols-6 gap-2">
+            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Choose Text Color</span>
+            <div className="grid grid-cols-5 gap-2.5 p-3.5 bg-zinc-50 rounded-2xl border border-zinc-100 shadow-inner">
               {CAPTION_COLORS.map(c => (
                 <button
                   key={`inner-${c}`}
                   onClick={() => updateStyle({ color: c })}
-                  className={`w-full aspect-square rounded-full border-2 transition-all ${style.color === c ? 'border-zinc-900 scale-110' : 'border-transparent hover:scale-105'}`}
+                  className={`w-full aspect-square rounded-full border-2 transition-all relative group ${style.color === c ? 'border-zinc-900 scale-110 shadow-md ring-2 ring-emerald-100' : 'border-white hover:scale-105 shadow-sm'}`}
                   style={{ backgroundColor: c }}
-                />
+                >
+                  {style.color === c && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Check size={12} className={c === '#ffffff' ? 'text-zinc-900' : 'text-white'} strokeWidth={4} />
+                    </div>
+                  )}
+                </button>
               ))}
-              <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-zinc-100 group">
+              <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-white shadow-sm group">
                 <input 
                   type="color" 
                   value={style.color}
                   onChange={(e) => updateStyle({ color: e.target.value })}
-                  className="absolute inset-0 w-full h-full scale-150 cursor-pointer"
+                  className="absolute inset-0 w-full h-full scale-150 cursor-pointer opacity-0 z-10"
                 />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Plus size={12} className="text-zinc-400" />
+                <div className="absolute inset-0 flex items-center justify-center bg-white group-hover:bg-zinc-50 transition-colors">
+                  <Plus size={14} className="text-zinc-400 group-hover:text-emerald-500 transition-colors" />
                 </div>
               </div>
             </div>
             
-            <div className="space-y-3 pt-2 border-t border-zinc-50">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Highlight Colors (Dynamic)</span>
-              <div className="flex gap-3">
+            <div className="space-y-3 pt-4 border-t border-zinc-100">
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Smart Dynamic Highlights</span>
+              <div className="flex gap-4 p-2 bg-white rounded-xl border border-zinc-50">
                 {[0, 1, 2].map(i => (
-                  <div key={`three-color-container-${i}`} className="space-y-1">
-                    <input 
-                      type="color" 
-                      value={style.threeColors?.[i] || '#ffffff'}
-                      onChange={(e) => {
-                        const newColors = [...(style.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
-                        newColors[i] = e.target.value;
-                        updateStyle({ threeColors: newColors });
-                      }}
-                      className="w-10 h-10 rounded-xl cursor-pointer border-2 border-zinc-100 p-0.5 bg-white shadow-sm hover:border-emerald-200 transition-all"
-                    />
+                  <div key={`three-color-container-${i}`} className="space-y-2 flex flex-col items-center">
+                    <div className="relative group">
+                      <input 
+                        type="color" 
+                        value={style.threeColors?.[i] || '#ffffff'}
+                        onChange={(e) => {
+                          const newColors = [...(style.threeColors || ['#ffffff', '#ffff00', '#00ff00'])];
+                          newColors[i] = e.target.value;
+                          updateStyle({ threeColors: newColors });
+                        }}
+                        className="w-12 h-12 rounded-2xl cursor-pointer border-2 border-zinc-100 p-0.5 bg-white shadow-md hover:border-emerald-400 hover:scale-110 transition-all z-10 relative"
+                      />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white text-[8px] font-bold z-20 shadow-sm">
+                        {i + 1}
+                      </div>
+                    </div>
+                    <span className="text-[8px] font-bold text-zinc-400 uppercase">C{i+1}</span>
                   </div>
                 ))}
               </div>
@@ -383,8 +421,8 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Stroke Width</span>
-                <span className="text-xs font-bold text-zinc-900">{style.strokeWidth || 0}px</span>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Stroke Width</span>
+                <span className="text-xs font-bold text-emerald-600">{style.strokeWidth || 0}px</span>
               </div>
               <input 
                 type="range" min="0" max="20" step="0.5"
@@ -395,23 +433,32 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
             </div>
             
             <div className="space-y-3">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Stroke Color</span>
-              <div className="grid grid-cols-6 gap-2">
+              <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Stroke Color (Outline)</span>
+              <div className="grid grid-cols-5 gap-2.5 p-3.5 bg-zinc-50 rounded-2xl border border-zinc-100 shadow-inner">
                 {CAPTION_COLORS.map(c => (
                   <button
                     key={`stroke-${c}`}
                     onClick={() => updateStyle({ outlineColor: c })}
-                    className={`w-full aspect-square rounded-full border-2 transition-all ${style.outlineColor === c ? 'border-zinc-900 scale-110' : 'border-transparent hover:scale-105'}`}
+                    className={`w-full aspect-square rounded-full border-2 transition-all relative group ${style.outlineColor === c ? 'border-zinc-900 scale-110 shadow-md ring-2 ring-emerald-100' : 'border-white hover:scale-105 shadow-sm'}`}
                     style={{ backgroundColor: c }}
-                  />
+                  >
+                    {style.outlineColor === c && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Check size={12} className={c === '#ffffff' ? 'text-zinc-900' : 'text-white'} strokeWidth={4} />
+                      </div>
+                    )}
+                  </button>
                 ))}
-                <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-zinc-100 group">
+                <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-white shadow-sm group">
                   <input 
                     type="color" 
                     value={style.outlineColor || '#000000'}
                     onChange={(e) => updateStyle({ outlineColor: e.target.value })}
-                    className="absolute inset-0 w-full h-full scale-150 cursor-pointer"
+                    className="absolute inset-0 w-full h-full scale-150 cursor-pointer opacity-0 z-10"
                   />
+                  <div className="absolute inset-0 flex items-center justify-center bg-white group-hover:bg-zinc-50 transition-colors">
+                    <Plus size={14} className="text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -420,38 +467,49 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
 
         {activeStyleSubTab === 'shadow' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+            <div className="flex items-center justify-between p-5 bg-zinc-950 rounded-[2rem] border border-zinc-800 shadow-xl">
               <div className="space-y-0.5">
-                <span className="text-sm font-bold text-zinc-900">Enable Drop Shadow</span>
-                <p className="text-[10px] text-zinc-500">Add depth to your captions</p>
+                <span className="text-sm font-bold text-white">Enable Drop Shadow</span>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest">Cinema Grade Depth</p>
               </div>
               <button 
                 onClick={() => updateStyle({ shadow: !style.shadow })}
-                className={`w-12 h-6 rounded-full transition-all relative ${style.shadow ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                className={`w-14 h-7 rounded-full transition-all relative ${style.shadow ? 'bg-emerald-500' : 'bg-zinc-800'}`}
               >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${style.shadow ? 'left-7' : 'left-1'}`} />
+                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-sm ${style.shadow ? 'left-8' : 'left-1'}`} />
               </button>
             </div>
             
             {style.shadow && (
-              <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Shadow Color</span>
-                <div className="grid grid-cols-6 gap-2">
-                  {CAPTION_COLORS.map(c => (
-                    <button
-                      key={`shadow-${c}`}
-                      onClick={() => updateStyle({ shadowColor: c })}
-                      className={`w-full aspect-square rounded-full border-2 transition-all ${style.shadowColor === c ? 'border-zinc-900 scale-110' : 'border-transparent hover:scale-105'}`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                  <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-zinc-100 group">
-                    <input 
-                      type="color" 
-                      value={style.shadowColor || '#000000'}
-                      onChange={(e) => updateStyle({ shadowColor: e.target.value })}
-                      className="absolute inset-0 w-full h-full scale-150 cursor-pointer"
-                    />
+              <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                <div className="space-y-3">
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Shadow Tint Color</span>
+                  <div className="grid grid-cols-5 gap-2.5 p-3.5 bg-zinc-50 rounded-2xl border border-zinc-100 shadow-inner">
+                    {CAPTION_COLORS.map(c => (
+                      <button
+                        key={`shadow-${c}`}
+                        onClick={() => updateStyle({ shadowColor: c })}
+                        className={`w-full aspect-square rounded-full border-2 transition-all relative group ${style.shadowColor === c ? 'border-zinc-900 scale-110 shadow-md ring-2 ring-emerald-100' : 'border-white hover:scale-105 shadow-sm'}`}
+                        style={{ backgroundColor: c }}
+                      >
+                        {style.shadowColor === c && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Check size={12} className={c === '#ffffff' ? 'text-zinc-900' : 'text-white'} strokeWidth={4} />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                    <div className="relative w-full aspect-square rounded-full overflow-hidden border-2 border-white shadow-sm group">
+                      <input 
+                        type="color" 
+                        value={style.shadowColor || '#000000'}
+                        onChange={(e) => updateStyle({ shadowColor: e.target.value })}
+                        className="absolute inset-0 w-full h-full scale-150 cursor-pointer opacity-0 z-10"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-white group-hover:bg-zinc-50 transition-colors">
+                        <Plus size={14} className="text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

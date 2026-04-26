@@ -230,8 +230,13 @@ export interface CaptionStyle {
   italic?: boolean;
   fontWeight?: string;
   isSmart?: boolean;
+  alternatingColors?: boolean;
+  background?: 'none' | 'box' | 'pill';
+  color1?: string;
+  color2?: string;
   x?: number;
   y?: number;
+  yPos?: number;
 }
 
 export interface CaptionPreset {

@@ -5,7 +5,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
     id: 'side-by-side',
     name: 'Side-by-Side',
     style: {
-      fontSize: 64,
+      fontSize: 36,
       color: '#ffffff',
       glow: false,
       border: 'thick',
@@ -14,11 +14,11 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       backgroundColor: 'transparent',
       outlineColor: '#000000',
       case: 'uppercase',
-      wordsPerLine: 2,
+      wordsPerLine: 3,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
-      fontWeight: '900',
+      strokeWidth: 6,
+      fontWeight: '800',
       isDynamic: true,
       threeColors: ['#ffffff', '#ffff00'],
       isSmart: true
@@ -29,7 +29,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
     id: 'viral-ai-smart',
     name: 'Viral AI Smart',
     style: {
-      fontSize: 64,
+      fontSize: 72,
       color: '#ffffff',
       glow: false,
       border: 'thick',
@@ -41,19 +41,19 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
-      fontWeight: '900',
+      strokeWidth: 8,
+      fontWeight: '800',
       isDynamic: true,
       threeColors: ['#ffff00', '#ffffff', '#00ff00'],
       isSmart: true
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hormozi-bold',
     name: 'Hormozi Bold',
     style: {
-      fontSize: 72,
+      fontSize: 80,
       color: '#ffff00',
       glow: false,
       border: 'thick',
@@ -65,10 +65,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 4,
-      fontWeight: '900'
+      strokeWidth: 10,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'neon-storyteller',
@@ -86,16 +86,16 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: 'rgba(0,255,255,0.5)',
-      strokeWidth: 1,
-      fontWeight: '600'
+      strokeWidth: 2,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'glow'
   },
   {
     id: 'minimalist-pro',
     name: 'Minimalist Pro',
     style: {
-      fontSize: 32,
+      fontSize: 48,
       color: '#ffffff',
       glow: false,
       border: 'none',
@@ -107,7 +107,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       shadow: true,
       shadowColor: 'rgba(0,0,0,0.5)',
       strokeWidth: 0,
-      fontWeight: '400',
+      fontWeight: '600',
       letterSpacing: '0.02em'
     },
     animation: 'typewriter'
@@ -128,7 +128,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
+      strokeWidth: 4,
       fontWeight: '900'
     },
     animation: 'typewriter'
@@ -137,7 +137,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
     id: 'professional-viral',
     name: 'Professional Viral',
     style: {
-      fontSize: 64,
+      fontSize: 72,
       color: '#ffffff',
       glow: false,
       border: 'thick',
@@ -149,8 +149,8 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 4,
-      fontWeight: '900',
+      strokeWidth: 8,
+      fontWeight: '800',
       isDynamic: true
     },
     animation: 'typewriter'
@@ -159,7 +159,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
     id: 'professional-three-color',
     name: 'Viral 3-Color',
     style: {
-      fontSize: 64,
+      fontSize: 72,
       color: '#ffffff',
       glow: false,
       border: 'thick',
@@ -171,8 +171,8 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
-      fontWeight: '900',
+      strokeWidth: 7,
+      fontWeight: '800',
       isDynamic: true,
       threeColors: ['#ffff00', '#ffffff', '#00ff00']
     },
@@ -182,7 +182,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
     id: 'viral-yellow-pro',
     name: 'Viral Yellow (Pro)',
     style: {
-      fontSize: 64,
+      fontSize: 72,
       color: '#ffff00',
       glow: false,
       border: 'thick',
@@ -194,8 +194,8 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
-      fontWeight: '900'
+      strokeWidth: 8,
+      fontWeight: '800'
     },
     animation: 'typewriter'
   },
@@ -215,10 +215,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
+      strokeWidth: 4,
       letterSpacing: '0.05em',
       italic: true,
-      fontWeight: '900'
+      fontWeight: '800'
     },
     animation: 'typewriter'
   },
@@ -236,11 +236,11 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       case: 'uppercase',
       wordsPerLine: 4,
       shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
+      shadowColor: 'rgba(0,0,0,0.8)',
       strokeWidth: 0,
-      fontWeight: '900'
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hindi-viral-yellow',
@@ -258,10 +258,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
-      fontWeight: '900'
+      strokeWidth: 5,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hindi-neon-green',
@@ -270,7 +270,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       fontSize: 48,
       color: '#00ff00',
       glow: true,
-      border: 'thin',
+      border: 'thick',
       font: 'Inter',
       position: 'bottom',
       backgroundColor: 'transparent',
@@ -278,11 +278,11 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       case: 'uppercase',
       wordsPerLine: 2,
       shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2,
-      fontWeight: '900'
+      shadowColor: 'rgba(0,0,0,0.8)',
+      strokeWidth: 4,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'glow'
   },
   {
     id: 'karaoke-blue',
@@ -299,16 +299,17 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       case: 'original',
       wordsPerLine: 5,
       shadow: true,
-      shadowColor: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2
+      shadowColor: 'rgba(0,0,0,0.8)',
+      strokeWidth: 4,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'typewriter-white',
     name: 'Typewriter White',
     style: {
-      fontSize: 36,
+      fontSize: 44,
       color: '#ffffff',
       glow: false,
       border: 'none',
@@ -319,9 +320,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 8,
       shadow: true,
       shadowColor: 'rgba(0,0,0,0.8)',
-      strokeWidth: 0
+      strokeWidth: 0,
+      fontWeight: '700'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hindi-shadow-white',
@@ -339,9 +341,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 0
+      strokeWidth: 0,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hindi-gradient-cyan',
@@ -359,9 +362,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: false,
       shadowColor: 'transparent',
-      strokeWidth: 1.5
+      strokeWidth: 4,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'bounce'
   },
   {
     id: 'hindi-bold-red',
@@ -379,10 +383,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 4,
-      fontWeight: '900'
+      strokeWidth: 6,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hindi-royal-gold',
@@ -400,10 +404,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
-      fontWeight: '900'
+      strokeWidth: 5,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hindi-soft-pink',
@@ -420,10 +424,11 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       case: 'uppercase',
       wordsPerLine: 1,
       shadow: true,
-      shadowColor: 'rgba(255,105,180,0.3)',
-      strokeWidth: 2
+      shadowColor: 'rgba(255,105,180,0.5)',
+      strokeWidth: 3,
+      fontWeight: '800'
     },
-    animation: 'typewriter'
+    animation: 'pop'
   },
   {
     id: 'hindi-classic-blue',
@@ -441,9 +446,115 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 3,
+      strokeWidth: 5,
+      fontWeight: '800'
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'beast-mode-orange',
+    name: 'Viral Orange (Beast)',
+    style: {
+      fontSize: 72,
+      color: '#ff6b00',
+      glow: true,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase',
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 8,
+      fontWeight: '900',
+      isDynamic: true
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'electric-green',
+    name: 'Electric Green',
+    style: {
+      fontSize: 68,
+      color: '#00ff00',
+      glow: true,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase',
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 6,
+      fontWeight: '800'
+    },
+    animation: 'snappy'
+  },
+  {
+    id: 'modern-bold-clean',
+    name: 'Modern Sans (Clean)',
+    style: {
+      fontSize: 64,
+      color: '#ffffff',
+      glow: false,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase',
+      wordsPerLine: 2,
+      shadow: true,
+      shadowColor: 'rgba(0,0,0,0.4)',
+      strokeWidth: 8,
       fontWeight: '900'
     },
-    animation: 'typewriter'
+    animation: 'bounce'
+  },
+  {
+    id: 'retro-glitch-white',
+    name: 'Retro Glitch',
+    style: {
+      fontSize: 60,
+      color: '#ffffff',
+      glow: false,
+      border: 'none',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      case: 'uppercase',
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#ff0000', // One side offset in code
+      strokeWidth: 0,
+      fontWeight: '900'
+    },
+    animation: 'glitch'
+  },
+  {
+    id: 'golden-spotlight',
+    name: 'Golden Spotlight',
+    style: {
+      fontSize: 70,
+      color: '#ffff00',
+      glow: true,
+      border: 'thick',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      outlineColor: '#000000',
+      case: 'uppercase',
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#b8860b',
+      strokeWidth: 6,
+      fontWeight: '800',
+      isDynamic: true
+    },
+    animation: 'glow'
   }
 ];
