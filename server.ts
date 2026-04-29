@@ -335,8 +335,9 @@ const app = express();
 const PORT = 3000;
 
 app.use((req, res, next) => {
-  res.header('Cross-Origin-Opener-Policy', 'same-origin');
-  res.header('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
 });
 
@@ -792,11 +793,15 @@ app.post("/api/analyze-voice", async (req, res) => {
   const { audioData, mimeType } = req.body;
   if (!audioData) return res.status(400).json({ error: "Audio data is required" });
 
-  try {
+  const maxRetries = 10;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
     const apiKey = getAvailableApiKey();
-    if (!apiKey) throw new Error("API keys exhausted");
-    
-    const prompt = `ALGORITHMIC VOCAL ANALYSIS TASK:
+    if (!apiKey) return res.status(503).json({ error: "API keys exhausted" });
+
+    try {
+      const prompt = `ALGORITHMIC VOCAL ANALYSIS TASK:
     Perform a high-resolution analysis of this voice sample to extract its unique "Vocal DNA".
     
     1. EXTRACT ALL NUANCES:
@@ -815,24 +820,35 @@ app.post("/api/analyze-voice", async (req, res) => {
     
     Return the response in JSON format with keys: 'description' (human readable breakdown) and 'fingerprint' (the dense technical cloning instruction).`;
 
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        { parts: [{ text: prompt }, { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }] }
-      ]
-    });
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          { parts: [{ text: prompt }, { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }] }
+        ]
+      });
 
-    const responseText = response.text;
-    // Try to extract JSON if model didn't return pure JSON
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { description: responseText, fingerprint: responseText };
+      const responseText = response.text;
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { description: responseText, fingerprint: responseText };
 
-    res.json(data);
-  } catch (error: any) {
-    console.error("Voice analysis error:", error);
-    res.status(500).json({ error: error.message });
+      return res.json(data);
+    } catch (error: any) {
+      const errorMessage = error.message || String(error);
+      console.error(`Voice analysis Attempt ${attempt + 1} failed:`, errorMessage);
+      
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
+        markKeyAsExhausted(apiKey);
+        attempt++;
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
   }
+
+  res.status(503).json({ error: "Failed to analyze voice after multiple attempts." });
 });
 
 // Update the Generate Speech logic to handle cloned voices
@@ -950,7 +966,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
             : `CRITICAL: The previous attempt sounded slightly robotic or off-pacing. Please deliver a MORE HUMAN, MORE REALISTIC, and MORE RESONANT performance in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
+            model: "gemini-3.1-flash-tts-preview",
             contents: [{ parts: [{ text: currentPrompt }] }],
             config: {
               responseModalities: [Modality.AUDIO],
@@ -1088,73 +1104,47 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
 
   while (attempt < maxRetries) {
     const apiKey = getAvailableApiKey();
-    if (!apiKey) return res.status(503).json({ error: "All Gemini API keys are currently exhausted." });
+    if (!apiKey) return res.status(503).json({ error: "System under extreme demand. Please try again in 5 seconds." });
 
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      // Step 1: Transcribe with Performance Capture
-      const prompt = `Transcribe the following audio/video exactly. 
-      CRITICAL: Also analyze the vocal characteristics of the speaker.
-      Include a "performance_metadata" section at the end that describes:
-      1. TONE: (e.g., Aggressive, Kind, Neutral, Emotional)
-      2. PACE: (e.g., Fast, Slow, Moderate)
-      3. EMPHASIS: (Where did the speaker put stress?)
+      // Smart Model Switching: Try preview first, then stable flash for transcription
+      const currentModel = attempt < 3 ? "gemini-3-flash-preview" : "gemini-1.5-flash-pro";
       
-      Return the transcription followed by the performance metadata. 
-      If there is no speech, return an empty string.`;
+      const prompt = `Transcribe the following audio/video exactly. 
+      Analyze vocal DNA:
+      1. TONE: (Emotional/Professional/etc)
+      2. PACE: (Fast/Slow)
+      3. EMPHASIS points.
+      
+      Return transcribed text followed by "PERFORMANCE METADATA: [traits]".`;
 
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: currentModel,
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
       });
 
       const fullTranscribedContent = result.text?.trim();
-      if (!fullTranscribedContent) {
-        console.log("[Voice Changer] No text transcribed or transcription failed.");
-        return res.status(400).json({ error: "Could not detect any speech in the uploaded file. Please ensure the audio is clear." });
-      }
+      if (!fullTranscribedContent) throw new Error("Voice data was silent or unreadable");
 
-      // Separate text from metadata for the TTS step
       const logicMatch = fullTranscribedContent.match(/(?:performance_metadata|PERFORMANCE METADATA):?([\s\S]+)$/i);
-      const performanceTraits = logicMatch ? logicMatch[1].trim() : "Natural and engaging.";
+      const performanceTraits = logicMatch ? logicMatch[1].trim() : "Natural.";
       const transcribedText = fullTranscribedContent.replace(/(?:performance_metadata|PERFORMANCE METADATA):?[\s\S]+$/i, '').trim();
 
-      console.log(`[Voice Changer] Transcribed text: ${transcribedText.substring(0, 50)}...`);
-      console.log(`[Voice Changer] Performance Traits detected: ${performanceTraits}`);
-
-      // Step 2: Generate Speech in Target Voice
       const currentTargetVoice = INTERNAL_VOICE_MAPPING[voice_id] || INTERNAL_VOICE_MAPPING[voice_id.toLowerCase()] || voice_id;
-      
       const lookupVoice = (voice_id || '').trim();
       const profile_desc = VOICE_TRAITS[lookupVoice] || 
                       VOICE_TRAITS[Object.keys(VOICE_TRAITS).find(k => k.toLowerCase() === lookupVoice.toLowerCase()) || ''] ||
                       "Balanced professional voice.";
 
-      const userPitch = req.body.pitch || 1.0;
       const ttsSystemInstruction = buildSystemInstruction(targetLanguage === 'Hindi' ? 'hi' : 'en', voice_id);
       
-      const performancePrompt = `
-      CRITICAL PERFORMANCE FINGERPRINT (MANDATORY MIMICRY):
-      ${performanceTraits}
-      
-      CRITICAL TRANSFORMATION:
-      YOU MUST ADAPT THE ABOVE PERFORMANCE INTO THE VOICE OF ${voice_id}.
-      - DO NOT keep the original speaker's vocal tone.
-      - YOU MUST change the vocal identity ENTIRELY to ${voice_id}.
-      - CHARACTER DNA: ${profile_desc}
-      - MIMIC the timing and emotion, but VOICED BY ${voice_id}.
-      
-      The result must be: The EMOTION of the original speaker, but 100% THE VOICE of ${voice_id}.
-      
-      CRITICAL: Use a very natural, balanced pace. PROJECT the voice forward as if exhaling naturally while speaking. Do NOT pull the voice inward or swallow it. Speak with an open, projected tone. Do not drag. Do not shout. Deliver a professional studio performance.
-      `;
-
       const ttsResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\n${performancePrompt}\n\nSCRIPT TO PERFORM:\n${transcribedText}` }] }],
+        model: "gemini-3.1-flash-tts-preview",
+        contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\nMIMIC EMOTION: ${performanceTraits}\n\nVOICE IDENTITY: ${profile_desc}\n\nSCRIPT: ${transcribedText}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -1165,47 +1155,29 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
         }
       });
 
-
       const audioData = (ttsResponse as any).audioData || (ttsResponse as any).inlineData?.data || ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!audioData) throw new Error("Failed to generate speech in target voice");
+      if (!audioData) throw new Error("Voice synthesis failure");
 
-      // Convert PCM to WAV
       const pcmBuffer = Buffer.from(audioData, 'base64');
       const wavBuffer = addWavHeader(pcmBuffer, 24000);
       const finalAudioData = wavBuffer.toString('base64');
 
-      // Save to history if firestore is available
-      if (firestore && userId) {
-        try {
-          await saveToHistory('voice_history', {
-            userId,
-            text: transcribedText,
-            voice_name: voice_id,
-            mode,
-            targetLanguage,
-            audio_data: finalAudioData,
-            created_at: admin.firestore.FieldValue.serverTimestamp()
-          });
-        } catch (saveErr) {
-          console.error("Failed to save voice changer history:", saveErr);
-        }
-      }
-
       return res.json({ audioData: finalAudioData, transcribedText: transcribedText });
     } catch (error: any) {
-      const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
-      console.error(`Voice Changer Attempt ${attempt + 1} failed:`, errorMessage);
+      const errorMessage = error.message || String(error);
+      console.error(`[Voice Changer] Fail-Safe Retry ${attempt + 1}:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
-        markKeyAsExhausted(apiKey);
+      const isRetryable = errorMessage.includes("503") || 
+                          errorMessage.includes("429") || 
+                          errorMessage.includes("exhausted") || 
+                          errorMessage.includes("UNAVAILABLE") ||
+                          errorMessage.includes("NOT_FOUND") ||
+                          errorMessage.includes("404");
+
+      if (isRetryable) {
+        if (errorMessage.includes("exhausted")) markKeyAsExhausted(apiKey);
         attempt++;
-        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        continue;
-      }
-      
-      if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
-        attempt++;
+        await new Promise(r => setTimeout(r, 1000));
         continue;
       }
       return res.status(500).json({ error: errorMessage });
@@ -1612,11 +1584,17 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         ? (scriptType === 'hinglish' ? "CRITICAL: Write the Hindi captions using English script (Hinglish). Example: 'Namaste dosto'." : "CRITICAL: Write the Hindi captions using Devanagari script (Hindi). Example: 'नमस्ते दोस्तों'.")
         : "";
 
-      const prompt = `Transcribe this video precisely with word-level timestamps in seconds.
+      const prompt = `Transcribe this video precisely with absolute word-level timestamps in seconds. 
+      
+      CRITICAL INSTRUCTIONS:
+      1. ANALYZE every vocal nuance. Captions must match the spoken words EXACTLY, including local nuances, slang, and specific terminology.
+      2. Perfect Grammar: Ensure Devanagari grammar and spelling are flawless.
+      3. Precise Alignment: Timestamps must be perfectly synchronized with the audio onset and offset of each word.
+      4. No Hallucinations: Do not add or omit words that are spoken.
       
       CONTENT LANGUAGE: ${language}.
       ${scriptInstruction}
-      ${translateToEnglish ? "CRITICAL: Output the transcription translated in English." : ""}
+      ${translateToEnglish ? "CRITICAL: Output the transcription translated in English with the same precision." : ""}
       
       OUTPUT FORMAT: A JSON array of word objects.
       Schema: [{"word": string, "start": number, "end": number}]
@@ -1704,24 +1682,45 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
 
       return res.status(200).json({ words });
     } catch (error: any) {
-      console.error(`[Captions] Attempt ${attempt + 1} failed:`, error.message);
+      let errorMsg = error.message || "";
+      console.error(`[Captions] Attempt ${attempt + 1} failed:`, errorMsg);
       
-      if (error.message?.includes("Resource has been exhausted") || error.message?.includes("429")) {
+      // Try to parse JSON error message from Gemini SDK
+      if (errorMsg.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(errorMsg);
+          if (parsed.error && parsed.error.message) {
+            errorMsg = parsed.error.message;
+          }
+        } catch (e) {}
+      }
+
+      const isOverloaded = errorMsg.toLowerCase().includes("resource has been exhausted") || 
+                           errorMsg.includes("429") || 
+                           errorMsg.includes("503") || 
+                           errorMsg.toLowerCase().includes("unavailable") ||
+                           errorMsg.toLowerCase().includes("high demand") ||
+                           errorMsg.toLowerCase().includes("overloaded");
+
+      if (isOverloaded) {
         markKeyAsExhausted(apiKey);
         attempt++;
-        await new Promise(r => setTimeout(r, 1000));
+        const delay = (errorMsg.includes("503") || errorMsg.toLowerCase().includes("unavailable") || errorMsg.toLowerCase().includes("high demand")) ? 5000 : 2000;
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
 
-      if (error.message?.includes("deadlines") || error.message?.includes("timeout") || error.message?.includes("504")) {
+      if (errorMsg.toLowerCase().includes("deadline") || errorMsg.toLowerCase().includes("timeout") || errorMsg.includes("504")) {
          attempt++;
-         await new Promise(r => setTimeout(r, 2000));
+         await new Promise(r => setTimeout(r, 4000));
          continue;
       }
       
-      return res.status(500).json({ 
+      const friendlyMsg = isOverloaded ? "AI Model is currently under heavy load. Please wait a few moments and try again." : errorMsg;
+      
+      return res.status(isOverloaded ? 503 : 500).json({ 
         error: "Transcription failed", 
-        message: error.message || "An unexpected error occurred during processing."
+        message: friendlyMsg || "An unexpected error occurred during processing."
       });
     }
   }
@@ -1843,13 +1842,29 @@ app.use((err: any, req: any, res: any, next: any) => {
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        headers: {
+          'Cross-Origin-Opener-Policy': 'same-origin',
+          'Cross-Origin-Embedder-Policy': 'require-corp',
+          'Cross-Origin-Resource-Policy': 'cross-origin'
+        }
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(process.cwd(), "dist")));
+    app.use(express.static(path.join(process.cwd(), "dist"), {
+      setHeaders: (res) => {
+        res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+        res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      }
+    }));
     app.get("*", (req, res) => {
+      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.sendFile(path.join(process.cwd(), "dist", "index.html"));
     });
   }

@@ -17,7 +17,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 3,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 6,
+      strokeWidth: 10,
       fontWeight: '800',
       isDynamic: true,
       threeColors: ['#ffffff', '#ffff00'],
@@ -41,7 +41,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 8,
+      strokeWidth: 12,
       fontWeight: '800',
       isDynamic: true,
       threeColors: ['#ffff00', '#ffffff', '#00ff00'],
@@ -65,8 +65,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 10,
-      fontWeight: '800'
+      strokeWidth: 13,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'pop'
   },
@@ -86,8 +87,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: 'rgba(0,255,255,0.5)',
-      strokeWidth: 2,
-      fontWeight: '800'
+      strokeWidth: 4,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'glow'
   },
@@ -103,7 +105,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       position: 'bottom',
       backgroundColor: 'transparent',
       case: 'original',
-      wordsPerLine: 8,
+      wordsPerLine: 6,
       shadow: true,
       shadowColor: 'rgba(0,0,0,0.5)',
       strokeWidth: 0,
@@ -128,8 +130,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 4,
-      fontWeight: '900'
+      strokeWidth: 10,
+      fontWeight: '900',
+      isDynamic: false
     },
     animation: 'typewriter'
   },
@@ -149,7 +152,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 8,
+      strokeWidth: 12,
       fontWeight: '800',
       isDynamic: true
     },
@@ -171,7 +174,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 7,
+      strokeWidth: 12,
       fontWeight: '800',
       isDynamic: true,
       threeColors: ['#ffff00', '#ffffff', '#00ff00']
@@ -194,8 +197,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 8,
-      fontWeight: '800'
+      strokeWidth: 12,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'typewriter'
   },
@@ -215,10 +219,11 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 4,
+      strokeWidth: 6,
       letterSpacing: '0.05em',
       italic: true,
-      fontWeight: '800'
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'typewriter'
   },
@@ -258,8 +263,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 5,
-      fontWeight: '800'
+      strokeWidth: 6,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'pop'
   },
@@ -279,8 +285,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: 'rgba(0,0,0,0.8)',
-      strokeWidth: 4,
-      fontWeight: '800'
+      strokeWidth: 8,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'glow'
   },
@@ -317,7 +324,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       position: 'bottom',
       backgroundColor: 'transparent',
       case: 'original',
-      wordsPerLine: 8,
+      wordsPerLine: 6,
       shadow: true,
       shadowColor: 'rgba(0,0,0,0.8)',
       strokeWidth: 0,
@@ -362,8 +369,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: false,
       shadowColor: 'transparent',
-      strokeWidth: 4,
-      fontWeight: '800'
+      strokeWidth: 8,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'bounce'
   },
@@ -383,8 +391,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 6,
-      fontWeight: '800'
+      strokeWidth: 10,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'pop'
   },
@@ -404,8 +413,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 5,
-      fontWeight: '800'
+      strokeWidth: 9,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'pop'
   },
@@ -425,8 +435,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: 'rgba(255,105,180,0.5)',
-      strokeWidth: 3,
-      fontWeight: '800'
+      strokeWidth: 8,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'pop'
   },
@@ -446,8 +457,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 5,
-      fontWeight: '800'
+      strokeWidth: 6,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'pop'
   },
@@ -467,7 +479,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 8,
+      strokeWidth: 11,
       fontWeight: '900',
       isDynamic: true
     },
@@ -489,8 +501,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#000000',
-      strokeWidth: 6,
-      fontWeight: '800'
+      strokeWidth: 9,
+      fontWeight: '800',
+      isDynamic: false
     },
     animation: 'snappy'
   },
@@ -510,8 +523,9 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 2,
       shadow: true,
       shadowColor: 'rgba(0,0,0,0.4)',
-      strokeWidth: 8,
-      fontWeight: '900'
+      strokeWidth: 11,
+      fontWeight: '900',
+      isDynamic: false
     },
     animation: 'bounce'
   },
@@ -529,9 +543,10 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       case: 'uppercase',
       wordsPerLine: 1,
       shadow: true,
-      shadowColor: '#ff0000', // One side offset in code
+      shadowColor: '#8B4513', // Mehandi (Saddle Brown)
       strokeWidth: 0,
-      fontWeight: '900'
+      fontWeight: '900',
+      isDynamic: false
     },
     animation: 'glitch'
   },
@@ -551,10 +566,108 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       wordsPerLine: 1,
       shadow: true,
       shadowColor: '#b8860b',
-      strokeWidth: 6,
+      strokeWidth: 9,
       fontWeight: '800',
       isDynamic: true
     },
     animation: 'glow'
+  },
+  {
+    id: 'long-video-pro',
+    name: 'Long Video Pro',
+    style: {
+      fontSize: 32,
+      color: '#ffff00',
+      glow: false,
+      border: 'none',
+      font: 'Inter',
+      position: 'bottom',
+      backgroundColor: 'rgba(0,0,0,0.85)',
+      outlineColor: '#000000',
+      case: 'uppercase',
+      wordsPerLine: 3,
+      shadow: false,
+      shadowColor: 'transparent',
+      strokeWidth: 0,
+      fontWeight: '900',
+      isDynamic: true,
+      threeColors: ['#ffff00', '#ffffff', '#00ff00'],
+      isSmart: true,
+      padding: '8px 16px',
+      borderRadius: '8px'
+    },
+    animation: 'pop'
+  },
+  {
+    id: 'adaptive-dynamic',
+    name: 'Adaptive Dynamic',
+    style: {
+      color: '#ffffff',
+      fontSize: 48,
+      font: 'Rajdhani',
+      position: 'bottom',
+      backgroundColor: 'rgba(0,0,0,0.85)',
+      padding: '12px 24px',
+      borderRadius: '16px',
+      case: 'original',
+      border: 'none',
+      wordsPerLine: 2,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 0,
+      fontWeight: '900',
+      isDynamic: true,
+      threeColors: ['#ffffff', '#ffff00', '#00ff1a'],
+      isSmart: true
+    },
+    animation: 'skate'
+  },
+  {
+    id: 'triple-stroke-elite',
+    name: 'Elite Triple Stroke',
+    style: {
+      fontSize: 24,
+      color: '#ffffff',
+      glow: false,
+      border: 'none',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      case: 'uppercase',
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 4,
+      fontWeight: '900',
+      isDynamic: false,
+      isSmart: true,
+      tripleBorder: true,
+      tripleBorderColors: ['#FFD700', '#0047AB', '#000000']
+    },
+    animation: 'typewriter'
+  },
+  {
+    id: 'triple-stroke-royal-thin',
+    name: 'Royal Triple Thin',
+    style: {
+      fontSize: 24,
+      color: '#ffffff',
+      glow: false,
+      border: 'none',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      case: 'uppercase',
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 2,
+      fontWeight: '900',
+      isDynamic: false,
+      isSmart: true,
+      tripleBorder: true,
+      tripleBorderColors: ['#1E90FF', '#FFD700', '#FF0000'] // Blue, Gold, Red
+    },
+    animation: 'typewriter'
   }
 ];

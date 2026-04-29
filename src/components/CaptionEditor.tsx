@@ -15,7 +15,8 @@ import {
   Smile,
   LayoutGrid,
   Sparkles,
-  Type as TypeIcon
+  Type as TypeIcon,
+  ChevronDown
 } from 'lucide-react';
 import { CaptionWord, CaptionStyle } from '../types';
 import { CAPTION_PRESETS } from '../constants/captionPresets';
@@ -545,14 +546,100 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
 
   const renderLayoutTab = () => (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Font Family Selection */}
       <div className="space-y-3">
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Position</span>
-        <div className="grid grid-cols-3 gap-2">
+        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Font Family</label>
+        <div className="relative group">
+          <select 
+            value={style.font}
+            onChange={(e) => updateStyle({ font: e.target.value })}
+            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-2xl p-4 text-sm font-bold appearance-none cursor-pointer hover:border-emerald-500/30 transition-all outline-none"
+            style={{ fontFamily: style.font }}
+          >
+            {FONTS.map(f => (
+              <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+            <ChevronDown size={18} />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* Case Style */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Case</label>
+          <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-100">
+            {[
+              { id: 'original', label: 'Original' },
+              { id: 'uppercase', label: 'Uppercase' }
+            ].map(c => (
+              <button
+                key={c.id}
+                onClick={() => updateStyle({ case: c.id as any })}
+                className={`flex-1 py-2 px-1 rounded-lg text-[10px] font-bold transition-all ${style.case === c.id ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Font Style Toggles */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Style</label>
+          <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-100">
+            <button
+              onClick={() => updateStyle({ fontWeight: style.fontWeight === '900' ? '400' : '900' })}
+              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${style.fontWeight === '900' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
+            >
+              Bold
+            </button>
+            <button
+              onClick={() => updateStyle({ italic: !style.italic })}
+              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${style.italic ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
+            >
+              Italic
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Font Size</span>
+          <span className="text-xs font-bold text-emerald-500">{style.fontSize}px</span>
+        </div>
+        <input 
+          type="range" min="12" max="120" step="1"
+          value={style.fontSize}
+          onChange={(e) => updateStyle({ fontSize: parseInt(e.target.value) })}
+          className="w-full h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-emerald-500"
+        />
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Words Per Line</span>
+          <span className="text-xs font-bold text-emerald-500">{style.wordsPerLine}</span>
+        </div>
+        <input 
+          type="range" min="1" max="6" step="1"
+          value={style.wordsPerLine}
+          onChange={(e) => updateStyle({ wordsPerLine: parseInt(e.target.value) })}
+          className="w-full h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-emerald-500"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Position</span>
+        <div className="bg-zinc-50 p-1.5 rounded-2xl border border-zinc-100 flex items-center gap-1">
           {['top', 'middle', 'bottom'].map(pos => (
             <button
               key={pos}
               onClick={() => updateStyle({ position: pos as any })}
-              className={`py-2 rounded-xl border-2 text-[10px] font-bold uppercase transition-all ${style.position === pos ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-zinc-100 bg-white hover:border-zinc-200 text-zinc-500'}`}
+              className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold capitalize transition-all ${style.position === pos ? 'bg-white text-zinc-900 shadow-sm border border-zinc-200/50' : 'text-zinc-400 hover:text-zinc-600'}`}
             >
               {pos}
             </button>
@@ -560,60 +647,26 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Smart Mode</span>
-            <p className="text-[10px] text-zinc-500">Auto-animation & dynamic grouping</p>
-          </div>
-          <button 
-            onClick={() => updateStyle({ isSmart: !style.isSmart })}
-            className={`w-10 h-5 rounded-full transition-all relative ${style.isSmart ? 'bg-emerald-500' : 'bg-zinc-200'}`}
-          >
-            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${style.isSmart ? 'left-6' : 'left-1'}`} />
-          </button>
-        </div>
+      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-100">
+        <button 
+          className="py-4 rounded-2xl border border-zinc-200 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:bg-zinc-50 transition-all"
+        >
+          Hindi Script
+        </button>
+        <button 
+          className="py-4 rounded-2xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+        >
+          Translated
+        </button>
       </div>
 
-      <div className="space-y-3">
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Case Style</span>
-        <div className="flex gap-2">
-          {[
-            { id: 'original', label: 'Aa' },
-            { id: 'uppercase', label: 'AA' },
-            { id: 'lowercase', label: 'aa' }
-          ].map(c => (
-            <button
-              key={c.id}
-              onClick={() => updateStyle({ case: c.id as any })}
-              className={`flex-1 py-2 rounded-xl border-2 text-xs font-bold transition-all ${style.case === c.id ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-zinc-100 bg-white hover:border-zinc-200 text-zinc-500'}`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <div className="flex justify-between items-center">
-          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Words Per Line</span>
-          <span className="text-xs font-bold text-zinc-900">{style.wordsPerLine}</span>
-        </div>
-        <input 
-          type="range" min="1" max="10"
-          value={style.wordsPerLine}
-          onChange={(e) => updateStyle({ wordsPerLine: parseInt(e.target.value) })}
-          className="w-full h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer accent-emerald-500"
-        />
-      </div>
-
-      <div className="pt-4 border-t border-zinc-100">
+      <div className="pt-2">
         <button
           onClick={() => updateStyle({ x: 0, y: 0 })}
-          className="w-full py-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
+          className="w-full py-3 bg-zinc-50 text-zinc-400 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:bg-zinc-100 transition-all flex items-center justify-center gap-2"
         >
-          <X size={14} />
-          Reset Custom Position
+          <X size={12} />
+          Reset Position
         </button>
       </div>
     </div>

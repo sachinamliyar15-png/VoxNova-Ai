@@ -234,6 +234,8 @@ export interface CaptionStyle {
   background?: 'none' | 'box' | 'pill';
   color1?: string;
   color2?: string;
+  tripleBorder?: boolean;
+  tripleBorderColors?: string[];
   x?: number;
   y?: number;
   yPos?: number;

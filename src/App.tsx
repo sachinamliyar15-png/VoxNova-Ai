@@ -496,17 +496,21 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
       let count = 1;
       
       // Smart chunking: Group words if they are close in time and short in length
+      // This creates a dynamic rhythm (1, 2, or 3 words)
       if (nextWord) {
         const gap = nextWord.start - currentWord.end;
         const totalLen = (currentWord.word?.length || 0) + (nextWord.word?.length || 0);
+        const isVeryQuick = gap < 0.25;
         
-        if (gap < 0.3 && totalLen < 12) {
+        // Group 2 words if they are fast or short
+        if (isVeryQuick || totalLen < 10) {
           count = 2;
           
           if (nextNextWord) {
              const gap2 = nextNextWord.start - nextWord.end;
              const totalLen2 = totalLen + (nextNextWord.word?.length || 0);
-             if (gap2 < 0.2 && totalLen2 < 18) {
+             // Group 3 words only if they are extremely short/fast
+             if (gap2 < 0.15 && totalLen2 < 16) {
                count = 3;
              }
           }
@@ -586,50 +590,70 @@ const CaptionOverlay = ({
 }) => {
   // Use the currentTime directly as it already includes the user-defined captionOffset from the parent
   const adjustedTime = currentTime;
+
+  // Handle Dragging - Moved to top to avoid React hook errors
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [guides, setGuides] = React.useState({ x: false, y: false });
   
   const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine, style.isSmart), [words, style.wordsPerLine, style.isSmart]);
-  const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
+  const currentWordIndex = displayWords.findIndex(w => adjustedTime >= (w.start - 0.2) && adjustedTime <= (w.end + 0.1));
   const currentWord = displayWords[currentWordIndex];
   
-  // RE-INTRODUCED: Subtle "living" motion that is predictable and smooth
-  const floatingOffset = animation === 'float' ? { 
-    x: 0, 
-    y: [0, -5, 0] 
-  } : { x: 0, y: 0 };
+    // Subtle "living" motion only for "Pro" styles (Animated templates)
+    const driftOffset = React.useMemo(() => {
+      const isProStyle = animation === 'skate' || animation === 'pop' || animation === 'snappy-pop' || animation === 'professional';
+      if (!style.isSmart || !isProStyle) return { x: 0, y: 0 };
+      
+      const seed = (currentWord?.start || 0) * 2; 
+      const offsetX = Math.sin(seed) * 4; // reduced for stability
+      const offsetY = Math.cos(seed) * 2; // reduced for stability
+      return { x: offsetX, y: offsetY };
+    }, [animation, style.isSmart, currentWord?.start]);
 
   if (!currentWord) return null;
 
   const getDynamicColor = (index: number, word: CaptionWord) => {
-    if (style.alternatingColors) {
-      const globalIndex = words.findIndex(w => w.start === word.start && w.word === word.word);
-      return globalIndex % 2 === 0 ? (style.color1 || '#FFFFFF') : (style.color2 || '#FFFF00');
-    }
     if (style.isDynamic) {
-      const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-      const globalIndex = words.findIndex(w => w.start === word.start && w.word === word.word);
-      return colors[globalIndex % colors.length];
+      const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff1a'];
+      // Use the start time as a stable seed to ensure consistent coloring even with grouping
+      const stableIndex = Math.floor((word.start * 10) % colors.length);
+      return colors[stableIndex];
     }
     return style.color || '#ffffff';
   };
 
   const getAnimationProps = () => {
+    const isPro = style.isSmart;
     switch (animation) {
       case 'typing':
       case 'typewriter':
         return {
-          initial: { opacity: 0, y: 2 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.15, ease: "easeOut" as const }
+          initial: { opacity: 0, x: -10, y: 4, scale: 0.88, rotate: -4 },
+          animate: { 
+            opacity: 1, 
+            x: 0,
+            y: 0,
+            rotate: 0,
+            scale: 1,
+          },
+          transition: { 
+            duration: 0.05,
+            type: "spring" as const,
+            stiffness: 1800,
+            damping: 50,
+            opacity: { duration: 0.03 },
+            ease: "easeOut" as const
+          }
         };
       case 'pop':
         return {
-          initial: { scale: 0.9, opacity: 0 },
-          animate: { scale: 1, opacity: 1 },
+          initial: { scale: 0.8, opacity: 0, y: isPro ? 8 : 12 },
+          animate: { scale: 1, opacity: 1, y: 0 },
           transition: { type: 'spring' as const, stiffness: 600, damping: 25 }
         };
       case 'professional':
         return {
-          initial: { scale: 0.9, opacity: 0, y: 10 },
+          initial: { scale: 0.9, opacity: 0, y: isPro ? 6 : 10 },
           animate: { scale: 1, opacity: 1, y: 0 },
           transition: { 
             duration: 0.1,
@@ -638,8 +662,8 @@ const CaptionOverlay = ({
         };
       case 'snappy':
         return {
-          initial: { scale: 0.5, opacity: 0 },
-          animate: { scale: 1, opacity: 1 },
+          initial: { scale: 0.8, opacity: 0, y: isPro ? 5 : 8 },
+          animate: { scale: 1, opacity: 1, y: 0 },
           transition: { 
             type: "spring" as const,
             stiffness: 1000,
@@ -649,12 +673,12 @@ const CaptionOverlay = ({
         };
       case 'snappy-pop':
         return {
-          initial: { scale: 0.5, opacity: 0, y: 10 },
+          initial: { scale: 0.5, opacity: 0, y: isPro ? 10 : 15 },
           animate: { scale: 1.2, opacity: 1, y: 0 },
           transition: { 
             type: 'spring' as const, 
             stiffness: 700, 
-            damping: 15, 
+            damping: 15,
             mass: 0.5
           }
         };
@@ -690,10 +714,10 @@ const CaptionOverlay = ({
           initial: { opacity: 0, x: 0 },
           animate: { 
             opacity: 1,
-            x: [0, -2, 2, -2, 2, 0],
+            x: [0, -1.5, 1.5, -1.5, 1.5, 0],
             filter: [
               'none',
-              'drop-shadow(2px 0 #ff00ff) drop-shadow(-2px 0 #00ffff)',
+              'drop-shadow(2px 0 #8B4513) drop-shadow(-2px 0 #FF4500)',
               'none'
             ]
           },
@@ -734,8 +758,8 @@ const CaptionOverlay = ({
         };
       case 'fade':
         return {
-          initial: { opacity: 0, y: 10 },
-          animate: { opacity: 1, y: 0 },
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
           transition: { duration: 0.2, ease: "easeOut" as const }
         };
       case 'glow':
@@ -792,16 +816,16 @@ const CaptionOverlay = ({
   const getPositionClass = (pos?: string) => {
     const p = pos || style.position;
     switch (p) {
-      case 'top': return 'top-[15%] justify-center';
-      case 'middle': return 'top-1/2 -translate-y-1/2 justify-center';
-      case 'bottom': return 'bottom-[12%] justify-center';
-      case 'left': return 'top-1/2 -translate-y-1/2 justify-start pl-12';
-      case 'right': return 'top-1/2 -translate-y-1/2 justify-end pr-12';
-      case 'top-left': return 'top-[15%] justify-start pl-12';
-      case 'top-right': return 'top-[15%] justify-end pr-12';
-      case 'bottom-left': return 'bottom-[12%] justify-start pl-12';
-      case 'bottom-right': return 'bottom-[12%] justify-end pr-12';
-      default: return 'bottom-[12%] justify-center';
+      case 'top': return 'items-start justify-center pt-[15%]';
+      case 'middle': return 'items-center justify-center';
+      case 'bottom': return 'items-end justify-center pb-[12%]';
+      case 'left': return 'items-center justify-start pl-12';
+      case 'right': return 'items-center justify-end pr-12';
+      case 'top-left': return 'items-start justify-start pt-[15%] pl-12';
+      case 'top-right': return 'items-start justify-end pt-[15%] pr-12';
+      case 'bottom-left': return 'items-end justify-start pb-[12%] pl-12';
+      case 'bottom-right': return 'items-end justify-end pb-[12%] pr-12';
+      default: return 'items-end justify-center pb-[12%]';
     }
   };
 
@@ -819,16 +843,37 @@ const CaptionOverlay = ({
       fontSize: `${word.fontSize || style.fontSize}px`,
       color: word.color || (style.isDynamic ? getDynamicColor(index, word) : style.color),
       textTransform: style.case === 'uppercase' ? 'uppercase' : style.case === 'lowercase' ? 'lowercase' : 'none',
-      padding: style.padding || '0.1em 0.3em',
+      backgroundColor: 'transparent', // Background is handled by container
+      padding: '0.1em 0.15em',
       borderRadius: style.borderRadius || '0.2rem',
       letterSpacing: style.letterSpacing || 'normal',
       display: 'inline-block',
-      margin: '0.1em 0.25em',
+      whiteSpace: 'nowrap',
+      wordBreak: 'keep-all',
+      margin: '0.25em 0.6em',
       transition: 'all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
       fontStyle: style.italic ? 'italic' : 'normal',
-      fontWeight: style.fontWeight || '900', // Respect the style's font weight
-      textShadow: `0 2px 10px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.1)`, // Extra clarity and vibrancy
+      fontWeight: style.fontWeight || '900',
+      textShadow: `0 2px 10px rgba(0,0,0,0.5)`,
     };
+
+    if (style.tripleBorder && style.tripleBorderColors) {
+      const c1 = style.tripleBorderColors[0] || '#FFD700'; 
+      const c2 = style.tripleBorderColors[1] || '#0047AB'; 
+      const c3 = style.tripleBorderColors[2] || '#000000'; 
+      
+      // ShaabdTeerth Style: Triple thick stroke + Shadow
+      baseStyle.textShadow = `
+        -1.5px -1.5px 0 ${c1}, 1.5px -1.5px 0 ${c1}, -1.5px 1.5px 0 ${c1}, 1.5px 1.5px 0 ${c1},
+        -3px -3px 0 ${c2}, 3px -3px 0 ${c2}, -3px 3px 0 ${c2}, 3px 3px 0 ${c2},
+        -4.5px -4.5px 0 ${c2}, 4.5px -4.5px 0 ${c2}, -4.5px 4.5px 0 ${c2}, 4.5px 4.5px 0 ${c2},
+        0 8px 15px rgba(0,0,0,0.9)
+      `.trim().replace(/\s+/g, ' ');
+      
+      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1.2}px ${c1}`;
+      baseStyle.whiteSpace = 'nowrap';
+      baseStyle.display = 'inline-block';
+    }
 
     if (style.border === 'thin') {
       (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 1) * 0.4}px ${style.outlineColor || '#000000'}`;
@@ -873,8 +918,20 @@ const CaptionOverlay = ({
 
   const currentWordPosition = currentWord.position || style.position;
 
-  // Handle Dragging
+  const handleDrag = (_: any, info: any) => {
+    setIsDragging(true);
+    const currentX = (style.x || 0) + info.offset.x;
+    const currentY = (style.y || 0) + info.offset.y;
+    
+    setGuides({
+      x: Math.abs(currentX) < 10,
+      y: Math.abs(currentY) < 10
+    });
+  };
+
   const handleDragEnd = (_: any, info: any) => {
+    setIsDragging(false);
+    setGuides({ x: false, y: false });
     if (onUpdateStyle) {
       onUpdateStyle({
         x: (style.x || 0) + info.offset.x,
@@ -901,11 +958,21 @@ const CaptionOverlay = ({
     // typewriter is now the default sequential animation
     const isSequential = ['professional', 'snappy', 'zoom', 'typing', 'typewriter'].includes(animation);
 
+    // Apply background to the whole line if configured
+    const lineContainerStyle: React.CSSProperties = {
+      ...textStyle,
+      maxWidth: '95%',
+      margin: '0 auto',
+      padding: (style.backgroundColor && style.backgroundColor !== 'transparent') ? (style.padding || '0.2em 0.5em') : 0,
+      backgroundColor: (style.backgroundColor && style.backgroundColor !== 'transparent') ? style.backgroundColor : 'transparent',
+      borderRadius: (style.backgroundColor && style.backgroundColor !== 'transparent') ? (style.borderRadius || '0.5rem') : 0,
+    };
+
     if (isSequential || animation === 'karaoke' || animation === 'zeemo') {
       return (
         <div 
-          style={{...textStyle, maxWidth: '95%', margin: '0 auto', backgroundColor: 'transparent', padding: 0}} 
-          className={`flex flex-wrap ${alignmentClass} gap-x-[0.25em] gap-y-1 overflow-visible pointer-events-none`}
+          style={lineContainerStyle} 
+          className={`flex flex-nowrap ${alignmentClass} gap-x-[0.6em] gap-y-1 overflow-visible pointer-events-none items-center justify-center`}
         >
           {lineWords.map((w, i) => {
             const isVisible = adjustedTime >= w.start;
@@ -1013,81 +1080,89 @@ const CaptionOverlay = ({
 
     // Snappy Pop / Pop Animation (Restore classic high-quality centered look)
     if (animation === 'pop' || animation === 'snappy-pop') {
+      const isPro = style.isSmart;
       return (
         <AnimatePresence mode="popLayout">
-          <motion.div
-            key={`${currentWord.word}-${currentWord.start}`}
-            initial={{ scale: 0.8, opacity: 0, y: 15 }}
-            animate={{ 
-              scale: 1.15, 
-              opacity: 1, 
-              y: 0,
-              color: style.color
-            }}
-            exit={{ scale: 0.9, opacity: 0, y: -10 }}
-            transition={{ 
-              type: 'spring', 
-              stiffness: animation === 'snappy-pop' ? 700 : 450, 
-              damping: 25 
-            }}
-            style={{ 
-              ...getWordStyle(currentWord, words.indexOf(currentWord)), 
-              maxWidth: '90%', 
-              margin: '0 auto',
-            }}
-            className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
-          >
-            {style.isDynamic ? (
-              currentWord.word.split(' ').map((w, i) => {
-                const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
-                const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-                const wordColor = colors[globalWordIndex % colors.length];
-                return (
-                  <span key={i} style={{ color: wordColor }}>
-                    {w}
-                  </span>
-                );
-              })
-            ) : (
-              currentWord.word
-            )}
-          </motion.div>
+          <div style={lineContainerStyle} className={alignmentClass}>
+            <motion.div
+              key={`${currentWord.word}-${currentWord.start}`}
+              initial={{ scale: 0.8, opacity: 0, y: isPro ? 8 : 12 }}
+              animate={{ 
+                scale: 1.15, 
+                opacity: 1, 
+                y: driftOffset.y,
+                x: driftOffset.x,
+                color: getDynamicColor(words.indexOf(currentWord), currentWord)
+              }}
+              exit={{ scale: 0.9, opacity: 0, y: isPro ? -5 : -8 }}
+              transition={{ 
+                type: 'spring', 
+                stiffness: animation === 'snappy-pop' ? 700 : 450, 
+                damping: 25 
+              }}
+              style={{ 
+                ...getWordStyle(currentWord, words.indexOf(currentWord)),
+                backgroundColor: 'transparent',
+                maxWidth: '90%', 
+                margin: '0 auto',
+              }}
+              className="font-bold text-center px-4 flex flex-nowrap justify-center items-center gap-[0.5em]"
+            >
+              {style.isDynamic ? (
+                currentWord.word.split(' ').map((w, i) => {
+                  const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
+                  const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+                  const wordColor = colors[globalWordIndex % colors.length];
+                  return (
+                    <span key={i} style={{ color: wordColor }}>
+                      {w}
+                    </span>
+                  );
+                })
+              ) : (
+                currentWord.word
+              )}
+            </motion.div>
+          </div>
         </AnimatePresence>
       );
     }
 
     // Glow animation
     if (animation === 'glow') {
+      const isPro = style.isSmart;
       return (
-        <AnimatePresence mode="popLayout">
-          <motion.div
-            key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
-            initial={{ opacity: 0, filter: 'blur(10px)' }}
-            animate={{ 
-              opacity: 1, 
-              filter: 'blur(0px)',
-              y: style.isSmart ? floatingOffset.y : 0,
-              x: style.isSmart ? floatingOffset.x : 0
-            }}
-            exit={{ opacity: 0, filter: 'blur(10px)' }}
-            style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)) }}
-            className="font-bold text-center px-4 flex flex-wrap justify-center gap-[0.25em]"
-          >
-            {style.isDynamic ? (
-              currentWord.word.split(' ').map((w, i) => {
-                const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
-                const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-                const wordColor = colors[globalWordIndex % colors.length];
-                return (
-                  <span key={i} style={{ color: wordColor }}>
-                    {w}
-                  </span>
-                );
-              })
-            ) : (
-              currentWord.word
-            )}
-          </motion.div>
+        <AnimatePresence mode="wait">
+          <div style={lineContainerStyle} className={alignmentClass}>
+            <motion.div
+              key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
+              initial={{ opacity: 0, filter: 'blur(10px)', y: isPro ? 5 : 8 }}
+              animate={{ 
+                opacity: 1, 
+                filter: 'blur(0px)',
+                y: driftOffset.y,
+                x: driftOffset.x
+              }}
+              exit={{ opacity: 0, filter: 'blur(10px)', y: isPro ? -5 : -8 }}
+              style={{ ...getWordStyle(currentWord, words.indexOf(currentWord)), backgroundColor: 'transparent' }}
+              className="font-bold text-center px-4 flex flex-nowrap justify-center items-center gap-[0.5em]"
+            >
+              {style.isDynamic ? (
+                currentWord.word.split(' ').map((w, i) => {
+                  const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
+                  const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+                  const wordColor = colors[globalWordIndex % colors.length];
+                  return (
+                    <span key={i} style={{ color: wordColor }}>
+                      {w}
+                    </span>
+                  );
+                })
+              ) : (
+                currentWord.word
+              )}
+            </motion.div>
+          </div>
         </AnimatePresence>
       );
     }
@@ -1095,41 +1170,52 @@ const CaptionOverlay = ({
     // Default style
     return (
       <AnimatePresence mode="popLayout">
-        <motion.div
-          key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
-          {...getAnimationProps()}
-          animate={{
-            ...getAnimationProps().animate,
-            x: style.isSmart ? floatingOffset.x : 0,
-            y: style.isSmart ? floatingOffset.y : 0
-          }}
-          style={getWordStyle(currentWord, words.indexOf(currentWord))}
-          className={`font-bold ${alignmentClass} px-4 flex flex-wrap gap-[0.25em]`}
-        >
-          {style.isDynamic ? (
-            currentWord.word.split(' ').map((w, i) => {
-              const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
-              const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-              const wordColor = colors[globalWordIndex % colors.length];
-              return (
-                <span key={i} style={{ color: wordColor }}>
-                  {w}
-                </span>
-              );
-            })
-          ) : (
-            currentWord.word
-          )}
-        </motion.div>
+        <div style={lineContainerStyle} className={alignmentClass}>
+          <motion.div
+            key={`${currentWord.word}-${currentWord.start}-${currentWord.end}`}
+            {...getAnimationProps()}
+            animate={{
+              ...(getAnimationProps()?.animate || {}),
+              x: driftOffset.x,
+              y: driftOffset.y
+            }}
+            style={{...getWordStyle(currentWord, words.indexOf(currentWord)), backgroundColor: 'transparent'}}
+            className="font-bold flex items-center justify-center whitespace-nowrap overflow-visible"
+          >
+            {style.isDynamic ? (
+              currentWord.word.split(' ').map((w, i) => {
+                const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
+                const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+                const wordColor = colors[globalWordIndex % colors.length];
+                return (
+                  <span key={i} style={{ color: wordColor }}>
+                    {w}
+                  </span>
+                );
+              })
+            ) : (
+              currentWord.word
+            )}
+          </motion.div>
+        </div>
       </AnimatePresence>
     );
   };
 
   return (
     <div className={`absolute inset-0 flex z-[100] ${positionClass} p-4 pointer-events-none`}>
+      {/* Laser Guides */}
+      {isDragging && guides.x && (
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-emerald-400/80 shadow-[0_0_10px_rgba(52,211,153,0.8)] z-[101]" />
+      )}
+      {isDragging && guides.y && (
+        <div className="absolute top-1/2 left-0 right-0 h-px bg-emerald-400/80 shadow-[0_0_10px_rgba(52,211,153,0.8)] z-[101]" />
+      )}
+
       <motion.div 
         drag
         dragMomentum={false}
+        onDrag={handleDrag}
         onDragEnd={handleDragEnd}
         animate={{
           x: style.x || 0,
@@ -1978,8 +2064,8 @@ function App() {
   const [selectedPresetId, setSelectedPresetId] = useState<string>('professional-three-color');
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>({
     ...CAPTION_PRESETS.find(p => p.id === 'professional-three-color')?.style || CAPTION_PRESETS[0].style,
-    fontSize: 72,
-    wordsPerLine: 1,
+    fontSize: 25,
+    wordsPerLine: 3,
     isSmart: true
   });
   const [captionAnimation, setCaptionAnimation] = useState<string>(CAPTION_PRESETS.find(p => p.id === 'professional-three-color')?.animation || 'typewriter');
@@ -2462,66 +2548,67 @@ function App() {
   const isFFmpegLoading = useRef(false);
   const [isFFmpegLoaded, setIsFFmpegLoaded] = useState(false);
 
+  const base64ToAudioBlob = (base64: string) => {
+    const pcmBuffer = base64ToArrayBuffer(base64);
+    const firstFour = new Uint8Array(pcmBuffer.slice(0, 4));
+    const isAlreadyWav = String.fromCharCode(firstFour[0], firstFour[1], firstFour[2], firstFour[3]) === 'RIFF';
+    
+    if (isAlreadyWav) {
+      return new Blob([pcmBuffer], { type: 'audio/wav' });
+    } else {
+      const wavHeader = createWavHeader(pcmBuffer, 24000);
+      const combinedBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
+      combinedBuffer.set(new Uint8Array(wavHeader), 0);
+      combinedBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+      return new Blob([combinedBuffer], { type: 'audio/wav' });
+    }
+  };
+
   const loadFFmpeg = async () => {
-    if (ffmpegRef.current) return;
+    if (ffmpegRef.current && ffmpegRef.current.loaded) return;
+    
+    // If already loading, wait for it
     if (isFFmpegLoading.current) {
-      // Wait for existing load to complete
+      console.log("[VoxNova] Engine already loading, waiting...");
       let attempts = 0;
-      while (isFFmpegLoading.current && !ffmpegRef.current && attempts < 50) {
-        await new Promise(r => setTimeout(r, 200));
+      while (isFFmpegLoading.current && !ffmpegRef.current && attempts < 60) {
+        await new Promise(r => setTimeout(r, 500));
         attempts++;
       }
-      return;
+      if (ffmpegRef.current) return;
     }
     
     isFFmpegLoading.current = true;
+    
     try {
-      console.log("Loading FFmpeg (VoxNova Engine)...");
+      console.log("[VoxNova] Initializing engine...");
+      setCaptionStep('Waking up engine...');
+      
       const { FFmpeg } = await import('@ffmpeg/ffmpeg');
       const { toBlobURL } = await import('@ffmpeg/util');
+      
       const ffmpeg = new FFmpeg();
+      ffmpegRef.current = ffmpeg;
+
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      });
       
-      // Load ffmpeg.wasm from CDN for maximum reliability in this environment
-      let baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+      console.log("[VoxNova] Engine Ready.");
       
-      try {
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-      } catch (loadError) {
-        console.warn("Primary FFmpeg CDN failed, trying fallback...", loadError);
-        baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-      }
-      
-      // Monitor progress for better UI feedback
       ffmpeg.on('progress', ({ progress }) => {
-        // Only update if we are in a phase that uses FFmpeg progress
         if (isCaptioning) {
           setCaptionProgress(Math.floor(progress * 100));
-        } else if (isVoiceChanging && voiceChangingProgress >= 80) {
-          // Voice changing uses manual progress until 80%, then FFmpeg takes over for the final merge
-          const advancedProgress = Math.floor(80 + (progress * 20));
-          if (advancedProgress > voiceChangingProgress) {
-            setVoiceChangingProgress(advancedProgress);
-          }
+        } else if (isVoiceChanging) {
+          const finalPhase = Math.floor(88 + (progress * 11)); 
+          setVoiceChangingProgress(prev => Math.max(prev, finalPhase));
         }
       });
-
-      ffmpeg.on('log', ({ message }) => {
-        console.log("FFmpeg Log:", message);
-      });
-      
-      ffmpegRef.current = ffmpeg;
-      setIsFFmpegLoaded(true);
-      console.log("FFmpeg loaded successfully");
-    } catch (error) {
-      console.error("Failed to load FFmpeg:", error);
-      setError("Failed to load video engine. Please refresh and try again.");
+    } catch (err: any) {
+      console.error("[VoxNova] Engine failed to load:", err);
+      setError(`Failed to load engine: ${err.message}. Try refreshing.`);
     } finally {
       isFFmpegLoading.current = false;
     }
@@ -2531,7 +2618,7 @@ function App() {
     loadFFmpeg();
   }, []);
 
-    const generateASS = (words: CaptionWord[], style: CaptionStyle, videoWidth: number = 1280, videoHeight: number = 720) => {
+    const generateASS = (words: CaptionWord[], style: CaptionStyle, videoWidth: number = 1280, videoHeight: number = 720, overrideFontName?: string) => {
     const isPortrait = videoHeight > videoWidth;
     
     const displayWords = groupWordsIntoLines(words.map(w => ({
@@ -2548,7 +2635,7 @@ function App() {
     };
 
     const alignment = 2; // Bottom Center
-    const fontName = style.font || 'Inter';
+    const fontName = overrideFontName || style.font || 'Inter';
 
     const hexToAss = (hex: string) => {
       const cleanHex = hex.replace('#', '');
@@ -2570,6 +2657,7 @@ function App() {
     
     const outline = style.strokeWidth || (style.border === 'thick' ? 3 : style.border === 'thin' ? 1.5 : 0);
     const shadow = style.shadow ? 2 : 0;
+    const spacing = 4; // Add larger gap between characters/words for better readability
     
     // Scale Font size based on resolution
     const baseResY = 720;
@@ -2583,7 +2671,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,0,0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 150 : 80},1
+Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 150 : 80},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -2608,35 +2696,72 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   };
 
   const burnCaptions = async (videoFile: File, words: CaptionWord[], style: CaptionStyle) => {
-    console.log("Starting burnCaptions...");
+    setCaptionStep('Preparing High-Speed Engine...');
+    setCaptionProgress(5);
+    console.log("[VoxNova] Starting burnCaptions process...");
+    
     if (!ffmpegRef.current) {
-      console.log("FFmpeg not loaded, loading now...");
       await loadFFmpeg();
     }
     const ffmpeg = ffmpegRef.current;
-    if (!ffmpeg) throw new Error("Video engine failed to initialize");
+    if (!ffmpeg) {
+      let errorMsg = "Video engine (FFmpeg) failed to initialize.";
+      if (!window.crossOriginIsolated) {
+        errorMsg += " Security constraints (COOP/COEP) are not active. Try opening the app in a new tab if you're in a restricted environment.";
+      } else {
+        errorMsg += " Check your connection or try refreshing the page.";
+      }
+      throw new Error(errorMsg);
+    }
     
     const { fetchFile } = await import('@ffmpeg/util');
     const inputName = 'input.mp4';
     const outputName = 'output.mp4';
     const assName = 'subtitles.ass';
-    const fontName = 'Inter-Bold.ttf';
     
-    setCaptionStep('Loading video engine...');
-    console.log("Writing input file...");
-    await ffmpeg.writeFile(inputName, await fetchFile(videoFile));
+    // Dynamic Font Loading
+    const selectedFont = style.font || 'Inter';
+    const fontMapping: Record<string, string> = {
+      'Inter': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/Inter-Bold.ttf',
+      'Poppins': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf',
+      'Montserrat': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat-Bold.ttf',
+      'Rajdhani': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/rajdhani/Rajdhani-Bold.ttf',
+      'Kalam': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/kalam/Kalam-Bold.ttf',
+      'Hind': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/hind/Hind-Bold.ttf',
+      'Teko': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/teko/Teko-Bold.ttf',
+      'Martel': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/martel/Martel-Bold.ttf',
+      'Bangers': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bangers/Bangers-Regular.ttf',
+      'Luckiest Guy': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/luckiestguy/LuckiestGuy-Regular.ttf'
+    };
+
+    const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
+    const fontName = selectedFont;
+    const fontFile = `${selectedFont}.ttf`;
     
-    setCaptionStep('Loading professional font...');
+    setCaptionStep('Reading video data...');
+    console.log("[VoxNova] Fetching video file...");
+    const videoData = await fetchFile(videoFile);
+    console.log("[VoxNova] Writing input file to virtual drive...");
+    await ffmpeg.writeFile(inputName, videoData);
+    
+    setCaptionStep('Loading professional fonts...');
     try {
-      console.log("Fetching font...");
-      // Load Inter-Bold for high quality captions
-      const fontData = await fetchFile('https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter-Bold.ttf');
-      await ffmpeg.writeFile(fontName, fontData);
+      console.log(`Fetching font: ${selectedFont} from ${fontUrl}`);
+      const fontData = await fetchFile(fontUrl);
+      await ffmpeg.writeFile(fontFile, fontData);
     } catch (e) {
-      console.warn("Font load failed, using fallback", e);
+      console.warn("Font load failed, using fallback Inter", e);
+      try {
+        const fallbackData = await fetchFile(fontMapping['Inter']);
+        const fallbackFont = 'Inter.ttf';
+        await ffmpeg.writeFile(fallbackFont, fallbackData);
+      } catch (innerErr) {
+        console.error("Critical font failure", innerErr);
+      }
     }
     
-    setCaptionStep('Finalizing subtitle data...');
+    setCaptionStep('Mapping video architecture...');
+    console.log("[VoxNova] Mapping video architecture...");
     // Get actual video dimensions for accurate subtitle positioning
     let videoWidth = 1280;
     let videoHeight = 720;
@@ -2645,10 +2770,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       videoElement.src = URL.createObjectURL(videoFile);
       await new Promise((resolve) => {
         videoElement.onloadedmetadata = () => {
-          videoWidth = videoElement.videoWidth;
-          videoHeight = videoElement.videoHeight;
+          // Ensure dimensions are even for yuv420p compatibility
+          videoWidth = videoElement.videoWidth % 2 === 0 ? videoElement.videoWidth : videoElement.videoWidth - 1;
+          videoHeight = videoElement.videoHeight % 2 === 0 ? videoElement.videoHeight : videoElement.videoHeight - 1;
           resolve(true);
         };
+        videoElement.onerror = () => resolve(false);
+        setTimeout(() => resolve(false), 5000); 
       });
       URL.revokeObjectURL(videoElement.src);
     } catch (e) {
@@ -2656,66 +2784,100 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
 
     // We update generateASS to use the font we just loaded and correct dimensions
-    const assContent = generateASS(words, style, videoWidth, videoHeight).replace(/Fontname, Inter/g, `Fontname, ${fontName}`);
+    const assContent = generateASS(words, style, videoWidth, videoHeight, fontName);
     await ffmpeg.writeFile(assName, assContent);
     
-    setCaptionStep('Burning captions (this may take a minute)...');
-    setCaptionProgress(50);
+    setCaptionStep('Encoding video (please wait)...');
+    console.log("[VoxNova] Encoding video...");
+    setCaptionProgress(0);
     
-    // Clean up old files to prevent issues
+    // Refresh progress listener to handle closure staleness
+    ffmpeg.off('progress', () => {}); // Clear previous if any
+    ffmpeg.on('progress', ({ progress }) => {
+      setCaptionProgress(Math.min(95, Math.floor(progress * 100)));
+    });
+
+    console.log("[VoxNova] Executing FFmpeg optimized command with resolution protection...");
+    // Optimized FFmpeg command:
+    // 1. scale to 720p maximum to prevent memory overflow
+    // 2. ultrafast preset for speed
+    // 3. crf 28 for maximum stability (prevents memory crashes on high-res)
+    // 4. pix_fmt yuv420p for maximum compatibility
     try {
-      await ffmpeg.deleteFile(outputName);
-    } catch (e) {}
- 
-    console.log("Executing FFmpeg command...");
-    // Run ffmpeg command to burn subtitles
-    // We add scaling to 720p if needed to prevent memory crashes on mobile/browser
-    // Also use ultrafast to minimize processing time
-    try {
+      console.log("[VoxNova] Starting FFmpeg process...");
+      // Simplified command for maximum speed
       await ffmpeg.exec([
+        '-y', 
         '-i', inputName, 
-        '-vf', `scale='if(gt(iw,ih),1280,-1)':'if(gt(iw,ih),-1,720)',subtitles=${assName}`,
+        '-vf', `scale=trunc(iw/2)*2:trunc(ih/2)*2,subtitles=${assName}:fontsdir=.`,
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
-        '-crf', '28',
-        '-c:a', 'aac', 
-        '-b:a', '128k',
+        '-crf', '26',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'copy',
+        '-movflags', '+faststart',
         outputName
       ]);
-    } catch (e) {
-      console.error("FFmpeg primary exec failed:", e);
-      // Fallback with even safer parameters
-      await ffmpeg.exec([
-        '-i', inputName, 
-        '-vf', `scale=720:-1:force_original_aspect_ratio=decrease,subtitles=${assName}`, 
-        '-c:v', 'libx264', 
-        '-preset', 'ultrafast', 
-        '-crf', '32',
-        '-c:a', 'aac',
-        outputName
-      ]);
+    } catch (e: any) {
+      console.error("FFmpeg execution error. Attempting fallback without fontsdir...", e);
+      try {
+        await ffmpeg.exec([
+          '-y',
+          '-i', inputName, 
+          '-vf', `subtitles=${assName}`, 
+          '-c:v', 'libx264', 
+          '-preset', 'ultrafast', 
+          '-crf', '30',
+          '-c:a', 'copy',
+          outputName
+        ]);
+      } catch (innerE: any) {
+        console.error("FFmpeg fallback failed:", innerE);
+        throw new Error(`Encoding failed: The video is too high-resolution for the browser. Please try a shorter or 720p video.`);
+      }
     }
     
-    setCaptionProgress(90);
-    setCaptionStep('Finalizing video...');
+    setCaptionProgress(95);
+    setCaptionStep('Finalizing download...');
     
-    // Small delay to ensure file system is synced
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    console.log("Reading output file...");
+    console.log("Reading final output...");
     const data = await ffmpeg.readFile(outputName);
-    if (!data || data.length === 0) throw new Error("Generated video is empty");
     
-    console.log("Burn captions complete");
+    setCaptionStep('Finalizing video encoding...');
+    setCaptionProgress(98);
+    
+    // Memory Cleanup
+    try {
+      await ffmpeg.deleteFile(inputName);
+      await ffmpeg.deleteFile(assName);
+      await ffmpeg.deleteFile(outputName);
+      await ffmpeg.deleteFile(fontFile);
+    } catch (e) {
+      console.warn("Cleanup failed", e);
+    }
+    
+    setCaptionProgress(100);
+    setCaptionStep('Success!');
+    
+    if (!data || (data as any).length === 0) throw new Error("Generated video is empty");
     return new Blob([data], { type: 'video/mp4' });
   };
 
   const mergeAudioWithVideo = async (videoFile: File, audioData: string) => {
+    setVoiceChangingProgress(81);
     setVoiceChangingStep('Preparing engine...');
     if (!ffmpegRef.current) {
       await loadFFmpeg();
       // Double check if it loaded
-      if (!ffmpegRef.current) throw new Error("FFmpeg could not be initialized. Please refresh.");
+      if (!ffmpegRef.current) {
+        let errorMsg = "FFmpeg could not be initialized.";
+        if (!window.crossOriginIsolated) {
+          errorMsg += " Security constraints (COOP/COEP) are not active. Try opening the app in a new tab if you are in a restricted environment.";
+        } else {
+          errorMsg += " Check your internet connection or try refreshing the page.";
+        }
+        throw new Error(errorMsg);
+      }
     }
     const ffmpeg = ffmpegRef.current;
     
@@ -2742,48 +2904,38 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     
     setVoiceChangingStep('Preparing audio track...');
     setVoiceChangingProgress(85);
-    // Gemini TTS returns raw PCM (24kHz, 16-bit mono). FFmpeg needs a WAV header to read it correctly as .wav
-    const pcmBuffer = base64ToArrayBuffer(audioData);
-    const wavHeader = createWavHeader(pcmBuffer, 24000);
-    const fullAudioBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
-    fullAudioBuffer.set(new Uint8Array(wavHeader), 0);
-    fullAudioBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
     
-    await ffmpeg.writeFile(inputAudio, fullAudioBuffer);
+    // The server already provides a full WAV file with RIFF header
+    const audioBuffer = base64ToArrayBuffer(audioData);
+    await ffmpeg.writeFile(inputAudio, new Uint8Array(audioBuffer));
     setVoiceChangingProgress(88);
     
     setVoiceChangingStep('Merging audio and video...');
-    // ffmpeg-progress listener will handle 88% -> 99%
     
-    // Optimized merge command for speed and compatibility
     try {
+      // Standard MP4 merge - try copy first for lightning speed
       await ffmpeg.exec([
         '-i', inputVideo, 
         '-i', inputAudio, 
-        '-y',
         '-c:v', 'copy', 
         '-c:a', 'aac', 
-        '-b:a', '192k', // Better audio quality
+        '-b:a', '128k',
         '-map', '0:v:0', 
         '-map', '1:a:0', 
         '-shortest',
-        '-threads', '0',
-        '-movflags', '+faststart',
+        '-y',
         outputName
       ]);
     } catch (e) {
-      console.warn("FFmpeg copy failed, falling back to re-encode...", e);
-      setVoiceChangingStep('Encoding video (fallback)...');
+      console.warn("FFmpeg copy failed, trying full merge...", e);
+      // Fallback merge without 'copy' which handles different container formats better
       await ffmpeg.exec([
         '-i', inputVideo, 
         '-i', inputAudio, 
-        '-y',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '32', // Higher compression for speed
+        '-c:v', 'copy', // Keep video fast
         '-c:a', 'aac',
-        '-b:a', '128k',
         '-shortest',
+        '-y',
         outputName
       ]);
     }
@@ -2857,31 +3009,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
       if (voiceChangingFile.type.startsWith('video/')) {
         setVoiceChangingStep('Merging with video...');
-        const videoBlob = await mergeAudioWithVideo(voiceChangingFile, audioBase64);
-        setVoiceChangingResult({
-          url: URL.createObjectURL(videoBlob),
-          type: 'video'
-        });
-      } else {
-        // Convert to WAV for audio-only, detecting if already a WAV file
-        const pcmBuffer = base64ToArrayBuffer(audioBase64);
-        const firstFour = new Uint8Array(pcmBuffer.slice(0, 4));
-        const isAlreadyWav = String.fromCharCode(firstFour[0], firstFour[1], firstFour[2], firstFour[3]) === 'RIFF';
-        
-        let finalBlob;
-        if (isAlreadyWav) {
-          finalBlob = new Blob([pcmBuffer], { type: 'audio/wav' });
-        } else {
-          // Note: Gemini flash-tts-preview returns 24kHz PCM for voice changer mode
-          const wavHeader = createWavHeader(pcmBuffer, 24000);
-          const combinedBuffer = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
-          combinedBuffer.set(new Uint8Array(wavHeader), 0);
-          combinedBuffer.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
-          finalBlob = new Blob([combinedBuffer], { type: 'audio/wav' });
+        try {
+          const videoBlob = await mergeAudioWithVideo(voiceChangingFile, audioBase64);
+          setVoiceChangingResult({
+            url: URL.createObjectURL(videoBlob),
+            type: 'video'
+          });
+        } catch (mergeError) {
+          console.error("Video merge failed, falling back to audio only:", mergeError);
+          showToast("Engine error: Could not merge video. Providing audio-only version.");
+          
+          const audioBlob = base64ToAudioBlob(audioBase64);
+          setVoiceChangingResult({
+            url: URL.createObjectURL(audioBlob),
+            type: 'audio'
+          });
         }
-        
+      } else {
+        const audioBlob = base64ToAudioBlob(audioBase64);
         setVoiceChangingResult({
-          url: URL.createObjectURL(finalBlob),
+          url: URL.createObjectURL(audioBlob),
           type: 'audio'
         });
       }
@@ -2903,20 +3050,35 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const toggleFullScreen = () => {
     if (!videoContainerRef.current) return;
+    const element = videoContainerRef.current as any;
     if (!document.fullscreenElement) {
-      videoContainerRef.current.requestFullscreen().catch(err => {
-        showToast(`Error: ${err.message}`);
-      });
+      if (element.requestFullscreen) {
+        element.requestFullscreen();
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+      } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      }
     } else {
-      document.exitFullscreen();
+      const doc = document as any;
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      } else if (doc.mozCancelFullScreen) {
+        doc.mozCancelFullScreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
     }
   };
 
   const handleGenerateCaptions = async () => {
     if (!captionFile) return;
     
-    // File size limit to prevent request failures
-    const limit = currentUser ? 300 * 1024 * 1024 : 50 * 1024 * 1024; // 300MB for Pro, 50MB for Guest
+    const limit = currentUser ? 300 * 1024 * 1024 : 50 * 1024 * 1024;
     if (captionFile.size > limit) {
       setError(`Video file is too large (> ${currentUser ? '300MB' : '50MB'}). Please upload a smaller video or compress it.`);
       return;
@@ -2927,43 +3089,69 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     setCaptionProgress(0);
     setCaptionStep('Reading video file...');
     
-    try {
-      const videoData = await fileToBase64(captionFile);
-      setCaptionProgress(20);
-      setCaptionStep('Uploading to AI engine...');
- 
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch('/api/generate-captions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          videoData,
-          language: captionLanguage,
-          scriptType: captionScriptType,
-          translateToEnglish
-        })
-      });
- 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Processing Failed. Possible size limit.' }));
-        throw new Error(errorData.error || 'Failed to generate captions');
-      }
- 
-      const data = await response.json();
-      if (!data.words) throw new Error("AI could not find any speech in video.");
+    let attempts = 0;
+    const maxAttempts = 5;
 
-      setCaptionWords(data.words);
-      setCaptionResult({
-        videoUrl: URL.createObjectURL(captionFile),
-        srt: '',
-        words: data.words
-      });
-      
-      setCaptionProgress(100);
-      setCaptionStep('Captions ready!');
+    const performGeneration = async (): Promise<any> => {
+      try {
+        const videoData = await fileToBase64(captionFile);
+        setCaptionProgress(20);
+        setCaptionStep('Uploading to AI engine...');
+    
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+        const response = await fetch('/api/generate-captions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            videoData,
+            language: captionLanguage,
+            scriptType: captionScriptType,
+            translateToEnglish
+          })
+        });
+    
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Processing Failed' }));
+          let errorMessage = 'Failed to generate captions';
+          
+          if (errorData.error) {
+            errorMessage = typeof errorData.error === 'string' ? errorData.error : (errorData.error.message || JSON.stringify(errorData.error));
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+
+          if (response.status === 503 && attempts < maxAttempts - 1) {
+            attempts++;
+            const nextDelay = (3000 * attempts) + 2000;
+            setCaptionStep(`Model busy, retrying in ${Math.round(nextDelay/1000)}s (${attempts}/${maxAttempts})...`);
+            await new Promise(r => setTimeout(r, nextDelay));
+            return performGeneration();
+          }
+          throw new Error(errorMessage);
+        }
+    
+        const data = await response.json();
+        if (!data.words) throw new Error("AI could not find any speech in video.");
+
+        setCaptionWords(data.words);
+        setCaptionResult({
+          videoUrl: URL.createObjectURL(captionFile),
+          srt: '',
+          words: data.words
+        });
+        
+        setCaptionProgress(100);
+        setCaptionStep('Captions ready!');
+      } catch (err: any) {
+        throw err;
+      }
+    };
+
+    try {
+      await performGeneration();
     } catch (err: any) {
       console.error("[Captions] Error:", err);
       setError(`Captioning failed: ${err.message}`);
@@ -2974,11 +3162,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
   const handleExportCaptions = async () => {
     if (!captionFile || captionWords.length === 0) return;
+    if (videoRef.current && videoRef.current.duration > 300) {
+      const confirmLarge = window.confirm("This video is over 5 minutes. Browser-based encoding might fail or crash your browser. Continue anyway?");
+      if (!confirmLarge) return;
+    }
+
+    console.log("[VoxNova] Exporting captions for:", captionFile.name);
     setIsCaptioning(true);
     setCaptionProgress(0);
-    setCaptionStep('Burning captions into video...'); 
+    setCaptionStep('Initializing download engine...'); 
     
     try {
+      showToast("Download started. Please keep this tab open.");
       const videoBlob = await burnCaptions(captionFile, captionWords, captionStyle);
       const url = URL.createObjectURL(videoBlob);
       const a = document.createElement('a');
@@ -2991,9 +3186,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 100);
-      showToast("Video exported successfully!");
+      showToast("Video downloaded successfully!");
     } catch (err: any) {
-      setError(`Export failed: ${err.message}`);
+      setError(`Download failed: ${err.message}`);
     } finally {
       setIsCaptioning(false);
     }
@@ -4301,24 +4496,30 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           <span>{speed}x</span>
                         </div>
                         <div className="flex gap-2 mb-2">
-                          <button 
+                          <motion.button 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => setSpeed(1.6)}
                             className={`flex-1 py-1 px-2 rounded-md text-[10px] border ${speed === 1.6 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             (U Fast)
-                          </button>
-                          <button 
+                          </motion.button>
+                          <motion.button 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => setSpeed(1.0)}
                             className={`flex-1 py-1 px-2 rounded-md text-[10px] border ${speed === 1.0 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Normal
-                          </button>
-                          <button 
+                          </motion.button>
+                          <motion.button 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => setSpeed(1.4)}
                             className={`flex-1 py-1 px-2 rounded-md text-[10px] border ${speed === 1.4 ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                           >
                             Fast
-                          </button>
+                          </motion.button>
                         </div>
                         <input 
                           type="range" min="0.5" max="2" step="0.1" 
@@ -4604,13 +4805,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 {captionResult && (
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => setIsEditingCaptions(!isEditingCaptions)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${isEditingCaptions ? 'bg-emerald-500 text-white shadow-lg' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                    >
-                      <Edit2 size={16} />
-                      {isEditingCaptions ? 'Finish Editing' : 'Edit Words'}
-                    </button>
-                    <button 
                       onClick={handleExportCaptions}
                       disabled={isCaptioning}
                       className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 min-w-[140px] justify-center shadow-xl shadow-zinc-900/20"
@@ -4618,12 +4812,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       {isCaptioning ? (
                         <>
                           <Loader2 className="animate-spin" size={16} />
-                          <span>Exporting...</span>
+                          <span>Downloading...</span>
                         </>
                       ) : (
                         <>
                           <Download size={16} />
-                          Export Video
+                          Download Video
                         </>
                       )}
                     </button>
@@ -4661,23 +4855,74 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mt-1">Real-time Rendering</p>
                              </div>
                            </div>
-                           <button 
-                             onClick={() => document.getElementById('video-upload-captions')?.click()}
-                             className="px-5 py-2.5 bg-zinc-100 text-zinc-600 rounded-2xl flex items-center gap-2 text-xs font-black hover:bg-zinc-200 transition-all border border-zinc-200 shadow-sm uppercase tracking-wider"
-                           >
-                             <RotateCcw size={14} />
-                             Change Video
-                           </button>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => setIsEditingCaptions(!isEditingCaptions)}
+                                className={`px-5 py-2.5 rounded-2xl flex items-center gap-2 text-xs font-black transition-all border shadow-sm uppercase tracking-wider ${isEditingCaptions ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'}`}
+                              >
+                                <Edit3 size={14} />
+                                {isEditingCaptions ? 'Save' : 'Edit Caption'}
+                              </button>
+                              <button 
+                                onClick={() => document.getElementById('video-upload-captions')?.click()}
+                                className="px-5 py-2.5 bg-zinc-100 text-zinc-600 rounded-2xl flex items-center gap-2 text-xs font-black hover:bg-zinc-200 transition-all border border-zinc-200 shadow-sm uppercase tracking-wider"
+                              >
+                                <RotateCcw size={14} />
+                                Change Video
+                              </button>
+                            </div>
                         </div>
                       )}
-                      {captionFile ? (
-                        <div className="relative w-full aspect-auto max-h-[70vh] bg-zinc-950 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden group shadow-2xl flex items-center justify-center border border-zinc-800">
+                      {isCaptioning && (
+                      <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md flex items-center justify-center p-6 rounded-[2.5rem] md:rounded-[3rem]">
+                        <div className="w-full max-w-sm space-y-6">
+                          <div className="flex justify-between items-center text-white">
+                            <div className="flex items-center gap-3">
+                              <Loader2 className="animate-spin text-emerald-400" size={24} />
+                              <span className="font-bold">{captionStep}</span>
+                            </div>
+                            <span className="font-mono text-emerald-400 font-bold">{captionProgress}%</span>
+                          </div>
+                          <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden border border-white/5">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${captionProgress}%` }}
+                              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                            />
+                          </div>
+                          <p className="text-center text-[10px] text-white/40 font-medium tracking-wider uppercase">
+                            Processing deep vectors • Do not close tab
+                          </p>
+                          {captionProgress === 0 && (
+                            <div className="pt-2 text-center">
+                              <button 
+                                onClick={() => {
+                                  ffmpegRef.current = null;
+                                  isFFmpegLoading.current = false;
+                                  handleExportCaptions();
+                                }}
+                                className="px-4 py-2 bg-white/10 text-white rounded-xl text-[10px] font-bold hover:bg-white/20 transition-all"
+                              >
+                                Stuck? Restart Engine
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {captionFile ? (
+                        <div 
+                          ref={videoContainerRef}
+                          className="relative w-full aspect-auto max-h-[70vh] bg-zinc-950 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden group shadow-2xl flex items-center justify-center border border-zinc-800"
+                        >
                           <video 
                             ref={videoRef}
                             src={captionResult ? captionResult.videoUrl : URL.createObjectURL(captionFile)} 
                             onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                             className="w-full h-full object-contain cursor-pointer" 
                             muted={isMuted}
+                            onPlay={() => setIsPlaying(true)}
+                            onPause={() => setIsPlaying(false)}
                             onClick={() => {
                               if (videoRef.current) {
                                 if (videoRef.current.paused) videoRef.current.play();
@@ -4696,13 +4941,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             />
                           )}
                           
-                          {/* Video Overlay Actions */}
+                          {/* Video Overlay Actions - Removed central play button as requested */}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all">
-                            {!isPlaying && (
-                              <button className="w-20 h-20 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white pointer-events-none border border-white/20 shadow-2xl">
-                                <Play size={36} fill="currentColor" className="ml-1" />
-                              </button>
-                            )}
                           </div>
 
                           {/* Video Controls Overlay */}
@@ -4717,19 +4957,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             </div>
                             
                             <div className="flex items-center gap-3 pointer-events-auto">
-                              <button 
-                                onClick={toggleFullScreen}
-                                className="w-12 h-12 bg-black/40 backdrop-blur-md rounded-2xl text-white hover:bg-emerald-500 transition-all flex items-center justify-center shadow-lg border border-white/10"
-                              >
-                                <Maximize size={22} strokeWidth={2.5} />
-                              </button>
+                            <motion.button 
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={toggleFullScreen}
+                              className="w-12 h-12 bg-black/40 backdrop-blur-md rounded-2xl text-white hover:bg-emerald-500 flex items-center justify-center shadow-lg border border-white/10"
+                            >
+                              <Maximize size={22} strokeWidth={2.5} />
+                            </motion.button>
                             </div>
                           </div>
                         </div>
                     ) : (
                       <div 
                         onClick={() => document.getElementById('video-upload-captions')?.click()}
-                        className="flex flex-col items-center justify-center gap-8 cursor-pointer group py-16 px-6 bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-[3rem] hover:border-emerald-500/50 hover:bg-emerald-50/20 transition-all duration-500"
+                        className="flex flex-col items-center justify-center gap-8 cursor-pointer group py-10 px-6 bg-zinc-50 border-2 border-dashed border-zinc-200 rounded-[3rem] hover:border-emerald-500/50 hover:bg-emerald-50/20 transition-all duration-500"
                       >
                         <div className="w-28 h-28 bg-zinc-900 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl group-hover:scale-110 transition-all duration-500 relative overflow-hidden">
                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -4990,9 +5232,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                      style={{
                                        color: preset.style.color || '#FFFFFF',
                                        fontFamily: preset.style.font || 'Inter',
-                                       WebkitTextStroke: preset.style.border !== 'none' ? `1.2px ${preset.style.outlineColor || '#000'}` : 'none',
+                                       WebkitTextStroke: preset.style.border !== 'none' ? `${Math.max(1.8, (preset.style.strokeWidth || 0) * 0.15)}px ${preset.style.outlineColor || '#000'}` : 'none',
                                        paintOrder: 'stroke fill',
                                        fontWeight: preset.style.fontWeight || '900',
+                                       backgroundColor: preset.style.backgroundColor && preset.style.backgroundColor !== 'transparent' ? preset.style.backgroundColor : 'transparent',
+                                       padding: preset.style.backgroundColor && preset.style.backgroundColor !== 'transparent' ? '4px 8px' : '0',
+                                       borderRadius: '4px',
                                        fontStyle: preset.style.italic ? 'italic' : 'normal',
                                        textShadow: preset.style.glow ? `0 0 5px ${preset.style.color}` : preset.style.shadow ? `1px 1px 0px ${preset.style.shadowColor || 'rgba(0,0,0,0.8)'}` : 'none'
                                      }}
@@ -5035,6 +5280,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                               <option value="Rajdhani">Rajdhani (Elite Hindi)</option>
                               <option value="Kalam">Kalam (Handwritten)</option>
                               <option value="Hind">Hind (Classic Devanagari)</option>
+                              <option value="Teko">Teko (Modern Bold)</option>
+                              <option value="Martel">Martel (Traditional)</option>
                               <option value="Bangers">Bangers (Impact)</option>
                               <option value="Luckiest Guy">Luckiest Guy (Funky)</option>
                               <option value="Outfit">Outfit Pro</option>
@@ -5383,7 +5630,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                            className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20 flex items-center justify-center gap-3"
                         >
                            <Video size={18} />
-                           Export HD Video
+                           Download HD Video
                         </button>
                         <button 
                            onClick={() => setCaptionResult(null)}
@@ -5452,7 +5699,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     <label className="block text-sm font-bold text-zinc-400 uppercase tracking-widest">1. Upload File</label>
                     <div 
                       onClick={() => document.getElementById('audio-upload-vc-main')?.click()}
-                      className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${voiceChangingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
+                      className={`border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${voiceChangingFile ? 'border-emerald-500/50 bg-emerald-50' : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50'}`}
                     >
                       <input 
                         type="file" id="audio-upload-vc-main" hidden accept="audio/*,video/*" 
