@@ -486,7 +486,8 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
   
   const grouped: CaptionWord[] = [];
   
-  if (isSmart) {
+  // If user sets wordsPerLine to 1, we DISABLE smart grouping to respect their choice
+  if (isSmart && wordsPerLine > 1) {
     let i = 0;
     while (i < words.length) {
       const currentWord = words[i];
@@ -496,20 +497,18 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
       let count = 1;
       
       // Smart chunking: Group words if they are close in time and short in length
-      // This creates a dynamic rhythm (1, 2, or 3 words)
-      if (nextWord) {
+      // RESPECT the maximum wordsPerLine limit
+      if (nextWord && wordsPerLine >= 2) {
         const gap = nextWord.start - currentWord.end;
         const totalLen = (currentWord.word?.length || 0) + (nextWord.word?.length || 0);
         const isVeryQuick = gap < 0.25;
         
-        // Group 2 words if they are fast or short
         if (isVeryQuick || totalLen < 10) {
           count = 2;
           
-          if (nextNextWord) {
+          if (nextNextWord && wordsPerLine >= 3) {
              const gap2 = nextNextWord.start - nextWord.end;
              const totalLen2 = totalLen + (nextNextWord.word?.length || 0);
-             // Group 3 words only if they are extremely short/fast
              if (gap2 < 0.15 && totalLen2 < 16) {
                count = 3;
              }
@@ -518,20 +517,21 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
       }
       
       const chunk = words.slice(i, i + count);
+      // Adding extra spaces between words for better visibility
       grouped.push({
-        word: chunk.map(w => w.word).join(' '),
+        word: chunk.map(w => w.word).join('   '), 
         start: chunk[0].start,
         end: chunk[chunk.length - 1].end
       });
       i += count;
     }
-  } else if (wordsPerLine <= 1) {
-    grouped.push(...words);
   } else {
-    for (let i = 0; i < words.length; i += wordsPerLine) {
-      const chunk = words.slice(i, i + wordsPerLine);
+    // REGULAR Non-Smart grouping or 1-word limit
+    const limit = Math.max(1, wordsPerLine);
+    for (let i = 0; i < words.length; i += limit) {
+      const chunk = words.slice(i, i + limit);
       grouped.push({
-        word: chunk.map(w => w.word).join(' '),
+        word: chunk.map(w => w.word).join('   '), // Extra spaces
         start: chunk[0].start,
         end: chunk[chunk.length - 1].end
       });
@@ -628,7 +628,7 @@ const CaptionOverlay = ({
       case 'typing':
       case 'typewriter':
         return {
-          initial: { opacity: 0, x: -10, y: 4, scale: 0.88, rotate: -4 },
+          initial: { opacity: 0, x: -20, y: 8, scale: 0.8, rotate: -8 },
           animate: { 
             opacity: 1, 
             x: 0,
@@ -637,11 +637,11 @@ const CaptionOverlay = ({
             scale: 1,
           },
           transition: { 
-            duration: 0.05,
+            duration: 0.03,
             type: "spring" as const,
-            stiffness: 1800,
-            damping: 50,
-            opacity: { duration: 0.03 },
+            stiffness: 2500,
+            damping: 60,
+            opacity: { duration: 0.02 },
             ease: "easeOut" as const
           }
         };
@@ -862,17 +862,18 @@ const CaptionOverlay = ({
       const c2 = style.tripleBorderColors[1] || '#0047AB'; 
       const c3 = style.tripleBorderColors[2] || '#000000'; 
       
-      // ShaabdTeerth Style: Triple thick stroke + Shadow
+      // Royal Triple Thin Style - Optimized for single line
       baseStyle.textShadow = `
         -1.5px -1.5px 0 ${c1}, 1.5px -1.5px 0 ${c1}, -1.5px 1.5px 0 ${c1}, 1.5px 1.5px 0 ${c1},
-        -3px -3px 0 ${c2}, 3px -3px 0 ${c2}, -3px 3px 0 ${c2}, 3px 3px 0 ${c2},
-        -4.5px -4.5px 0 ${c2}, 4.5px -4.5px 0 ${c2}, -4.5px 4.5px 0 ${c2}, 4.5px 4.5px 0 ${c2},
-        0 8px 15px rgba(0,0,0,0.9)
+        -2.5px -2.5px 0 ${c2}, 2.5px -2.5px 0 ${c2}, -2.5px 2.5px 0 ${c2}, 2.5px 2.5px 0 ${c2},
+        -3.5px -3.5px 0 ${c3}, 3.5px -3.5px 0 ${c3}, -3.5px 3.5px 0 ${c3}, 3.5px 3.5px 0 ${c3},
+        0 6px 12px rgba(0,0,0,0.8)
       `.trim().replace(/\s+/g, ' ');
       
-      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1.2}px ${c1}`;
+      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1}px ${c1}`;
       baseStyle.whiteSpace = 'nowrap';
       baseStyle.display = 'inline-block';
+      baseStyle.overflow = 'visible';
     }
 
     if (style.border === 'thin') {
@@ -1180,10 +1181,10 @@ const CaptionOverlay = ({
               y: driftOffset.y
             }}
             style={{...getWordStyle(currentWord, words.indexOf(currentWord)), backgroundColor: 'transparent'}}
-            className="font-bold flex items-center justify-center whitespace-nowrap overflow-visible"
+            className="font-bold flex items-center justify-center whitespace-nowrap overflow-visible gap-8"
           >
             {style.isDynamic ? (
-              currentWord.word.split(' ').map((w, i) => {
+              currentWord.word.split('   ').map((w, i) => {
                 const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
                 const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
                 const wordColor = colors[globalWordIndex % colors.length];
@@ -2567,36 +2568,42 @@ function App() {
   const loadFFmpeg = async () => {
     if (ffmpegRef.current && ffmpegRef.current.loaded) return;
     
-    // If already loading, wait for it
     if (isFFmpegLoading.current) {
-      console.log("[VoxNova] Engine already loading, waiting...");
-      let attempts = 0;
-      while (isFFmpegLoading.current && !ffmpegRef.current && attempts < 60) {
+      console.log("[VoxNova] Engine busy, waiting...");
+      let waitTime = 0;
+      while (isFFmpegLoading.current && waitTime < 20) {
         await new Promise(r => setTimeout(r, 500));
-        attempts++;
+        waitTime++;
       }
-      if (ffmpegRef.current) return;
+      if (ffmpegRef.current?.loaded) return;
     }
     
     isFFmpegLoading.current = true;
-    
     try {
-      console.log("[VoxNova] Initializing engine...");
+      console.log("[VoxNova] Igniting engine...");
       setCaptionStep('Waking up engine...');
       
       const { FFmpeg } = await import('@ffmpeg/ffmpeg');
       const { toBlobURL } = await import('@ffmpeg/util');
       
       const ffmpeg = new FFmpeg();
-      ffmpegRef.current = ffmpeg;
-
+      
       const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-      await ffmpeg.load({
+      const loadPromise = ffmpeg.load({
         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
+
+      // Add 2 minute timeout for loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Engine timeout - link too slow')), 120000)
+      );
+
+      await Promise.race([loadPromise, timeoutPromise]);
       
-      console.log("[VoxNova] Engine Ready.");
+      ffmpegRef.current = ffmpeg;
+      setIsFFmpegLoaded(true);
+      console.log("[VoxNova] Engine active and ready.");
       
       ffmpeg.on('progress', ({ progress }) => {
         if (isCaptioning) {
@@ -2607,8 +2614,8 @@ function App() {
         }
       });
     } catch (err: any) {
-      console.error("[VoxNova] Engine failed to load:", err);
-      setError(`Failed to load engine: ${err.message}. Try refreshing.`);
+      console.error("[VoxNova] Engine load failure:", err);
+      setError(`Engine failed: ${err.message}. Please refresh the page.`);
     } finally {
       isFFmpegLoading.current = false;
     }
@@ -2668,6 +2675,7 @@ ScriptType: v4.00+
 PlayResX: ${videoWidth}
 PlayResY: ${videoHeight}
 ScaledBorderAndShadow: yes
+WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -2682,6 +2690,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const isDevanagari = /[\u0900-\u097F]/.test(w.word);
       let text = (style.case === 'uppercase' && !isDevanagari) ? w.word.toUpperCase() : (style.case === 'lowercase' && !isDevanagari) ? w.word.toLowerCase() : w.word;
       
+      // Ensure words joined by triple spaces also stay separated in ASS
+      // Convert triple spaces to \h (hard space) or just regular spaces that ASS respects
+      text = text.replace(/   /g, '   '); 
+
       if (style.isDynamic) {
         const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
         const color = colors[idx % colors.length];
@@ -2735,8 +2747,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     };
 
     const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
-    const fontName = selectedFont;
-    const fontFile = `${selectedFont}.ttf`;
+    const fontNameOverride = selectedFont;
+    const fontFileName = `${selectedFont.replace(/\s+/g, '')}.ttf`;
     
     setCaptionStep('Reading video data...');
     console.log("[VoxNova] Fetching video file...");
@@ -2748,13 +2760,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     try {
       console.log(`Fetching font: ${selectedFont} from ${fontUrl}`);
       const fontData = await fetchFile(fontUrl);
-      await ffmpeg.writeFile(fontFile, fontData);
+      await ffmpeg.writeFile(fontFileName, fontData);
     } catch (e) {
       console.warn("Font load failed, using fallback Inter", e);
       try {
         const fallbackData = await fetchFile(fontMapping['Inter']);
-        const fallbackFont = 'Inter.ttf';
-        await ffmpeg.writeFile(fallbackFont, fallbackData);
+        await ffmpeg.writeFile('Inter.ttf', fallbackData);
       } catch (innerErr) {
         console.error("Critical font failure", innerErr);
       }
@@ -2783,8 +2794,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       console.warn("Failed to get video metadata, using defaults", e);
     }
 
-    // We update generateASS to use the font we just loaded and correct dimensions
-    const assContent = generateASS(words, style, videoWidth, videoHeight, fontName);
+    // Use the filename for the subtitle style to ensure it is found in fontsdir
+    const assContent = generateASS(words, style, videoWidth, videoHeight, fontFileName.replace('.ttf', ''));
     await ffmpeg.writeFile(assName, assContent);
     
     setCaptionStep('Encoding video (please wait)...');

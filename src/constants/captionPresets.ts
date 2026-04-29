@@ -669,5 +669,29 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       tripleBorderColors: ['#1E90FF', '#FFD700', '#FF0000'] // Blue, Gold, Red
     },
     animation: 'typewriter'
+  },
+  {
+    id: 'trinity-thin',
+    name: 'Trinity Thin',
+    style: {
+      fontSize: 24,
+      color: '#ffffff',
+      glow: false,
+      border: 'none',
+      font: 'Inter',
+      position: 'middle',
+      backgroundColor: 'transparent',
+      case: 'uppercase',
+      wordsPerLine: 1,
+      shadow: true,
+      shadowColor: '#000000',
+      strokeWidth: 1,
+      fontWeight: '900',
+      isDynamic: false,
+      isSmart: true,
+      tripleBorder: true,
+      tripleBorderColors: ['#1E90FF', '#FFD700', '#FF0000']
+    },
+    animation: 'typewriter'
   }
 ];
