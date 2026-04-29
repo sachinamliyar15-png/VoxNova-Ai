@@ -486,52 +486,38 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
   
   const grouped: CaptionWord[] = [];
   
-  // If user sets wordsPerLine to 1, we DISABLE smart grouping to respect their choice
-  if (isSmart && wordsPerLine > 1) {
+  if (isSmart && limit > 1) {
     let i = 0;
     while (i < words.length) {
       const currentWord = words[i];
       const nextWord = words[i + 1];
       const nextNextWord = words[i + 2];
-      
       let count = 1;
       
-      // Smart chunking: Group words if they are close in time and short in length
-      // RESPECT the maximum wordsPerLine limit
-      if (nextWord && wordsPerLine >= 2) {
+      if (nextWord && limit >= 2) {
         const gap = nextWord.start - currentWord.end;
-        const totalLen = (currentWord.word?.length || 0) + (nextWord.word?.length || 0);
-        const isVeryQuick = gap < 0.25;
-        
-        if (isVeryQuick || totalLen < 10) {
+        if (gap < 0.25 || ((currentWord.word?.length || 0) + (nextWord.word?.length || 0) < 12)) {
           count = 2;
-          
-          if (nextNextWord && wordsPerLine >= 3) {
-             const gap2 = nextNextWord.start - nextWord.end;
-             const totalLen2 = totalLen + (nextNextWord.word?.length || 0);
-             if (gap2 < 0.15 && totalLen2 < 16) {
-               count = 3;
-             }
+          if (nextNextWord && limit >= 3) {
+            const gap2 = nextNextWord.start - nextWord.end;
+            if (gap2 < 0.15) count = 3;
           }
         }
       }
       
       const chunk = words.slice(i, i + count);
-      // Adding extra spaces between words for better visibility
       grouped.push({
-        word: chunk.map(w => w.word).join('   '), 
+        word: chunk.map(w => w.word).join('   '),
         start: chunk[0].start,
         end: chunk[chunk.length - 1].end
       });
       i += count;
     }
   } else {
-    // REGULAR Non-Smart grouping or 1-word limit
-    const limit = Math.max(1, wordsPerLine);
     for (let i = 0; i < words.length; i += limit) {
       const chunk = words.slice(i, i + limit);
       grouped.push({
-        word: chunk.map(w => w.word).join('   '), // Extra spaces
+        word: chunk.map(w => w.word).join('   '),
         start: chunk[0].start,
         end: chunk[chunk.length - 1].end
       });
@@ -1852,7 +1838,12 @@ function Sidebar({
         {currentUser ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <img src={currentUser.photoURL || ''} alt="" className="w-10 h-10 rounded-full border border-zinc-200" />
+              <img 
+                src={currentUser.photoURL || ''} 
+                alt="" 
+                referrerPolicy="no-referrer"
+                className="w-10 h-10 rounded-full border border-zinc-200" 
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold truncate">{currentUser.displayName}</p>
                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
@@ -2662,13 +2653,13 @@ function App() {
     const assOutlineColor = hexToAss(style.outlineColor || '#000000');
     const assShadowColor = hexToAss(style.shadowColor || '#000000');
     
-    const outline = style.strokeWidth || (style.border === 'thick' ? 3 : style.border === 'thin' ? 1.5 : 0);
-    const shadow = style.shadow ? 2 : 0;
-    const spacing = 4; // Add larger gap between characters/words for better readability
+    const outline = style.tripleBorder ? 5 : (style.strokeWidth || (style.border === 'thick' ? 4 : style.border === 'thin' ? 2 : 0));
+    const shadow = style.tripleBorder ? 3 : (style.shadow ? 3 : 0);
+    const spacing = 1.5; 
     
     // Scale Font size based on resolution
     const baseResY = 720;
-    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY));
+    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.1); // Slightly larger for clarity
 
     let ass = `[Script Info]
 ScriptType: v4.00+
@@ -2679,20 +2670,18 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 150 : 80},1
+Style: Default,Arial,${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 80 : 40},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
     displayWords.forEach((w, idx) => {
-      // Disable automatic casing for Hindi/Devanagari to prevent Unicode issues or unwanted rendering
       const isDevanagari = /[\u0900-\u097F]/.test(w.word);
       let text = (style.case === 'uppercase' && !isDevanagari) ? w.word.toUpperCase() : (style.case === 'lowercase' && !isDevanagari) ? w.word.toLowerCase() : w.word;
       
-      // Ensure words joined by triple spaces also stay separated in ASS
-      // Convert triple spaces to \h (hard space) or just regular spaces that ASS respects
-      text = text.replace(/   /g, '   '); 
+      // Use hard spaces for the gap to ensure FFmpeg preserves them
+      text = text.replace(/   /g, '\\h\\h\\h'); 
 
       if (style.isDynamic) {
         const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
@@ -2701,6 +2690,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         text = `{\\c${assWordColor}}${text}`;
       }
       
+      // Add font override to the dialogue line itself if needed, but fallback to Arial which is standard in FFmpeg builds
       ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${text}\n`;
     });
 
@@ -3740,7 +3730,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 {currentUser ? (
                   <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <img src={currentUser.photoURL || ''} alt="" className="w-10 h-10 rounded-full border border-zinc-200" />
+                      <img 
+                        src={currentUser.photoURL || ''} 
+                        alt="" 
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded-full border border-zinc-200" 
+                      />
                       <div>
                         <p className="text-sm font-bold">{currentUser.displayName}</p>
                         <p className="text-xs text-zinc-500">{currentUser.email}</p>
