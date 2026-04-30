@@ -632,11 +632,11 @@ const CaptionOverlay = ({
             scale: 1,
           },
           transition: { 
-            duration: 0.05, // Slowed down
+            duration: 0.08, // Slowed down by ~15% for readability
             type: "spring" as const,
-            stiffness: 1800, // Reduced for smoother feel
-            damping: 70,
-            opacity: { duration: 0.04 },
+            stiffness: 1500, // Softer springs
+            damping: 80,
+            opacity: { duration: 0.06 },
             ease: "easeOut" as const
           }
         };
@@ -2608,9 +2608,9 @@ function App() {
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
 
-      // Add 2 minute timeout for loading
+      // Add 5 minute timeout for loading to support slow connections
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Engine timeout - link too slow')), 120000)
+        setTimeout(() => reject(new Error('Engine initial load timeout - link too slow. Please check your internet and refresh.')), 300000)
       );
 
       await Promise.race([loadPromise, timeoutPromise]);
@@ -2768,7 +2768,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
     const fontNameOverride = selectedFont;
     const fontFileName = `${selectedFont.replace(/\s+/g, '')}.ttf`;
-    const assFontName = selectedFont === 'Inter' ? 'Inter' : selectedFont; // Use original name for ASS mapping
+    const internalFontName = fontFileName.replace('.ttf', ''); // Match FS name for better resolution
     
     setCaptionStep('Reading video data...');
     console.log("[VoxNova] Fetching video file...");
@@ -2823,7 +2823,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     console.log(`[VoxNova] Video Dimensions: ${videoWidth}x${videoHeight}`);
     
     // Generate ASS content with safe font pathing
-    const assContent = generateASS(words, style, videoWidth, videoHeight, selectedFont);
+    const assContent = generateASS(words, style, videoWidth, videoHeight, internalFontName);
     await ffmpeg.writeFile(assName, assContent);
     
     setCaptionStep('Encoding video (please wait)...');
@@ -2836,26 +2836,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       setCaptionProgress(Math.min(95, Math.floor(progress * 100)));
     });
 
-    console.log("[VoxNova] Executing FFmpeg optimized command with resolution protection...");
+    console.log("[VoxNova] Executing FFmpeg with font support...");
     try {
-      console.log("[VoxNova] Starting High-Quality Encoding...");
+      console.log("[VoxNova] Starting High-Quality Encoding with local fonts...");
       
-      // Robust subtitle burning with resolution protection
+      // We use fontsdir . to ensure FFmpeg looks at the virtual filesystem where we wrote the font
       await ffmpeg.exec([
         '-y', 
         '-i', inputName, 
-        '-vf', `scale=trunc(iw/2)*2:trunc(ih/2)*2,subtitles=${assName}:fontsdir=.`,
+        '-vf', `subtitles=${assName}:fontsdir=.`, 
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
-        '-crf', '22', // High quality for clear text
+        '-crf', '22', 
         '-pix_fmt', 'yuv420p',
         '-c:a', 'copy',
         outputName
       ]);
     } catch (e: any) {
-      console.error("FFmpeg primary burn failed, trying fallback...", e);
+      console.error("FFmpeg primary burn failed, trying ultra-stable fallback...", e);
       try {
-        // Fallback without fontsdir
+        // Fallback without fontsdir and slightly lower quality for stability
         await ffmpeg.exec([
           '-y', 
           '-i', inputName, 

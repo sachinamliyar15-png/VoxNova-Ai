@@ -1642,7 +1642,10 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
           responseText = anyResult.text || "";
         }
         
-        console.log(`[Captions] Raw AI Result (first 100 chars): ${responseText.substring(0, 100)}...`);
+        // Clean up markdown markers if AI included them despite instructions
+        responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        console.log(`[Captions] Cleaned AI Result (first 100 chars): ${responseText.substring(0, 100)}...`);
       } catch (e) {
          console.error("[Captions] AI Content extraction error:", e);
          responseText = (result as any).text || "";
