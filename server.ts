@@ -1630,15 +1630,19 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
 
       let responseText = "";
       try {
-        // Handle GenerateContentResponse structure
         const anyResult = result as any;
-        if (typeof anyResult.text === 'function') {
+        // Robust extraction for various SDK versions and structures
+        if (anyResult.response && typeof anyResult.response.text === 'function') {
+          responseText = anyResult.response.text();
+        } else if (anyResult.text && typeof anyResult.text === 'function') {
           responseText = anyResult.text();
-        } else if (anyResult.response && typeof anyResult.response.text === 'function') {
-           responseText = anyResult.response.text();
+        } else if (anyResult.candidates?.[0]?.content?.parts?.[0]?.text) {
+          responseText = anyResult.candidates[0].content.parts[0].text;
         } else {
-           responseText = anyResult.text || "";
+          responseText = anyResult.text || "";
         }
+        
+        console.log(`[Captions] Raw AI Result (first 100 chars): ${responseText.substring(0, 100)}...`);
       } catch (e) {
          console.error("[Captions] AI Content extraction error:", e);
          responseText = (result as any).text || "";
@@ -1871,7 +1875,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
-  });
+  }).setTimeout(600000); // 10 minutes timeout for video processing
 }
 
 startServer();

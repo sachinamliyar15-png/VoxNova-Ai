@@ -632,11 +632,11 @@ const CaptionOverlay = ({
             scale: 1,
           },
           transition: { 
-            duration: 0.033,
+            duration: 0.05, // Slowed down
             type: "spring" as const,
-            stiffness: 2200,
-            damping: 65,
-            opacity: { duration: 0.022 },
+            stiffness: 1800, // Reduced for smoother feel
+            damping: 70,
+            opacity: { duration: 0.04 },
             ease: "easeOut" as const
           }
         };
@@ -2838,37 +2838,36 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     console.log("[VoxNova] Executing FFmpeg optimized command with resolution protection...");
     try {
-      console.log("[VoxNova] Starting FFmpeg process...");
+      console.log("[VoxNova] Starting High-Quality Encoding...");
       
-      // Use a more robust subtitle filter syntax to ensure font matching
-      // We explicitly map the font file we just wrote
+      // Robust subtitle burning with resolution protection
       await ffmpeg.exec([
         '-y', 
         '-i', inputName, 
         '-vf', `scale=trunc(iw/2)*2:trunc(ih/2)*2,subtitles=${assName}:fontsdir=.`,
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
-        '-crf', '24', // Improved quality
+        '-crf', '22', // High quality for clear text
         '-pix_fmt', 'yuv420p',
         '-c:a', 'copy',
         outputName
       ]);
     } catch (e: any) {
-      console.error("FFmpeg execution error. Attempting fallback without fontsdir...", e);
+      console.error("FFmpeg primary burn failed, trying fallback...", e);
       try {
+        // Fallback without fontsdir
         await ffmpeg.exec([
-          '-y',
+          '-y', 
           '-i', inputName, 
-          '-vf', `subtitles=${assName}`, 
+          '-vf', `subtitles=${assName}`,
           '-c:v', 'libx264', 
           '-preset', 'ultrafast', 
-          '-crf', '30',
+          '-pix_fmt', 'yuv420p',
           '-c:a', 'copy',
           outputName
         ]);
       } catch (innerE: any) {
-        console.error("FFmpeg fallback failed:", innerE);
-        throw new Error(`Encoding failed: The video is too high-resolution for the browser. Please try a shorter or 720p video.`);
+        throw new Error(`Encoding failed: ${innerE.message}. Your video resolution might be unsupported.`);
       }
     }
     
@@ -2886,7 +2885,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       await ffmpeg.deleteFile(inputName);
       await ffmpeg.deleteFile(assName);
       await ffmpeg.deleteFile(outputName);
-      await ffmpeg.deleteFile(fontFile);
     } catch (e) {
       console.warn("Cleanup failed", e);
     }
