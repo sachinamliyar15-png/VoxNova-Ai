@@ -484,8 +484,14 @@ const fileToBase64 = (file: File): Promise<string> => {
 const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart?: boolean): CaptionWord[] => {
   if (words.length === 0) return [];
   
+  const limit = Math.max(1, wordsPerLine);
   const grouped: CaptionWord[] = [];
   
+  // If limit is 1, always return single words regardless of isSmart
+  if (limit === 1) {
+    return words.map(w => ({ ...w }));
+  }
+
   if (isSmart && limit > 1) {
     let i = 0;
     while (i < words.length) {
@@ -494,20 +500,23 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
       const nextNextWord = words[i + 2];
       let count = 1;
       
+      // Respect the user's maximum wordsPerLine limit
       if (nextWord && limit >= 2) {
         const gap = nextWord.start - currentWord.end;
-        if (gap < 0.25 || ((currentWord.word?.length || 0) + (nextWord.word?.length || 0) < 12)) {
+        // Group if words are close or combined length is short
+        if (gap < 0.2 && ((currentWord.word?.length || 0) + (nextWord.word?.length || 0) < 12)) {
           count = 2;
           if (nextNextWord && limit >= 3) {
             const gap2 = nextNextWord.start - nextWord.end;
-            if (gap2 < 0.15) count = 3;
+            if (gap2 < 0.1) count = 3;
           }
         }
       }
       
       const chunk = words.slice(i, i + count);
       grouped.push({
-        word: chunk.map(w => w.word).join('   '),
+        // Use FOUR spaces to ensure they are distinct even with borders
+        word: chunk.map(w => w.word).join('\u00A0\u00A0\u00A0\u00A0'), // Use non-breaking spaces
         start: chunk[0].start,
         end: chunk[chunk.length - 1].end
       });
@@ -517,7 +526,7 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
     for (let i = 0; i < words.length; i += limit) {
       const chunk = words.slice(i, i + limit);
       grouped.push({
-        word: chunk.map(w => w.word).join('   '),
+        word: chunk.map(w => w.word).join('\u00A0\u00A0\u00A0\u00A0'),
         start: chunk[0].start,
         end: chunk[chunk.length - 1].end
       });
@@ -1170,7 +1179,7 @@ const CaptionOverlay = ({
             className="font-bold flex items-center justify-center whitespace-nowrap overflow-visible gap-8"
           >
             {style.isDynamic ? (
-              currentWord.word.split('   ').map((w, i) => {
+              currentWord.word.split('\u00A0\u00A0\u00A0\u00A0').map((w, i) => {
                 const globalWordIndex = words.findIndex(gw => gw.start === currentWord.start) + i;
                 const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
                 const wordColor = colors[globalWordIndex % colors.length];
@@ -1838,12 +1847,26 @@ function Sidebar({
         {currentUser ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <img 
-                src={currentUser.photoURL || ''} 
-                alt="" 
-                referrerPolicy="no-referrer"
-                className="w-10 h-10 rounded-full border border-zinc-200" 
-              />
+              {currentUser.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt="" 
+                  referrerPolicy="no-referrer"
+                  className="w-10 h-10 rounded-full border border-zinc-200"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallback = target.nextSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div 
+                className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 border border-zinc-200 font-bold"
+                style={{ display: currentUser.photoURL ? 'none' : 'flex' }}
+              >
+                {currentUser.displayName?.[0]?.toUpperCase() || 'U'}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold truncate">{currentUser.displayName}</p>
                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
@@ -2670,7 +2693,7 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 80 : 40},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -2681,7 +2704,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       let text = (style.case === 'uppercase' && !isDevanagari) ? w.word.toUpperCase() : (style.case === 'lowercase' && !isDevanagari) ? w.word.toLowerCase() : w.word;
       
       // Use hard spaces for the gap to ensure FFmpeg preserves them
-      text = text.replace(/   /g, '\\h\\h\\h'); 
+      text = text.replace(/\u00A0\u00A0\u00A0\u00A0/g, '\\h\\h\\h\\h'); 
+
+      if (style.tripleBorder) {
+        // ASS triple border simulation: use multiple layers or thick outline
+        // We add a thicker outline and a shadow to mimic the royal look
+        text = `{\\bord${outline + 2}\\3c${assOutlineColor}\\shad${shadow + 2}}${text}`;
+      }
 
       if (style.isDynamic) {
         const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
@@ -2739,6 +2768,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
     const fontNameOverride = selectedFont;
     const fontFileName = `${selectedFont.replace(/\s+/g, '')}.ttf`;
+    const assFontName = selectedFont === 'Inter' ? 'Inter' : selectedFont; // Use original name for ASS mapping
     
     setCaptionStep('Reading video data...');
     console.log("[VoxNova] Fetching video file...");
@@ -2750,7 +2780,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     try {
       console.log(`Fetching font: ${selectedFont} from ${fontUrl}`);
       const fontData = await fetchFile(fontUrl);
+      console.log(`[VoxNova] Font data size: ${fontData.byteLength} bytes`);
       await ffmpeg.writeFile(fontFileName, fontData);
+      // Ensure we have a default font file too
+      if (selectedFont === 'Inter' || !selectedFont) {
+        await ffmpeg.writeFile('Inter.ttf', fontData);
+      }
     } catch (e) {
       console.warn("Font load failed, using fallback Inter", e);
       try {
@@ -2784,8 +2819,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       console.warn("Failed to get video metadata, using defaults", e);
     }
 
-    // Use the filename for the subtitle style to ensure it is found in fontsdir
-    const assContent = generateASS(words, style, videoWidth, videoHeight, fontFileName.replace('.ttf', ''));
+    // Log metadata for debugging
+    console.log(`[VoxNova] Video Dimensions: ${videoWidth}x${videoHeight}`);
+    
+    // Use the actual font name for the subtitle style
+    // Use a slightly larger margin for portrait videos to keep text readable
+    const assContent = generateASS(words, style, videoWidth, videoHeight, selectedFont);
     await ffmpeg.writeFile(assName, assContent);
     
     setCaptionStep('Encoding video (please wait)...');
