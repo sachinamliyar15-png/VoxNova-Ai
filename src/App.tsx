@@ -632,11 +632,11 @@ const CaptionOverlay = ({
             scale: 1,
           },
           transition: { 
-            duration: 0.03,
+            duration: 0.033,
             type: "spring" as const,
-            stiffness: 2500,
-            damping: 60,
-            opacity: { duration: 0.02 },
+            stiffness: 2200,
+            damping: 65,
+            opacity: { duration: 0.022 },
             ease: "easeOut" as const
           }
         };
@@ -2676,9 +2676,9 @@ function App() {
     const assOutlineColor = hexToAss(style.outlineColor || '#000000');
     const assShadowColor = hexToAss(style.shadowColor || '#000000');
     
-    const outline = style.tripleBorder ? 5 : (style.strokeWidth || (style.border === 'thick' ? 4 : style.border === 'thin' ? 2 : 0));
-    const shadow = style.tripleBorder ? 3 : (style.shadow ? 3 : 0);
-    const spacing = 1.5; 
+    const outline = style.tripleBorder ? 6 : (style.strokeWidth || (style.border === 'thick' ? 4 : style.border === 'thin' ? 2 : 0));
+    const shadow = style.tripleBorder ? 4 : (style.shadow ? 3 : 0);
+    const spacing = 3; 
     
     // Scale Font size based on resolution
     const baseResY = 720;
@@ -2704,12 +2704,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       let text = (style.case === 'uppercase' && !isDevanagari) ? w.word.toUpperCase() : (style.case === 'lowercase' && !isDevanagari) ? w.word.toLowerCase() : w.word;
       
       // Use hard spaces for the gap to ensure FFmpeg preserves them
-      text = text.replace(/\u00A0\u00A0\u00A0\u00A0/g, '\\h\\h\\h\\h'); 
+      // We use 5 hard spaces to ensure clear separation
+      text = text.replace(/\u00A0\u00A0\u00A0\u00A0/g, '\\h\\h\\h\\h\\h'); 
 
       if (style.tripleBorder) {
-        // ASS triple border simulation: use multiple layers or thick outline
-        // We add a thicker outline and a shadow to mimic the royal look
-        text = `{\\bord${outline + 2}\\3c${assOutlineColor}\\shad${shadow + 2}}${text}`;
+        // Enhanced ASS triple border simulation
+        text = `{\\bord${outline}\\3c${assOutlineColor}\\shad${shadow}\\4c${assShadowColor}}${text}`;
       }
 
       if (style.isDynamic) {
@@ -2822,8 +2822,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     // Log metadata for debugging
     console.log(`[VoxNova] Video Dimensions: ${videoWidth}x${videoHeight}`);
     
-    // Use the actual font name for the subtitle style
-    // Use a slightly larger margin for portrait videos to keep text readable
+    // Generate ASS content with safe font pathing
     const assContent = generateASS(words, style, videoWidth, videoHeight, selectedFont);
     await ffmpeg.writeFile(assName, assContent);
     
@@ -2832,30 +2831,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     setCaptionProgress(0);
     
     // Refresh progress listener to handle closure staleness
-    ffmpeg.off('progress', () => {}); // Clear previous if any
+    ffmpeg.off('progress', () => {}); 
     ffmpeg.on('progress', ({ progress }) => {
       setCaptionProgress(Math.min(95, Math.floor(progress * 100)));
     });
 
     console.log("[VoxNova] Executing FFmpeg optimized command with resolution protection...");
-    // Optimized FFmpeg command:
-    // 1. scale to 720p maximum to prevent memory overflow
-    // 2. ultrafast preset for speed
-    // 3. crf 28 for maximum stability (prevents memory crashes on high-res)
-    // 4. pix_fmt yuv420p for maximum compatibility
     try {
       console.log("[VoxNova] Starting FFmpeg process...");
-      // Simplified command for maximum speed
+      
+      // Use a more robust subtitle filter syntax to ensure font matching
+      // We explicitly map the font file we just wrote
       await ffmpeg.exec([
         '-y', 
         '-i', inputName, 
         '-vf', `scale=trunc(iw/2)*2:trunc(ih/2)*2,subtitles=${assName}:fontsdir=.`,
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
-        '-crf', '26',
+        '-crf', '24', // Improved quality
         '-pix_fmt', 'yuv420p',
         '-c:a', 'copy',
-        '-movflags', '+faststart',
         outputName
       ]);
     } catch (e: any) {
