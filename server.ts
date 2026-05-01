@@ -1638,8 +1638,17 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
           responseText = anyResult.text();
         } else if (anyResult.candidates?.[0]?.content?.parts?.[0]?.text) {
           responseText = anyResult.candidates[0].content.parts[0].text;
+        } else if (anyResult.response?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          responseText = anyResult.response.candidates[0].content.parts[0].text;
+        } else if (typeof anyResult === 'string') {
+          responseText = anyResult;
         } else {
-          responseText = anyResult.text || "";
+          responseText = JSON.stringify(anyResult);
+        }
+        
+        // Final cleanup for JSON objects returned as strings
+        if (typeof responseText === 'object') {
+          responseText = JSON.stringify(responseText);
         }
         
         // Clean up markdown markers if AI included them despite instructions
@@ -1648,7 +1657,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
         console.log(`[Captions] Cleaned AI Result (first 100 chars): ${responseText.substring(0, 100)}...`);
       } catch (e) {
          console.error("[Captions] AI Content extraction error:", e);
-         responseText = (result as any).text || "";
+         responseText = (result as any).text || String(result);
       }
 
       if (!responseText) {

@@ -623,7 +623,7 @@ const CaptionOverlay = ({
       case 'typing':
       case 'typewriter':
         return {
-          initial: { opacity: 0, x: -20, y: 8, scale: 0.8, rotate: -8 },
+          initial: { opacity: 0, x: -10, y: 5, scale: 0.9, rotate: -3 },
           animate: { 
             opacity: 1, 
             x: 0,
@@ -632,38 +632,40 @@ const CaptionOverlay = ({
             scale: 1,
           },
           transition: { 
-            duration: 0.08, // Slowed down by ~15% for readability
+            duration: 0.02, // Ultra-snappy
             type: "spring" as const,
-            stiffness: 1500, // Softer springs
-            damping: 80,
-            opacity: { duration: 0.06 },
+            stiffness: 3000,
+            damping: 50,
+            opacity: { duration: 0.015 },
             ease: "easeOut" as const
           }
         };
       case 'pop':
         return {
-          initial: { scale: 0.8, opacity: 0, y: isPro ? 8 : 12 },
+          initial: { scale: 0.7, opacity: 0, y: 15 },
           animate: { scale: 1, opacity: 1, y: 0 },
-          transition: { type: 'spring' as const, stiffness: 600, damping: 25 }
+          transition: { type: 'spring' as const, stiffness: 800, damping: 20 }
         };
       case 'professional':
         return {
-          initial: { scale: 0.9, opacity: 0, y: isPro ? 6 : 10 },
+          initial: { scale: 0.85, opacity: 0, y: 10 },
           animate: { scale: 1, opacity: 1, y: 0 },
           transition: { 
-            duration: 0.1,
-            ease: "easeOut" as const
+            type: 'spring' as const, 
+            stiffness: 900, 
+            damping: 25,
+            restDelta: 0.001
           }
         };
       case 'snappy':
         return {
-          initial: { scale: 0.8, opacity: 0, y: isPro ? 5 : 8 },
-          animate: { scale: 1, opacity: 1, y: 0 },
+          initial: { scale: 0.7, opacity: 0, y: 10 },
+          animate: { scale: [1.2, 1], opacity: 1, y: 0 },
           transition: { 
             type: "spring" as const,
-            stiffness: 1000,
-            damping: 15,
-            duration: 0.05
+            stiffness: 1200,
+            damping: 25,
+            duration: 0.03
           }
         };
       case 'snappy-pop':
@@ -2093,6 +2095,7 @@ function App() {
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionStep, setCaptionStep] = useState('');
   const [captionProgress, setCaptionProgress] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
   const [showConfigError, setShowConfigError] = useState(false);
   const [translateToEnglish, setTranslateToEnglish] = useState(false);
   
@@ -2602,15 +2605,21 @@ function App() {
       
       const ffmpeg = new FFmpeg();
       
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+      const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
       const loadPromise = ffmpeg.load({
         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
 
-      // Add 5 minute timeout for loading to support slow connections
+      ffmpeg.on('log', ({ message }) => {
+        if (message.includes('loading')) {
+           setCaptionStep(`Engine Loading... (${message})`);
+        }
+      });
+
+      // Add 10 minute timeout for loading
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Engine initial load timeout - link too slow. Please check your internet and refresh.')), 300000)
+        setTimeout(() => reject(new Error('Engine initial load timeout. Your connection might be too slow to download the 30MB engine. Please refresh or try a faster network.')), 600000)
       );
 
       await Promise.race([loadPromise, timeoutPromise]);
@@ -2676,13 +2685,13 @@ function App() {
     const assOutlineColor = hexToAss(style.outlineColor || '#000000');
     const assShadowColor = hexToAss(style.shadowColor || '#000000');
     
-    const outline = style.tripleBorder ? 6 : (style.strokeWidth || (style.border === 'thick' ? 4 : style.border === 'thin' ? 2 : 0));
-    const shadow = style.tripleBorder ? 4 : (style.shadow ? 3 : 0);
-    const spacing = 3; 
+    const outline = style.tripleBorder ? 8 : (style.strokeWidth || (style.border === 'thick' ? 5 : style.border === 'thin' ? 2 : 0));
+    const shadow = style.tripleBorder ? 5 : (style.shadow ? 4 : 0);
+    const spacing = 4; // Increased spacing for premium look
     
     // Scale Font size based on resolution
     const baseResY = 720;
-    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.1); // Slightly larger for clarity
+    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.2); // Larger for clarity
 
     let ass = `[Script Info]
 ScriptType: v4.00+
@@ -2703,12 +2712,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const isDevanagari = /[\u0900-\u097F]/.test(w.word);
       let text = (style.case === 'uppercase' && !isDevanagari) ? w.word.toUpperCase() : (style.case === 'lowercase' && !isDevanagari) ? w.word.toLowerCase() : w.word;
       
-      // Use hard spaces for the gap to ensure FFmpeg preserves them
-      // We use 5 hard spaces to ensure clear separation
-      text = text.replace(/\u00A0\u00A0\u00A0\u00A0/g, '\\h\\h\\h\\h\\h'); 
+      // Use hard spaces (\h) to ensure FFmpeg preserves gaps between words
+      text = text.replace(/\u00A0\u00A0\u00A0\u00A0/g, '\\h\\h\\h\\h\\h\\h'); 
 
       if (style.tripleBorder) {
-        // Enhanced ASS triple border simulation
+        // High-end look with custom border and shadow layering
         text = `{\\bord${outline}\\3c${assOutlineColor}\\shad${shadow}\\4c${assShadowColor}}${text}`;
       }
 
@@ -2765,40 +2773,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       'Luckiest Guy': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/luckiestguy/LuckiestGuy-Regular.ttf'
     };
 
+    // We use the selectedFont name directly as both the filename and internal name for highest reliability
+    const safeFontName = selectedFont.replace(/\s+/g, '');
+    const fontFileName = `${safeFontName}.ttf`;
+    const internalFontName = safeFontName;
     const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
-    const fontNameOverride = selectedFont;
-    const fontFileName = `${selectedFont.replace(/\s+/g, '')}.ttf`;
-    const internalFontName = fontFileName.replace('.ttf', ''); // Match FS name for better resolution
     
     setCaptionStep('Reading video data...');
-    console.log("[VoxNova] Fetching video file...");
-    const videoData = await fetchFile(videoFile);
-    console.log("[VoxNova] Writing input file to virtual drive...");
-    await ffmpeg.writeFile(inputName, videoData);
-    
-    setCaptionStep('Loading professional fonts...');
     try {
-      console.log(`Fetching font: ${selectedFont} from ${fontUrl}`);
+      const videoData = await fetchFile(videoFile);
+      await ffmpeg.writeFile(inputName, videoData);
+      
+      setCaptionStep('Loading professional fonts...');
       const fontData = await fetchFile(fontUrl);
-      console.log(`[VoxNova] Font data size: ${fontData.byteLength} bytes`);
       await ffmpeg.writeFile(fontFileName, fontData);
-      // Ensure we have a default font file too
-      if (selectedFont === 'Inter' || !selectedFont) {
-        await ffmpeg.writeFile('Inter.ttf', fontData);
-      }
     } catch (e) {
-      console.warn("Font load failed, using fallback Inter", e);
-      try {
-        const fallbackData = await fetchFile(fontMapping['Inter']);
-        await ffmpeg.writeFile('Inter.ttf', fallbackData);
-      } catch (innerErr) {
-        console.error("Critical font failure", innerErr);
-      }
+      console.error("File write failure", e);
+      throw new Error("FFmpeg storage failed. Refresh and try again.");
     }
     
     setCaptionStep('Mapping video architecture...');
-    console.log("[VoxNova] Mapping video architecture...");
-    // Get actual video dimensions for accurate subtitle positioning
     let videoWidth = 1280;
     let videoHeight = 720;
     try {
@@ -2806,45 +2800,46 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       videoElement.src = URL.createObjectURL(videoFile);
       await new Promise((resolve) => {
         videoElement.onloadedmetadata = () => {
-          // Ensure dimensions are even for yuv420p compatibility
-          videoWidth = videoElement.videoWidth % 2 === 0 ? videoElement.videoWidth : videoElement.videoWidth - 1;
-          videoHeight = videoElement.videoHeight % 2 === 0 ? videoElement.videoHeight : videoElement.videoHeight - 1;
+          let w = videoElement.videoWidth;
+          let h = videoElement.videoHeight;
+          const MAX_DIM = 1280;
+          if (w > MAX_DIM || h > MAX_DIM) {
+            const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+          videoWidth = w % 2 === 0 ? w : w - 1;
+          videoHeight = h % 2 === 0 ? h : h - 1;
           resolve(true);
         };
         videoElement.onerror = () => resolve(false);
-        setTimeout(() => resolve(false), 5000); 
+        setTimeout(() => resolve(false), 8000); 
       });
       URL.revokeObjectURL(videoElement.src);
     } catch (e) {
-      console.warn("Failed to get video metadata, using defaults", e);
+      // Fallback
     }
-
-    // Log metadata for debugging
-    console.log(`[VoxNova] Video Dimensions: ${videoWidth}x${videoHeight}`);
     
-    // Generate ASS content with safe font pathing
+    // Create ASS with forced font styling for FFmpeg compatibility
+    // We use StyleFont as the face name but fallback to standard fonts if StyleFont fails
     const assContent = generateASS(words, style, videoWidth, videoHeight, internalFontName);
     await ffmpeg.writeFile(assName, assContent);
     
-    setCaptionStep('Encoding video (please wait)...');
-    console.log("[VoxNova] Encoding video...");
+    setCaptionStep('Burning captions into video...');
+    // setIsExporting(true); // Already set in handleExportCaptions
     setCaptionProgress(0);
     
-    // Refresh progress listener to handle closure staleness
-    ffmpeg.off('progress', () => {}); 
     ffmpeg.on('progress', ({ progress }) => {
       setCaptionProgress(Math.min(95, Math.floor(progress * 100)));
     });
 
-    console.log("[VoxNova] Executing FFmpeg with font support...");
     try {
-      console.log("[VoxNova] Starting High-Quality Encoding with local fonts...");
+      console.log("[VoxNova] Starting High-Quality Encoding...");
       
-      // We use fontsdir . to ensure FFmpeg looks at the virtual filesystem where we wrote the font
       await ffmpeg.exec([
         '-y', 
         '-i', inputName, 
-        '-vf', `subtitles=${assName}:fontsdir=.`, 
+        '-vf', `scale=${videoWidth}:${videoHeight}:force_original_aspect_ratio=decrease,pad=${videoWidth}:${videoHeight}:(ow-iw)/2:(oh-ih)/2,subtitles=${assName}:fontsdir=.`, 
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
         '-crf', '22', 
@@ -2853,9 +2848,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         outputName
       ]);
     } catch (e: any) {
-      console.error("FFmpeg primary burn failed, trying ultra-stable fallback...", e);
+      console.error("Burn-in failure, trying aggressive fallback...", e);
       try {
-        // Fallback without fontsdir and slightly lower quality for stability
         await ffmpeg.exec([
           '-y', 
           '-i', inputName, 
@@ -2867,7 +2861,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
           outputName
         ]);
       } catch (innerE: any) {
-        throw new Error(`Encoding failed: ${innerE.message}. Your video resolution might be unsupported.`);
+        throw new Error(`Video encoding failed. This happens if the video resolution is too high for the browser memory. Try using a 720p or lower resolution video.`);
       }
     }
     
@@ -3202,6 +3196,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     console.log("[VoxNova] Exporting captions for:", captionFile.name);
     setIsCaptioning(true);
+    setIsExporting(true); // Hide captions immediately in the UI
     setCaptionProgress(0);
     setCaptionStep('Initializing download engine...'); 
     
@@ -3210,7 +3205,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const videoBlob = await burnCaptions(captionFile, captionWords, captionStyle);
       const url = URL.createObjectURL(videoBlob);
       const a = document.createElement('a');
-      a.style.display = 'none';
+      a.className = 'hidden';
       a.href = url;
       a.download = `VoxNova-Captions-${captionFile.name}`;
       document.body.appendChild(a);
@@ -3218,12 +3213,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      }, 100);
+      }, 1000);
       showToast("Video downloaded successfully!");
     } catch (err: any) {
+      console.error("[Export] Error:", err);
       setError(`Download failed: ${err.message}`);
     } finally {
       setIsCaptioning(false);
+      setIsExporting(false);
     }
   };
 
@@ -4951,35 +4948,39 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     {captionFile ? (
                         <div 
                           ref={videoContainerRef}
-                          className="relative w-full aspect-auto max-h-[70vh] bg-zinc-950 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden group shadow-2xl flex items-center justify-center border border-zinc-800"
+                          className="relative w-full max-h-[70vh] bg-zinc-950 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden group shadow-2xl flex items-center justify-center border border-zinc-800"
                         >
-                          <video 
-                            ref={videoRef}
-                            src={captionResult ? captionResult.videoUrl : URL.createObjectURL(captionFile)} 
-                            onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                            className="w-full h-full object-contain cursor-pointer" 
-                            muted={isMuted}
-                            onPlay={() => setIsPlaying(true)}
-                            onPause={() => setIsPlaying(false)}
-                            onClick={() => {
-                              if (videoRef.current) {
-                                if (videoRef.current.paused) videoRef.current.play();
-                                else videoRef.current.pause();
-                              }
-                            }}
-                          />
-                          {captionWords.length > 0 && (
-                            <CaptionOverlay 
-                              words={captionWords} 
-                              currentTime={currentTime + (captionOffset / 1000)} 
-                              style={captionStyle} 
-                              animation={captionAnimation} 
-                              shadowColor={shadowColor}
-                              onUpdateStyle={(updates) => setCaptionStyle(prev => ({ ...prev, ...updates }))}
+                          <div className="relative max-w-full max-h-full flex items-center justify-center">
+                            <video 
+                              ref={videoRef}
+                              src={captionResult ? captionResult.videoUrl : (captionFile ? URL.createObjectURL(captionFile) : '')} 
+                              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                              className="max-w-full max-h-[70vh] object-contain cursor-pointer" 
+                              muted={isMuted}
+                              onPlay={() => setIsPlaying(true)}
+                              onPause={() => setIsPlaying(false)}
+                              onClick={() => {
+                                if (videoRef.current) {
+                                  if (videoRef.current.paused) videoRef.current.play();
+                                  else videoRef.current.pause();
+                                }
+                              }}
                             />
-                          )}
+                            {captionWords.length > 0 && !isCaptioning && !isExporting && (
+                              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                <CaptionOverlay 
+                                  words={captionWords} 
+                                  currentTime={currentTime + (captionOffset / 1000)} 
+                                  style={captionStyle} 
+                                  animation={captionAnimation} 
+                                  shadowColor={shadowColor}
+                                  onUpdateStyle={(updates) => setCaptionStyle(prev => ({ ...prev, ...updates }))}
+                                />
+                              </div>
+                            )}
+                          </div>
                           
-                          {/* Video Overlay Actions - Removed central play button as requested */}
+                          {/* Video Overlay Actions */}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all">
                           </div>
 
