@@ -574,6 +574,7 @@ const CaptionOverlay = ({
   style, 
   animation,
   shadowColor: propShadowColor,
+  isExporting,
   onUpdateStyle
 }: { 
   words: CaptionWord[], 
@@ -581,8 +582,10 @@ const CaptionOverlay = ({
   style: CaptionStyle, 
   animation: string,
   shadowColor: string,
+  isExporting?: boolean,
   onUpdateStyle?: (style: Partial<CaptionStyle>) => void
 }) => {
+  if (isExporting) return null;
   // Use the currentTime directly as it already includes the user-defined captionOffset from the parent
   const adjustedTime = currentTime;
 
@@ -623,49 +626,49 @@ const CaptionOverlay = ({
       case 'typing':
       case 'typewriter':
         return {
-          initial: { opacity: 0, x: -10, y: 5, scale: 0.9, rotate: -3 },
+          initial: { opacity: 0, x: -5, y: 10, scale: 0.5, rotate: -3 },
           animate: { 
             opacity: 1, 
             x: 0,
             y: 0,
             rotate: 0,
-            scale: 1,
+            scale: [0.5, 1.2, 1],
           },
           transition: { 
-            duration: 0.02, // Ultra-snappy
+            duration: 0.15,
             type: "spring" as const,
-            stiffness: 3000,
-            damping: 50,
-            opacity: { duration: 0.015 },
-            ease: "easeOut" as const
+            stiffness: 700,
+            damping: 15,
+            opacity: { duration: 0.08 },
+            scale: { duration: 0.2, times: [0, 0.7, 1] }
           }
         };
       case 'pop':
         return {
-          initial: { scale: 0.7, opacity: 0, y: 15 },
-          animate: { scale: 1, opacity: 1, y: 0 },
-          transition: { type: 'spring' as const, stiffness: 800, damping: 20 }
+          initial: { scale: 0.5, opacity: 0, y: 20 },
+          animate: { scale: [0.5, 1.2, 1], opacity: 1, y: 0 },
+          transition: { duration: 0.2, times: [0, 0.6, 1], ease: "easeOut" as const }
         };
       case 'professional':
         return {
-          initial: { scale: 0.85, opacity: 0, y: 10 },
-          animate: { scale: 1, opacity: 1, y: 0 },
+          initial: { scale: 0.8, opacity: 0, y: 10 },
+          animate: { scale: [0.8, 1.05, 1], opacity: 1, y: 0 },
           transition: { 
             type: 'spring' as const, 
-            stiffness: 900, 
-            damping: 25,
+            stiffness: 1000, 
+            damping: 30,
             restDelta: 0.001
           }
         };
       case 'snappy':
         return {
           initial: { scale: 0.7, opacity: 0, y: 10 },
-          animate: { scale: [1.2, 1], opacity: 1, y: 0 },
+          animate: { scale: [0.7, 1.25, 1], opacity: 1, y: 0 },
           transition: { 
             type: "spring" as const,
-            stiffness: 1200,
+            stiffness: 1500,
             damping: 25,
-            duration: 0.03
+            duration: 0.05
           }
         };
       case 'snappy-pop':
@@ -859,37 +862,39 @@ const CaptionOverlay = ({
       const c2 = style.tripleBorderColors[1] || '#0047AB'; 
       const c3 = style.tripleBorderColors[2] || '#000000'; 
       
-      // Royal Triple Thin Style - Optimized for single line
+      // Multi-layered text shadow for explicit triple border appearance - Increased offsets for better visibility
       baseStyle.textShadow = `
         -1.5px -1.5px 0 ${c1}, 1.5px -1.5px 0 ${c1}, -1.5px 1.5px 0 ${c1}, 1.5px 1.5px 0 ${c1},
-        -2.5px -2.5px 0 ${c2}, 2.5px -2.5px 0 ${c2}, -2.5px 2.5px 0 ${c2}, 2.5px 2.5px 0 ${c2},
-        -3.5px -3.5px 0 ${c3}, 3.5px -3.5px 0 ${c3}, -3.5px 3.5px 0 ${c3}, 3.5px 3.5px 0 ${c3},
-        0 6px 12px rgba(0,0,0,0.8)
+        -3px -3px 0 ${c2}, 3px -3px 0 ${c2}, -3px 3px 0 ${c2}, 3px 3px 0 ${c2},
+        -5px -5px 0 ${c3}, 5px -5px 0 ${c3}, -5px 5px 0 ${c3}, 5px 5px 0 ${c3},
+        0 10px 20px rgba(0,0,0,0.9)
       `.trim().replace(/\s+/g, ' ');
       
-      (baseStyle as any).WebkitTextStroke = `${style.strokeWidth || 1}px ${c1}`;
+      (baseStyle as any).WebkitTextStroke = `2px ${c1}`;
       baseStyle.whiteSpace = 'nowrap';
       baseStyle.display = 'inline-block';
       baseStyle.overflow = 'visible';
     }
 
-    if (style.border === 'thin') {
-      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 1) * 0.4}px ${style.outlineColor || '#000000'}`;
-      (baseStyle as any).paintOrder = 'stroke fill';
-      (baseStyle as any).WebkitPaintOrder = 'stroke fill';
-    } else if (style.border === 'thick') {
-      (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 3) * 0.8}px ${style.outlineColor || '#000000'}`;
-      (baseStyle as any).paintOrder = 'stroke fill';
-      (baseStyle as any).WebkitPaintOrder = 'stroke fill';
-    }
+    if (!style.tripleBorder) {
+      if (style.border === 'thin') {
+        (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 1) * 0.4}px ${style.outlineColor || '#000000'}`;
+        (baseStyle as any).paintOrder = 'stroke fill';
+        (baseStyle as any).WebkitPaintOrder = 'stroke fill';
+      } else if (style.border === 'thick') {
+        (baseStyle as any).WebkitTextStroke = `${(style.strokeWidth || 3) * 0.8}px ${style.outlineColor || '#000000'}`;
+        (baseStyle as any).paintOrder = 'stroke fill';
+        (baseStyle as any).WebkitPaintOrder = 'stroke fill';
+      }
 
-    if (style.glow) {
-      baseStyle.textShadow = `0 0 12px ${baseStyle.color}, 0 0 24px ${baseStyle.color}, 0 2px 8px rgba(0,0,0,0.4)`;
-      baseStyle.filter = `drop-shadow(0 0 8px ${baseStyle.color})`;
-    }
+      if (style.glow) {
+        baseStyle.textShadow = `0 0 12px ${baseStyle.color}, 0 0 24px ${baseStyle.color}, 0 2px 8px rgba(0,0,0,0.4)`;
+        baseStyle.filter = `drop-shadow(0 0 8px ${baseStyle.color})`;
+      }
 
-    if (style.shadow) {
-      baseStyle.textShadow = `1.5px 1.5px 0px ${finalShadow}, -1.5px -1.5px 0px ${finalShadow}, 1.5px -1.5px 0px ${finalShadow}, -1.5px 1.5px 0px ${finalShadow}, 0px 6px 15px rgba(0,0,0,0.7)`;
+      if (style.shadow) {
+        baseStyle.textShadow = `1.5px 1.5px 0px ${finalShadow}, -1.5px -1.5px 0px ${finalShadow}, 1.5px -1.5px 0px ${finalShadow}, -1.5px 1.5px 0px ${finalShadow}, 0px 6px 15px rgba(0,0,0,0.7)`;
+      }
     }
     
     if (style.background === 'box') {
@@ -2278,7 +2283,17 @@ function App() {
     setIsAuthLoading(true);
     try {
       console.log("Starting Google Login...");
-      const result = await signInWithPopup(auth, googleProvider);
+      // For popups in restricted environments, we can try to catch common errors
+      const result = await signInWithPopup(auth, googleProvider).catch(async (err) => {
+        if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+          console.warn("Popup blocked, trying redirect fallback...");
+          // We could try redirect here but it often fails in iframes. 
+          // For now, just inform the user.
+          throw new Error("Login popup was blocked by your browser. Please allow popups for this site.");
+        }
+        throw err;
+      });
+
       console.log("Login successful:", result.user.email);
       if (analytics) {
         logEvent(analytics, 'login', {
@@ -2288,7 +2303,13 @@ function App() {
       }
     } catch (err: any) {
       console.error('Login failed', err);
-      setError(`Login failed: ${err.message || "Please check your internet connection and try again."}`);
+      // More user-friendly errors
+      let msg = err.message || "Please check your internet connection and try again.";
+      if (err.code === 'auth/network-request-failed') msg = "Network error. Please check your internet connection.";
+      if (err.code === 'auth/internal-error') msg = "Firebase service internal error. Please try again in a few moments.";
+      
+      setError(`Login failed: ${msg}`);
+    } finally {
       setIsAuthLoading(false);
     }
   };
@@ -2298,11 +2319,29 @@ function App() {
     setIsAuthLoading(true);
     try {
       console.log("Starting Logout...");
-      await signOut(auth);
-      console.log("Logout successful");
+      // Try to sign out normally
+      await signOut(auth).catch(err => {
+        console.warn("Firebase signOut failed, forcing local cleanup", err);
+      });
+      
+      console.log("Logout cleanup...");
+      // Always clear local state even if Firebase failed
+      setCurrentUser(null);
+      setUserProfile(null);
+      setHistory([]);
+      
+      // Clear sensitive storage if any
+      localStorage.removeItem('voxnova_user_profile');
+      
+      showToast("Successfully logged out");
     } catch (err: any) {
-      console.error('Logout failed', err);
-      setError(`Logout failed: ${err.message}`);
+      console.error('Logout failed completely', err);
+      setError(`Logout failed: ${err.message || "Unknown error"}. Please refresh the page manually.`);
+      
+      // Absolute fallback
+      setCurrentUser(null);
+      setUserProfile(null);
+    } finally {
       setIsAuthLoading(false);
     }
   };
@@ -2685,13 +2724,18 @@ function App() {
     const assOutlineColor = hexToAss(style.outlineColor || '#000000');
     const assShadowColor = hexToAss(style.shadowColor || '#000000');
     
-    const outline = style.tripleBorder ? 8 : (style.strokeWidth || (style.border === 'thick' ? 5 : style.border === 'thin' ? 2 : 0));
-    const shadow = style.tripleBorder ? 5 : (style.shadow ? 4 : 0);
-    const spacing = 4; // Increased spacing for premium look
+    // Triple Border Color support for ASS
+    const c1 = style.tripleBorderColors?.[0] ? hexToAss(style.tripleBorderColors[0]) : assOutlineColor;
+    const c2 = style.tripleBorderColors?.[1] ? hexToAss(style.tripleBorderColors[1]) : assOutlineColor;
+    const c3 = style.tripleBorderColors?.[2] ? hexToAss(style.tripleBorderColors[2]) : assShadowColor;
+
+    const outline = style.tripleBorder ? 12 : (style.strokeWidth || (style.border === 'thick' ? 5 : style.border === 'thin' ? 2 : 0));
+    const shadow = style.tripleBorder ? 0 : (style.shadow ? 4 : 0);
+    const spacing = 4; 
     
     // Scale Font size based on resolution
     const baseResY = 720;
-    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.2); // Larger for clarity
+    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.3); // Slightly larger for video legibility
 
     let ass = `[Script Info]
 ScriptType: v4.00+
@@ -2703,6 +2747,9 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer3,${fontName},${scaledSize},${assColor},&H000000FF,${c3},&H00000000,1,0,0,0,100,100,${spacing},0,1,10,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer2,${fontName},${scaledSize},${assColor},&H000000FF,${c2},&H00000000,1,0,0,0,100,100,${spacing},0,1,6,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer1,${fontName},${scaledSize},${assColor},&H000000FF,${c1},&H00000000,1,0,0,0,100,100,${spacing},0,1,2,0,${alignment},20,20,${isPortrait ? 80 : 40},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -2712,23 +2759,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const isDevanagari = /[\u0900-\u097F]/.test(w.word);
       let text = (style.case === 'uppercase' && !isDevanagari) ? w.word.toUpperCase() : (style.case === 'lowercase' && !isDevanagari) ? w.word.toLowerCase() : w.word;
       
-      // Use hard spaces (\h) to ensure FFmpeg preserves gaps between words
-      text = text.replace(/\u00A0\u00A0\u00A0\u00A0/g, '\\h\\h\\h\\h\\h\\h'); 
+      text = text.replace(/\u00A0\u00A0\u00A0\u00A0/g, '\\h\\h\\h\\h'); 
 
       if (style.tripleBorder) {
-        // High-end look with custom border and shadow layering
-        text = `{\\bord${outline}\\3c${assOutlineColor}\\shad${shadow}\\4c${assShadowColor}}${text}`;
+        // Triple Border Layering in ASS - Stacking 3 dialogue lines for perfect pixel-perfect borders
+        const startTime = formatTime(w.start);
+        const endTime = formatTime(w.end);
+        
+        // Deepest Layer (Border 3)
+        ass += `Dialogue: 0,${startTime},${endTime},Layer3,,0,0,0,,${text}\n`;
+        // Middle Layer (Border 2)
+        ass += `Dialogue: 1,${startTime},${endTime},Layer2,,0,0,0,,${text}\n`;
+        // Top Layer (Border 1 + Fill)
+        ass += `Dialogue: 2,${startTime},${endTime},Layer1,,0,0,0,,${text}\n`;
+      } else {
+        if (style.isDynamic) {
+          const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
+          const color = colors[idx % colors.length];
+          const assWordColor = hexToAss(color);
+          text = `{\\c${assWordColor}}${text}`;
+        }
+        ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${text}\n`;
       }
-
-      if (style.isDynamic) {
-        const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff00'];
-        const color = colors[idx % colors.length];
-        const assWordColor = hexToAss(color);
-        text = `{\\c${assWordColor}}${text}`;
-      }
-      
-      // Add font override to the dialogue line itself if needed, but fallback to Arial which is standard in FFmpeg builds
-      ass += `Dialogue: 0,${formatTime(w.start)},${formatTime(w.end)},Default,,0,0,0,,${text}\n`;
     });
 
     return ass;
@@ -2774,6 +2826,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     };
 
     // We use the selectedFont name directly as both the filename and internal name for highest reliability
+    // We also use a more standard approach for FFmpeg font handling
     const safeFontName = selectedFont.replace(/\s+/g, '');
     const fontFileName = `${safeFontName}.ttf`;
     const internalFontName = safeFontName;
@@ -2787,6 +2840,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       setCaptionStep('Loading professional fonts...');
       const fontData = await fetchFile(fontUrl);
       await ffmpeg.writeFile(fontFileName, fontData);
+      // Copy to standard name as backup
+      await ffmpeg.writeFile('StyleFont.ttf', fontData);
     } catch (e) {
       console.error("File write failure", e);
       throw new Error("FFmpeg storage failed. Refresh and try again.");
@@ -2839,7 +2894,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       await ffmpeg.exec([
         '-y', 
         '-i', inputName, 
-        '-vf', `scale=${videoWidth}:${videoHeight}:force_original_aspect_ratio=decrease,pad=${videoWidth}:${videoHeight}:(ow-iw)/2:(oh-ih)/2,subtitles=${assName}:fontsdir=.`, 
+        '-vf', `scale=${videoWidth}:${videoHeight}:force_original_aspect_ratio=decrease,pad=${videoWidth}:${videoHeight}:(ow-iw)/2:(oh-ih)/2,subtitles='${assName}':fontsdir=.`, 
         '-c:v', 'libx264', 
         '-preset', 'ultrafast', 
         '-crf', '22', 
@@ -4112,10 +4167,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] bg-white flex flex-col items-center justify-center"
+            className="fixed inset-0 z-[300] bg-white flex flex-col items-center justify-center p-6 text-center"
           >
-            <div className="w-12 h-12 border-4 border-zinc-100 border-t-zinc-900 rounded-full animate-spin" />
-            <p className="mt-4 text-zinc-500 font-medium animate-pulse">Initializing VoxNova...</p>
+            <div className="w-16 h-16 border-4 border-zinc-100 border-t-emerald-500 rounded-full animate-spin mb-6" />
+            <h2 className="text-2xl font-display font-bold text-zinc-900 mb-2">VoxNova</h2>
+            <p className="text-zinc-500 font-medium animate-pulse mb-8">Authenticating with Firebase...</p>
+            
+            <div className="max-w-xs space-y-4">
+              <p className="text-[10px] text-zinc-400 uppercase tracking-widest leading-relaxed">
+                If this takes too long, your connection may be slow or blocked by firewall.
+              </p>
+              <button 
+                onClick={() => setIsAuthLoading(false)}
+                className="px-6 py-3 bg-zinc-100 text-zinc-600 rounded-2xl font-bold text-sm hover:bg-zinc-200 transition-all"
+              >
+                Continue as Guest
+              </button>
+            </div>
           </motion.div>
         ) : showWelcome ? (
           <WelcomeScreen onComplete={handleWelcomeComplete} />
@@ -4974,6 +5042,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                   style={captionStyle} 
                                   animation={captionAnimation} 
                                   shadowColor={shadowColor}
+                                  isExporting={isExporting}
                                   onUpdateStyle={(updates) => setCaptionStyle(prev => ({ ...prev, ...updates }))}
                                 />
                               </div>

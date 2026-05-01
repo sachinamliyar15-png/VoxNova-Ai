@@ -624,7 +624,7 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
   },
   {
     id: 'triple-stroke-elite',
-    name: 'Elite Triple Stroke',
+    name: 'Elite Triple Red',
     style: {
       fontSize: 24,
       color: '#ffffff',
@@ -635,20 +635,20 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       backgroundColor: 'transparent',
       case: 'uppercase',
       wordsPerLine: 1,
-      shadow: true,
+      shadow: false, // Turned off to prevent override
       shadowColor: '#000000',
       strokeWidth: 4,
       fontWeight: '900',
       isDynamic: false,
       isSmart: true,
       tripleBorder: true,
-      tripleBorderColors: ['#FFD700', '#0047AB', '#000000']
+      tripleBorderColors: ['#FF0000', '#000000', '#0047AB'] // Red, Black, Blue
     },
     animation: 'typewriter'
   },
   {
     id: 'triple-stroke-royal-thin',
-    name: 'Royal Triple Thin',
+    name: 'Royal Triple Blue',
     style: {
       fontSize: 24,
       color: '#ffffff',
@@ -659,20 +659,20 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       backgroundColor: 'transparent',
       case: 'uppercase',
       wordsPerLine: 1,
-      shadow: true,
+      shadow: false, // Turned off to prevent override
       shadowColor: '#000000',
       strokeWidth: 2,
       fontWeight: '900',
       isDynamic: false,
       isSmart: true,
       tripleBorder: true,
-      tripleBorderColors: ['#1E90FF', '#FFD700', '#FF0000'] // Blue, Gold, Red
+      tripleBorderColors: ['#FFFF00', '#000000', '#1E90FF'] // Yellow, Black, Blue
     },
     animation: 'typewriter'
   },
   {
     id: 'trinity-thin',
-    name: 'Trinity Thin',
+    name: 'Trinity Classic',
     style: {
       fontSize: 24,
       color: '#ffffff',
@@ -683,14 +683,14 @@ export const CAPTION_PRESETS: CaptionPreset[] = [
       backgroundColor: 'transparent',
       case: 'uppercase',
       wordsPerLine: 1,
-      shadow: true,
+      shadow: false, // Turned off to prevent override
       shadowColor: '#000000',
       strokeWidth: 1,
       fontWeight: '900',
       isDynamic: false,
       isSmart: true,
       tripleBorder: true,
-      tripleBorderColors: ['#1E90FF', '#FFD700', '#FF0000']
+      tripleBorderColors: ['#ffffff', '#00ff00', '#000000'] // White, Green, Black
     },
     animation: 'typewriter'
   }
