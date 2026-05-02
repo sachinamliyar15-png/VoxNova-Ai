@@ -594,7 +594,7 @@ const CaptionOverlay = ({
   const [guides, setGuides] = React.useState({ x: false, y: false });
   
   const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine, style.isSmart), [words, style.wordsPerLine, style.isSmart]);
-  const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
+  const currentWordIndex = displayWords.findIndex(w => adjustedTime >= (w.start - 0.1) && adjustedTime <= w.end);
   const currentWord = displayWords[currentWordIndex];
   
     // Subtle "living" motion only for "Pro" styles (Animated templates)
@@ -862,15 +862,15 @@ const CaptionOverlay = ({
       const c2 = style.tripleBorderColors[1] || '#0047AB'; 
       const c3 = style.tripleBorderColors[2] || '#000000'; 
       
-      // Multi-layered text shadow for explicit triple border appearance - Very thin for high clarity
+      // Multi-layered text shadow for explicit triple border appearance - Ultra-thin for high clarity
       baseStyle.textShadow = `
-        -0.8px -0.8px 0 ${c1}, 0.8px -0.8px 0 ${c1}, -0.8px 0.8px 0 ${c1}, 0.8px 0.8px 0 ${c1},
-        -1.8px -1.8px 0 ${c2}, 1.8px -1.8px 0 ${c2}, -1.8px 1.8px 0 ${c2}, 1.8px 1.8px 0 ${c2},
-        -3px -3px 0 ${c3}, 3px -3px 0 ${c3}, -3px 3px 0 ${c3}, 3px 3px 0 ${c3},
-        0 6px 12px rgba(0,0,0,0.8)
+        -0.6px -0.6px 0 ${c1}, 0.6px -0.6px 0 ${c1}, -0.6px 0.6px 0 ${c1}, 0.6px 0.6px 0 ${c1},
+        -1.4px -1.4px 0 ${c2}, 1.4px -1.4px 0 ${c2}, -1.4px 1.4px 0 ${c2}, 1.4px 1.4px 0 ${c2},
+        -2.5px -2.5px 0 ${c3}, 2.5px -2.5px 0 ${c3}, -2.5px 2.5px 0 ${c3}, 2.5px 2.5px 0 ${c3},
+        0 4px 10px rgba(0,0,0,0.8)
       `.trim().replace(/\s+/g, ' ');
       
-      (baseStyle as any).WebkitTextStroke = `1.2px ${c1}`;
+      (baseStyle as any).WebkitTextStroke = `1px ${c1}`;
       baseStyle.whiteSpace = 'nowrap';
       baseStyle.display = 'inline-block';
       baseStyle.overflow = 'visible';
@@ -2307,6 +2307,11 @@ function App() {
       let msg = err.message || "Please check your internet connection and try again.";
       if (err.code === 'auth/network-request-failed') msg = "Network error. Please check your internet connection.";
       if (err.code === 'auth/internal-error') msg = "Firebase service internal error. Please try again in a few moments.";
+      if (err.code === 'auth/popup-closed-by-user') {
+        console.log("User closed the login popup.");
+        setIsAuthLoading(false);
+        return; // Don't show error for manual closure
+      }
       
       setError(`Login failed: ${msg}`);
     } finally {
@@ -2732,7 +2737,8 @@ function App() {
     const c2 = style.tripleBorderColors?.[1] ? hexToAss(style.tripleBorderColors[1]) : assOutlineColor;
     const c3 = style.tripleBorderColors?.[2] ? hexToAss(style.tripleBorderColors[2]) : assShadowColor;
 
-    const outline = style.tripleBorder ? 5 : (style.strokeWidth || (style.border === 'thick' ? 5 : style.border === 'thin' ? 2 : 0));
+    // Significantly thinner layers for ASS as requested
+    const outline = style.tripleBorder ? 3.5 : (style.strokeWidth || (style.border === 'thick' ? 5 : style.border === 'thin' ? 2 : 0));
     const shadow = style.tripleBorder ? 0 : (style.shadow ? 4 : 0);
     const spacing = 4; 
     
@@ -2750,9 +2756,9 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer3,${fontName},${scaledSize},${assColor},&H000000FF,${c3},&H00000000,1,0,0,0,100,100,${spacing},0,1,4.5,0,${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer2,${fontName},${scaledSize},${assColor},&H000000FF,${c2},&H00000000,1,0,0,0,100,100,${spacing},0,1,2.8,0,${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer1,${fontName},${scaledSize},${assColor},&H000000FF,${c1},&H00000000,1,0,0,0,100,100,${spacing},0,1,1.2,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer3,${fontName},${scaledSize},${assColor},&H000000FF,${c3},&H00000000,1,0,0,0,100,100,${spacing},0,1,3.2,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer2,${fontName},${scaledSize},${assColor},&H000000FF,${c2},&H00000000,1,0,0,0,100,100,${spacing},0,1,2.0,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer1,${fontName},${scaledSize},${assColor},&H000000FF,${c1},&H00000000,1,0,0,0,100,100,${spacing},0,1,0.8,0,${alignment},20,20,${isPortrait ? 80 : 40},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -2840,22 +2846,31 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       // Ensure engine is truly loaded before writing LARGE files
       if (!ffmpeg) throw new Error("FFmpeg engine not initialized");
       
-      const videoData = await fetchFile(videoFile);
-      if (!videoData || videoData.length === 0) throw new Error("Unable to read video file content");
+      // Cleanup previous files more aggressively to avoid memory issues
+      try {
+        await ffmpeg.deleteFile(inputName);
+        await ffmpeg.deleteFile(assName);
+        await ffmpeg.deleteFile(outputName);
+      } catch (e) { /* Ignore delete errors */ }
+
+      const rawVideoData = await fetchFile(videoFile);
+      if (!rawVideoData || rawVideoData.length === 0) throw new Error("Unable to read video file content");
       
-      await ffmpeg.writeFile(inputName, videoData);
+      // Use .slice(0) to create a copy and avoid detached buffer issues if reused
+      await ffmpeg.writeFile(inputName, new Uint8Array(rawVideoData.buffer).slice(0));
       
       setCaptionStep('Optimizing font layers...');
-      const fontData = await fetchFile(fontUrl);
-      await ffmpeg.writeFile(fontFileName, fontData);
+      const rawFontData = await fetchFile(fontUrl);
+      const fontBuffer = new Uint8Array(rawFontData.buffer).slice(0);
+      await ffmpeg.writeFile(fontFileName, fontBuffer);
       // Copy to standard name as backup
-      await ffmpeg.writeFile('StyleFont.ttf', fontData);
+      await ffmpeg.writeFile('StyleFont.ttf', fontBuffer);
     } catch (e: any) {
       console.error("FFmpeg storage failure:", e);
       const msg = e.message || "Failed to write into virtual memory";
       
       // If we see the detached buffer error, reset the instance entirely
-      if (msg.includes('detached') || msg.includes('postMessage')) {
+      if (msg.includes('detached') || msg.includes('postMessage') || msg.includes('ArrayBuffer')) {
         ffmpegRef.current = null;
         setIsFFmpegLoaded(false);
       }
