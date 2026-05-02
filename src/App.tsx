@@ -551,8 +551,8 @@ const groupWordsIntoLines = (words: CaptionWord[], wordsPerLine: number, isSmart
     // Hindi specific word joining logic can go here if needed
   }
 
-  // Ensure the first caption starts at 0 if it's very close to the start
-  if (grouped.length > 0 && grouped[0].start < 4.0) {
+  // Ensure the first caption starts at 0 only if it's very close to the start (< 0.5s)
+  if (grouped.length > 0 && grouped[0].start < 0.5) {
     grouped[0].start = 0;
   }
 
@@ -594,7 +594,7 @@ const CaptionOverlay = ({
   const [guides, setGuides] = React.useState({ x: false, y: false });
   
   const displayWords = React.useMemo(() => groupWordsIntoLines(words, style.wordsPerLine, style.isSmart), [words, style.wordsPerLine, style.isSmart]);
-  const currentWordIndex = displayWords.findIndex(w => adjustedTime >= (w.start - 0.2) && adjustedTime <= (w.end + 0.1));
+  const currentWordIndex = displayWords.findIndex(w => adjustedTime >= w.start && adjustedTime <= w.end);
   const currentWord = displayWords[currentWordIndex];
   
     // Subtle "living" motion only for "Pro" styles (Animated templates)
@@ -626,21 +626,21 @@ const CaptionOverlay = ({
       case 'typing':
       case 'typewriter':
         return {
-          initial: { opacity: 0, x: -5, y: 10, scale: 0.5, rotate: -3 },
+          initial: { opacity: 0, x: -5, y: 5, scale: 0.8, rotate: -2 },
           animate: { 
             opacity: 1, 
             x: 0,
             y: 0,
             rotate: 0,
-            scale: [0.5, 1.2, 1],
+            scale: 1,
           },
           transition: { 
-            duration: 0.15,
+            duration: 0.04, // Ultra-snappy
             type: "spring" as const,
-            stiffness: 700,
-            damping: 15,
-            opacity: { duration: 0.08 },
-            scale: { duration: 0.2, times: [0, 0.7, 1] }
+            stiffness: 2000,
+            damping: 40,
+            opacity: { duration: 0.03 },
+            scale: { duration: 0.05 }
           }
         };
       case 'pop':
@@ -862,15 +862,15 @@ const CaptionOverlay = ({
       const c2 = style.tripleBorderColors[1] || '#0047AB'; 
       const c3 = style.tripleBorderColors[2] || '#000000'; 
       
-      // Multi-layered text shadow for explicit triple border appearance - Increased offsets for better visibility
+      // Multi-layered text shadow for explicit triple border appearance - EXTREME visibility offsets
       baseStyle.textShadow = `
-        -1.5px -1.5px 0 ${c1}, 1.5px -1.5px 0 ${c1}, -1.5px 1.5px 0 ${c1}, 1.5px 1.5px 0 ${c1},
-        -3px -3px 0 ${c2}, 3px -3px 0 ${c2}, -3px 3px 0 ${c2}, 3px 3px 0 ${c2},
-        -5px -5px 0 ${c3}, 5px -5px 0 ${c3}, -5px 5px 0 ${c3}, 5px 5px 0 ${c3},
-        0 10px 20px rgba(0,0,0,0.9)
+        -3px -3px 0 ${c1}, 3px -3px 0 ${c1}, -3px 3px 0 ${c1}, 3px 3px 0 ${c1},
+        -6px -6px 0 ${c2}, 6px -6px 0 ${c2}, -6px 6px 0 ${c2}, 6px 6px 0 ${c2},
+        -10px -10px 0 ${c3}, 10px -10px 0 ${c3}, -10px 10px 0 ${c3}, 10px 10px 0 ${c3},
+        0 20px 40px rgba(0,0,0,0.95)
       `.trim().replace(/\s+/g, ' ');
       
-      (baseStyle as any).WebkitTextStroke = `2px ${c1}`;
+      (baseStyle as any).WebkitTextStroke = `4px ${c1}`;
       baseStyle.whiteSpace = 'nowrap';
       baseStyle.display = 'inline-block';
       baseStyle.overflow = 'visible';
@@ -2218,7 +2218,7 @@ function App() {
         console.warn("Auth loading timed out, forcing app load");
         setIsAuthLoading(false);
       }
-    }, 5000);
+    }, 2500); // Shorter safety timeout for better UX
 
     if (!auth) {
       setIsAuthLoading(false);
@@ -2330,10 +2330,13 @@ function App() {
       setUserProfile(null);
       setHistory([]);
       
-      // Clear sensitive storage if any
+      // Clear sensitive storage
       localStorage.removeItem('voxnova_user_profile');
+      localStorage.removeItem('voxnova_guest_history'); // Also clear guest history to be safe
       
+      setIsAuthLoading(false);
       showToast("Successfully logged out");
+      window.location.reload(); // Force a fresh state on logout to avoid Firebase zombies
     } catch (err: any) {
       console.error('Logout failed completely', err);
       setError(`Logout failed: ${err.message || "Unknown error"}. Please refresh the page manually.`);
@@ -2832,19 +2835,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const internalFontName = safeFontName;
     const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
     
-    setCaptionStep('Reading video data...');
+    setCaptionStep('Syncing engine with video storage...');
     try {
+      // Ensure engine is truly loaded before writing LARGE files
+      if (!ffmpeg) throw new Error("FFmpeg engine not initialized");
+      
       const videoData = await fetchFile(videoFile);
+      if (!videoData || videoData.length === 0) throw new Error("Unable to read video file content");
+      
       await ffmpeg.writeFile(inputName, videoData);
       
-      setCaptionStep('Loading professional fonts...');
+      setCaptionStep('Optimizing font layers...');
       const fontData = await fetchFile(fontUrl);
       await ffmpeg.writeFile(fontFileName, fontData);
       // Copy to standard name as backup
       await ffmpeg.writeFile('StyleFont.ttf', fontData);
-    } catch (e) {
-      console.error("File write failure", e);
-      throw new Error("FFmpeg storage failed. Refresh and try again.");
+    } catch (e: any) {
+      console.error("FFmpeg storage failure:", e);
+      const msg = e.message || "Failed to write into virtual memory";
+      throw new Error(`FFmpeg error: ${msg}. Your browser might have run out of memory. Please close other tabs, refresh the app, and try again with a shorter video.`);
     }
     
     setCaptionStep('Mapping video architecture...');
