@@ -2226,15 +2226,25 @@ function App() {
       return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("Auth State Changed:", user?.email);
+      console.log("Auth State Updated:", user?.email || "No User");
+      
+      // Update currentUser immediately
       setCurrentUser(user);
-      setIsAuthLoading(false);
       clearTimeout(safetyTimer);
+      
       if (user) {
-        fetchUserProfile(user);
+        // Only load if user is new or we don't have a profile
+        if (!currentUser || currentUser.uid !== user.uid || !userProfile) {
+          setIsAuthLoading(true);
+          fetchUserProfile(user).finally(() => {
+            setIsAuthLoading(false);
+          });
+        } else {
+          setIsAuthLoading(false);
+        }
       } else {
         setUserProfile(null);
-        // Load guest history from localStorage when logged out
+        // Load guest history
         const guestHistory = localStorage.getItem('voxnova_guest_history');
         if (guestHistory) {
           try {
@@ -2245,6 +2255,7 @@ function App() {
         } else {
           setHistory([]);
         }
+        setIsAuthLoading(false);
       }
     }, (error) => {
       console.error("Auth State Error:", error);
@@ -2337,11 +2348,11 @@ function App() {
       
       // Clear sensitive storage
       localStorage.removeItem('voxnova_user_profile');
-      localStorage.removeItem('voxnova_guest_history'); // Also clear guest history to be safe
+      localStorage.removeItem('voxnova_guest_history');
       
       setIsAuthLoading(false);
       showToast("Successfully logged out");
-      window.location.reload(); // Force a fresh state on logout to avoid Firebase zombies
+      // REMOVED window.location.reload() to prevent zombie loops
     } catch (err: any) {
       console.error('Logout failed completely', err);
       setError(`Logout failed: ${err.message || "Unknown error"}. Please refresh the page manually.`);
@@ -2841,35 +2852,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const internalFontName = safeFontName;
     const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
     
-    setCaptionStep('Syncing engine with video storage...');
+    setCaptionStep('Cleaning engine memory...');
     try {
-      // Ensure engine is truly loaded before writing LARGE files
       if (!ffmpeg) throw new Error("FFmpeg engine not initialized");
       
-      // Cleanup previous files aggressively to save memory
-      const cleaning = [inputName, assName, outputName, 'StyleFont.ttf'];
+      // Cleanup all possible temporary files
+      const cleaning = [inputName, assName, outputName, 'StyleFont.ttf', fontFileName];
       for (const f of cleaning) {
         try { await ffmpeg.deleteFile(f); } catch (e) {}
       }
 
-      // VITAL: Use fetchFile directly and Uint8Array more safely to prevent detachment
-      const rawVideoData = await fetchFile(videoFile);
-      if (!rawVideoData || rawVideoData.length === 0) throw new Error("Unable to read video file content");
+      setCaptionStep('Writing video buffer...');
+      const rawData = await fetchFile(videoFile);
+      if (!rawData || rawData.length === 0) throw new Error("Unable to read video file content");
       
-      // Attempt to clear previous memory before writing
-      try {
-        await ffmpeg.deleteFile(inputName);
-        await ffmpeg.deleteFile(assName);
-        await ffmpeg.deleteFile(outputName);
-      } catch (e) {}
-
-      await ffmpeg.writeFile(inputName, rawVideoData);
+      // CRITICAL: Slice(0) creates a private copy for the worker, preventing detachment of the original
+      await ffmpeg.writeFile(inputName, new Uint8Array(rawData as Uint8Array).slice(0));
       
-      setCaptionStep('Optimizing font layers...');
-      const rawFontData = await fetchFile(fontUrl);
-      await ffmpeg.writeFile(fontFileName, rawFontData);
-      // Copy to standard name as backup
-      await ffmpeg.writeFile('StyleFont.ttf', rawFontData);
+      setCaptionStep('Finalizing font layers...');
+      const rawFont = await fetchFile(fontUrl);
+      const cleanFont = new Uint8Array(rawFont as Uint8Array).slice(0);
+      await ffmpeg.writeFile(fontFileName, cleanFont);
+      await ffmpeg.writeFile('StyleFont.ttf', cleanFont);
     } catch (e: any) {
       console.error("FFmpeg storage failure:", e);
       const msg = e.message || String(e);
