@@ -862,15 +862,15 @@ const CaptionOverlay = ({
       const c2 = style.tripleBorderColors[1] || '#0047AB'; 
       const c3 = style.tripleBorderColors[2] || '#000000'; 
       
-      // Multi-layered text shadow for explicit triple border appearance - Super-thin for maximum clarity
+      // Multi-layered text shadow for explicit triple border appearance - Balanced for clarity and style
       baseStyle.textShadow = `
-        -0.3px -0.3px 0 ${c1}, 0.3px -0.3px 0 ${c1}, -0.3px 0.3px 0 ${c1}, 0.3px 0.3px 0 ${c1},
-        -0.8px -0.8px 0 ${c2}, 0.8px -0.8px 0 ${c2}, -0.8px 0.8px 0 ${c2}, 0.8px 0.8px 0 ${c2},
-        -1.5px -1.5px 0 ${c3}, 1.5px -1.5px 0 ${c3}, -1.5px 1.5px 0 ${c3}, 1.5px 1.5px 0 ${c3},
-        0 4px 8px rgba(0,0,0,0.8)
+        -0.5px -0.5px 0 ${c1}, 0.5px -0.5px 0 ${c1}, -0.5px 0.5px 0 ${c1}, 0.5px 0.5px 0 ${c1},
+        -1.2px -1.2px 0 ${c2}, 1.2px -1.2px 0 ${c2}, -1.2px 1.2px 0 ${c2}, 1.2px 1.2px 0 ${c2},
+        -2.5px -2.5px 0 ${c3}, 2.5px -2.5px 0 ${c3}, -2.5px 2.5px 0 ${c3}, 2.5px 2.5px 0 ${c3},
+        0 4px 10px rgba(0,0,0,0.8)
       `.trim().replace(/\s+/g, ' ');
       
-      (baseStyle as any).WebkitTextStroke = `0.5px ${c1}`;
+      (baseStyle as any).WebkitTextStroke = `1px ${c1}`;
       baseStyle.whiteSpace = 'nowrap';
       baseStyle.display = 'inline-block';
       baseStyle.overflow = 'visible';
@@ -2215,10 +2215,10 @@ function App() {
     // Safety timeout for auth loading
     const safetyTimer = setTimeout(() => {
       if (isAuthLoading) {
-        console.warn("Auth loading timed out, forcing app load");
+        console.warn("Auth loading timed out, unblocking UI");
         setIsAuthLoading(false);
       }
-    }, 2500); // Shorter safety timeout for better UX
+    }, 10000); // 10s safe window for potentially slow networks
 
     if (!auth) {
       setIsAuthLoading(false);
@@ -2226,42 +2226,43 @@ function App() {
       return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("Auth State Updated:", user?.email || "No User");
-      
-      // Update currentUser immediately
-      setCurrentUser(user);
-      clearTimeout(safetyTimer);
+      console.log("Auth System Sync:", user?.email || "No User Detected");
       
       if (user) {
-        // Only load if user is new or we don't have a profile
-        if (!currentUser || currentUser.uid !== user.uid || !userProfile) {
-          setIsAuthLoading(true);
-          fetchUserProfile(user).finally(() => {
+        // 1. Set user context immediately
+        setCurrentUser(user);
+        
+        // 2. Load Profile + History (Blocking Splash Screen)
+        const loadUserData = async () => {
+          try {
+            await fetchUserProfile(user);
+          } catch (e) {
+            console.error("Profile load sync error", e);
+          } finally {
             setIsAuthLoading(false);
-          });
-        } else {
-          setIsAuthLoading(false);
-        }
+            clearTimeout(safetyTimer);
+          }
+        };
+        loadUserData();
       } else {
+        // Guest Path
+        setCurrentUser(null);
         setUserProfile(null);
-        // Load guest history
+        
         const guestHistory = localStorage.getItem('voxnova_guest_history');
         if (guestHistory) {
-          try {
-            setHistory(JSON.parse(guestHistory));
-          } catch (e) {
-            setHistory([]);
-          }
+          try { setHistory(JSON.parse(guestHistory)); } catch (e) { setHistory([]); }
         } else {
           setHistory([]);
         }
+        
         setIsAuthLoading(false);
+        clearTimeout(safetyTimer);
       }
     }, (error) => {
-      console.error("Auth State Error:", error);
+      console.error("Auth Listener Error:", error);
       setIsAuthLoading(false);
       clearTimeout(safetyTimer);
-      setError("Authentication service encountered an error. Please refresh the page.");
     });
     return () => {
       unsubscribe();
@@ -2334,32 +2335,25 @@ function App() {
     if (!auth) return;
     setIsAuthLoading(true);
     try {
-      console.log("Starting Logout...");
-      // Try to sign out normally
-      await signOut(auth).catch(err => {
-        console.warn("Firebase signOut failed, forcing local cleanup", err);
-      });
+      console.log("Forcing Global Logout...");
       
-      console.log("Logout cleanup...");
-      // Always clear local state even if Firebase failed
+      // 1. Storage wipe (CRITICAL)
+      localStorage.clear(); 
+      localStorage.setItem('voxnova_logout_timestamp', Date.now().toString());
+      
+      // 2. Firebase Signout (Silent)
+      await signOut(auth).catch(() => {});
+      
+      // 3. Local state purge
       setCurrentUser(null);
       setUserProfile(null);
       setHistory([]);
       
-      // Clear sensitive storage
-      localStorage.removeItem('voxnova_user_profile');
-      localStorage.removeItem('voxnova_guest_history');
-      
-      setIsAuthLoading(false);
-      showToast("Successfully logged out");
-      // REMOVED window.location.reload() to prevent zombie loops
+      // 4. Force Redirect to Home
+      window.location.replace('/');
     } catch (err: any) {
-      console.error('Logout failed completely', err);
-      setError(`Logout failed: ${err.message || "Unknown error"}. Please refresh the page manually.`);
-      
-      // Absolute fallback
-      setCurrentUser(null);
-      setUserProfile(null);
+      console.error('Logout error:', err);
+      window.location.replace('/');
     } finally {
       setIsAuthLoading(false);
     }
@@ -2675,9 +2669,9 @@ function App() {
         }
       });
 
-      // Add 10 minute timeout for loading
+      // Set a robust timeout for slower networks (30s minimum for 30MB)
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Engine initial load timeout. Your connection might be too slow to download the 30MB engine. Please refresh or try a faster network.')), 600000)
+        setTimeout(() => reject(new Error('Engine initial load timeout. Your connection might be too slow. Please refresh or try a faster network.')), 120000)
       );
 
       await Promise.race([loadPromise, timeoutPromise]);
@@ -2748,14 +2742,14 @@ function App() {
     const c2 = style.tripleBorderColors?.[1] ? hexToAss(style.tripleBorderColors[1]) : assOutlineColor;
     const c3 = style.tripleBorderColors?.[2] ? hexToAss(style.tripleBorderColors[2]) : assShadowColor;
 
-    // Ultra-thinner layers for ASS for a crisp professional look
-    const outline = style.tripleBorder ? 1.8 : (style.strokeWidth || (style.border === 'thick' ? 5 : style.border === 'thin' ? 2 : 0));
+    // Cinematic thick layers for ASS to ensure visibility on all backgrounds
+    const outline = style.tripleBorder ? 3.5 : (style.strokeWidth || (style.border === 'thick' ? 5 : style.border === 'thin' ? 2 : 0));
     const shadow = style.tripleBorder ? 0 : (style.shadow ? 4 : 0);
     const spacing = 4; 
     
     // Scale Font size based on resolution
     const baseResY = 720;
-    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.3); // Slightly larger for video legibility
+    const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.3);
 
     let ass = `[Script Info]
 ScriptType: v4.00+
@@ -2767,9 +2761,9 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer3,${fontName},${scaledSize},${assColor},&H000000FF,${c3},&H00000000,1,0,0,0,100,100,${spacing},0,1,1.5,0,${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer2,${fontName},${scaledSize},${assColor},&H000000FF,${c2},&H00000000,1,0,0,0,100,100,${spacing},0,1,0.9,0,${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer1,${fontName},${scaledSize},${assColor},&H000000FF,${c1},&H00000000,1,0,0,0,100,100,${spacing},0,1,0.4,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer3,${fontName},${scaledSize},${assColor},&H000000FF,${c3},&H00000000,1,0,0,0,100,100,${spacing},0,1,4.5,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer2,${fontName},${scaledSize},${assColor},&H000000FF,${c2},&H00000000,1,0,0,0,100,100,${spacing},0,1,2.5,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Layer1,${fontName},${scaledSize},${assColor},&H000000FF,${c1},&H00000000,1,0,0,0,100,100,${spacing},0,1,1.0,0,${alignment},20,20,${isPortrait ? 80 : 40},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -2852,39 +2846,38 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const internalFontName = safeFontName;
     const fontUrl = fontMapping[selectedFont] || fontMapping['Inter'];
     
-    setCaptionStep('Cleaning engine memory...');
+    setCaptionStep('Rebuilding memory engine...');
     try {
       if (!ffmpeg) throw new Error("FFmpeg engine not initialized");
       
-      // Cleanup all possible temporary files
+      // Cleanup all files to prevent memory overflow
       const cleaning = [inputName, assName, outputName, 'StyleFont.ttf', fontFileName];
       for (const f of cleaning) {
         try { await ffmpeg.deleteFile(f); } catch (e) {}
       }
 
-      setCaptionStep('Writing video buffer...');
+      setCaptionStep('Processing video stream...');
       const rawData = await fetchFile(videoFile);
       if (!rawData || rawData.length === 0) throw new Error("Unable to read video file content");
       
-      // CRITICAL: Slice(0) creates a private copy for the worker, preventing detachment of the original
-      await ffmpeg.writeFile(inputName, new Uint8Array(rawData as Uint8Array).slice(0));
+      // DEEP CLONE: Triple-guaranteed fresh buffer to prevent 'already detached' errors
+      const videoBuffer = rawData.buffer ? rawData.buffer.slice(0) : rawData.slice(0);
+      const videoArray = new Uint8Array(videoBuffer);
+      // Extra safety: Create another copy just for the write operation
+      await ffmpeg.writeFile(inputName, new Uint8Array(videoArray));
       
-      setCaptionStep('Finalizing font layers...');
+      setCaptionStep('Applying layers...');
       const rawFont = await fetchFile(fontUrl);
-      const cleanFont = new Uint8Array(rawFont as Uint8Array).slice(0);
-      await ffmpeg.writeFile(fontFileName, cleanFont);
-      await ffmpeg.writeFile('StyleFont.ttf', cleanFont);
+      const fontBuffer = rawFont.buffer ? rawFont.buffer.slice(0) : rawFont.slice(0);
+      const fontArray = new Uint8Array(fontBuffer);
+      await ffmpeg.writeFile(fontFileName, new Uint8Array(fontArray));
+      await ffmpeg.writeFile('StyleFont.ttf', new Uint8Array(fontArray));
     } catch (e: any) {
-      console.error("FFmpeg storage failure:", e);
-      const msg = e.message || String(e);
-      
-      // Reset instance if buffer detachment occurs
-      if (msg.includes('detached') || msg.includes('postMessage') || msg.includes('ArrayBuffer')) {
-        ffmpegRef.current = null;
-        setIsFFmpegLoaded(false);
-      }
-      
-      throw new Error(`FFmpeg error: ${msg}. Your browser memory is full. Please refresh, close extra tabs, and use a smaller/shorter video.`);
+      console.error("FFmpeg memory failure", e);
+      // Hard reset signal
+      ffmpegRef.current = null;
+      setIsFFmpegLoaded(false);
+      throw new Error(`Memory full or Engine busy. Solution: Refresh the page and try a shorter video.`);
     }
     
     setCaptionStep('Mapping video architecture...');
@@ -4204,26 +4197,69 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         {isAuthLoading ? (
           <motion.div 
             key="auth-loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] bg-white flex flex-col items-center justify-center p-6 text-center"
+            className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-6 text-center overflow-hidden"
           >
-            <div className="w-16 h-16 border-4 border-zinc-100 border-t-emerald-500 rounded-full animate-spin mb-6" />
-            <h2 className="text-2xl font-display font-bold text-zinc-900 mb-2">VoxNova</h2>
-            <p className="text-zinc-500 font-medium animate-pulse mb-8">Authenticating with Firebase...</p>
-            
-            <div className="max-w-xs space-y-4">
-              <p className="text-[10px] text-zinc-400 uppercase tracking-widest leading-relaxed">
-                If this takes too long, your connection may be slow or blocked by firewall.
-              </p>
-              <button 
-                onClick={() => setIsAuthLoading(false)}
-                className="px-6 py-3 bg-zinc-100 text-zinc-600 rounded-2xl font-bold text-sm hover:bg-zinc-200 transition-all"
-              >
-                Continue as Guest
-              </button>
+            {/* Background Soundwave Patterns */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-10">
+              {[...Array(40)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ 
+                    height: [20, 100, 20],
+                    opacity: [0.2, 0.5, 0.2]
+                  }}
+                  transition={{ 
+                    duration: 1.5, 
+                    repeat: Infinity, 
+                    delay: i * 0.05 
+                  }}
+                  className="w-1 mx-0.5 bg-emerald-500 rounded-full"
+                />
+              ))}
             </div>
+
+            {/* VoxNova Premium Intro Animation */}
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0, scaleZ: 0 }}
+              animate={{ scale: 1, opacity: 1, scaleZ: 1 }}
+              transition={{ duration: 1, ease: [0.23, 1, 0.32, 1] }}
+              className="relative mb-12"
+            >
+              <div className="absolute inset-x-[-150px] inset-y-[-150px] bg-emerald-500/15 blur-[100px] rounded-full" />
+              <div className="w-32 h-32 bg-gradient-to-br from-emerald-600/20 to-black rounded-[3rem] flex items-center justify-center relative z-10 shadow-[0_0_80px_rgba(16,185,129,0.4)] border border-emerald-500/30">
+                <Mic className="text-white w-16 h-16 filter drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]" />
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+              className="space-y-4"
+            >
+              <h2 className="text-7xl font-display font-black text-white tracking-tighter filter drop-shadow-2xl">
+                VoxNova <span className="text-emerald-500">PRO</span>
+              </h2>
+              <p className="text-emerald-500/60 font-mono text-xs uppercase tracking-[0.8em]">Ultra High Fidelity Studio</p>
+            </motion.div>
+            
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: 300 }}
+              transition={{ delay: 0.2, duration: 2, ease: "easeInOut" }}
+              className="h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent my-12"
+            />
+
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.3 }}
+              transition={{ delay: 2.5 }}
+              className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-medium absolute bottom-12 px-8"
+            >
+              Professional AI Voice Engine • Cinematic Caption Studio
+            </motion.p>
           </motion.div>
         ) : showWelcome ? (
           <WelcomeScreen onComplete={handleWelcomeComplete} />
@@ -4552,7 +4588,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                       </svg>
                     </div>
                     <span className="text-sm font-bold text-zinc-500">
-                      {!currentUser ? 'Guest Mode (Limited)' : (isWhitelisted(currentUser?.email || '') ? 'Unlimited' : `${(userProfile?.credits || 0).toLocaleString()} credits remaining`)}
+                      {isAuthLoading ? 'Initializing VoxNova...' : (!currentUser ? 'Guest Mode (Limited)' : (isWhitelisted(currentUser?.email || '') ? 'Unlimited' : `${(userProfile?.credits || 0).toLocaleString()} credits remaining`))}
                     </span>
                   </div>
 
