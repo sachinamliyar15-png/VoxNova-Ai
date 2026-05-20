@@ -18,10 +18,15 @@ const exhaustedKeys = new Map<string, number>();
 
 const HEAVY_VOICES = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'];
 
-const markKeyAsExhausted = (key: string, isDailyLimit: boolean = false) => {
+const markKeyAsExhausted = (key: string, isDailyLimit: boolean = false, isTransient: boolean = false) => {
   if (!key) return;
-  const cooldown = isDailyLimit ? 12 * 60 * 60 * 1000 : 5 * 60 * 1000; // 12 hours for daily limit, 5 mins for per-minute
-  console.log(`[Auth] Marking API key as exhausted (${isDailyLimit ? 'Daily' : 'Transient'}): ${key.substring(0, 8)}...`);
+  
+  // Smarter cooldowns
+  let cooldown = 5 * 60 * 1000; // Default 5 mins
+  if (isDailyLimit) cooldown = 12 * 60 * 60 * 1000; // 12 hours
+  if (isTransient) cooldown = 30 * 1000; // 30 seconds for 503/Transient errors
+
+  console.log(`[Auth] Marking API key as exhausted (${isDailyLimit ? 'Daily' : isTransient ? 'Transient' : 'Quota'}): ${key.substring(0, 8)}... (Cooldown: ${cooldown/1000}s)`);
   exhaustedKeys.set(key, Date.now() + cooldown);
 };
 
@@ -691,10 +696,11 @@ app.post("/api/analyze-voice", async (req, res) => {
       const errorMessage = error.message || String(error);
       console.error(`Voice analysis Attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
-        markKeyAsExhausted(apiKey);
+      const isTransient = errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE");
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || isTransient) {
+        markKeyAsExhausted(apiKey, false, isTransient);
         attempt++;
-        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : 1000;
+        const waitTime = isTransient ? 2000 : 1000;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -875,23 +881,39 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       }
     } catch (error: any) {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
-      console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
+      console.error(`TTS Attempt ${attempt + 1} failed for voice ${voice_name}:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
+      const isQuotaError = errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED");
+      const isTransientError = errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE") || errorMessage.includes("overloaded");
+
+      if (isQuotaError || isTransientError) {
         const isDailyLimit = errorMessage.includes("limit: 10") || errorMessage.includes("daily") || errorMessage.includes("GenerateRequestsPerDay");
-        markKeyAsExhausted(apiKey, isDailyLimit);
+        markKeyAsExhausted(apiKey, isDailyLimit, isTransientError);
         attempt++;
-        // If it's a 503 error, wait a bit longer to let the spike pass
-        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : isDailyLimit ? 500 : 1000 * attempt;
+        
+        const waitTime = isTransientError ? 2000 : isDailyLimit ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       
       if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
+        console.warn(`[TTS] Model or voice not found for ${voice_name}. Retrying with another key...`);
         attempt++;
         continue;
       }
-      return res.status(500).json({ error: errorMessage });
+      
+      // If it's a safety error or block, don't mark as exhausted but fail the attempt
+      if (errorMessage.includes("SAFE") || errorMessage.includes("block") || errorMessage.includes("candidate")) {
+         return res.status(400).json({ 
+           error: "The content was flagged by the AI's safety filters. Please try modifying your text.",
+           code: "CONTENT_FLAGGED"
+         });
+      }
+
+      return res.status(500).json({ 
+        error: `Gemini TTS Error: ${errorMessage}`,
+        details: errorMessage
+      });
     }
   }
 
@@ -1120,10 +1142,11 @@ app.post("/api/generate-image", maybeAuthenticate, async (req: any, res) => {
       const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
       console.error(`Image generation attempt ${attempt + 1} failed:`, errorMessage);
       
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
-        markKeyAsExhausted(apiKey);
+      const isTransient = errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE");
+      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || isTransient) {
+        markKeyAsExhausted(apiKey, false, isTransient);
         attempt++;
-        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        const waitTime = isTransient ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -1575,9 +1598,10 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
                            errorMsg.toLowerCase().includes("overloaded");
 
       if (isOverloaded) {
-        markKeyAsExhausted(apiKey);
+        const isTransient = errorMsg.includes("503") || errorMsg.toLowerCase().includes("unavailable") || errorMsg.toLowerCase().includes("high demand") || errorMsg.toLowerCase().includes("overloaded");
+        markKeyAsExhausted(apiKey, false, isTransient);
         attempt++;
-        const delay = (errorMsg.includes("503") || errorMsg.toLowerCase().includes("unavailable") || errorMsg.toLowerCase().includes("high demand")) ? 5000 : 2000;
+        const delay = isTransient ? 5000 : 2000;
         await new Promise(r => setTimeout(r, delay));
         continue;
       }

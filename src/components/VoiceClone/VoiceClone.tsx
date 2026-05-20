@@ -92,6 +92,24 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS, onLogin }: {
       });
       
       setAnalysisProgress(60);
+      
+      if (!response.ok) {
+        let errorMsg = "Voice analysis failed";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+          } else {
+            const text = await response.text();
+            errorMsg = `Server error ${response.status}: ${text.slice(0, 100)}`;
+          }
+        } catch (e) {
+          errorMsg = `Server connection error (${response.status})`;
+        }
+        throw new Error(errorMsg);
+      }
+
       const data = await response.json();
       
       if (data.fingerprint) {
@@ -176,6 +194,24 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS, onLogin }: {
           language: 'hi'
         })
       });
+
+      if (!response.ok) {
+        let errorMsg = "Preview generation failed";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+          } else {
+            const text = await response.text();
+            errorMsg = `Server error ${response.status}: ${text.slice(0, 100)}`;
+          }
+        } catch (e) {
+          errorMsg = `Server connection error (${response.status})`;
+        }
+        throw new Error(errorMsg);
+      }
+
       const data = await response.json();
       if (data.audioData) {
         setClonedPreviewAudio(data.audioData);

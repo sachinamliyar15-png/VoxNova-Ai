@@ -230,7 +230,17 @@ const App: React.FC = () => {
         })
       });
       
-      if (!response.ok) throw new Error("Conversion failed");
+      if (!response.ok) {
+        let errorMsg = "Conversion failed";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+          }
+        } catch (e) {}
+        throw new Error(errorMsg);
+      }
       const data = await response.json();
       setVoiceChangingResult({ url: `data:audio/wav;base64,${data.audioData}`, type: 'audio' });
       setVoiceChangingProgress(100);
@@ -260,7 +270,17 @@ const App: React.FC = () => {
           language: language 
         })
       });
-      if (!response.ok) throw new Error("Preview failed");
+      if (!response.ok) {
+        let errorMsg = "Voice preview failed";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+          }
+        } catch (e) {}
+        throw new Error(errorMsg);
+      }
       const { audioData } = await response.json();
       setIsPreviewLoading(false);
       if (audioData) {
@@ -353,8 +373,11 @@ const App: React.FC = () => {
       const res = await fetch('/api/history', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
-      if (Array.isArray(data)) {
+      if (!res.ok) {
+        throw new Error(`Failed to fetch history (${res.status})`);
+      }
+      const data = await res.json().catch(() => null);
+      if (data && Array.isArray(data)) {
          setHistory(data);
       }
     } catch (err) {
@@ -592,12 +615,15 @@ const App: React.FC = () => {
         });
     
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Processing Failed' }));
-          let errorMessage = 'Failed to generate captions';
-          
-          if (errorData.error) {
-            errorMessage = typeof errorData.error === 'string' ? errorData.error : (errorData.error.message || JSON.stringify(errorData.error));
-          }
+          let errorMsg = 'Failed to generate captions';
+          try {
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              const errorData = await response.json();
+              errorMsg = errorData.error || errorMsg;
+              if (typeof errorData.error === 'object') errorMsg = errorData.error.message || JSON.stringify(errorData.error);
+            }
+          } catch (e) {}
 
           if (response.status === 503 && attempts < maxAttempts - 1) {
             attempts++;
@@ -606,7 +632,7 @@ const App: React.FC = () => {
             await new Promise(r => setTimeout(r, nextDelay));
             return performGeneration();
           }
-          throw new Error(errorMessage);
+          throw new Error(errorMsg);
         }
     
         const data = await response.json();
