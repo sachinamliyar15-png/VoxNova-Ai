@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Search, Sparkles, Crown } from 'lucide-react';
+import { Play, Search, Sparkles, Crown, Pause, Loader2, Volume2 } from 'lucide-react';
 import { Voice } from '../types';
 
 interface VoiceLibraryProps {
   onSelect: (voice: Voice) => void;
   selectedVoiceId: string;
   voices: Voice[];
+  onPreview: (voice: Voice) => void;
+  playingId: string | number | null;
+  isLoading?: boolean;
 }
 
-const VoiceLibrary: React.FC<VoiceLibraryProps> = ({ onSelect, selectedVoiceId, voices }) => {
+const VoiceLibrary: React.FC<VoiceLibraryProps> = ({ onSelect, selectedVoiceId, voices, onPreview, playingId, isLoading }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
   const filteredVoices = voices.filter(v => {
@@ -65,14 +68,41 @@ const VoiceLibrary: React.FC<VoiceLibraryProps> = ({ onSelect, selectedVoiceId, 
                 </div>
                 <div>
                   <h4 className="font-bold text-zinc-900">{voice.name}</h4>
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{voice.gender}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{voice.gender}</span>
+                    {voice.language && (
+                      <>
+                        <span className="w-1 h-1 bg-zinc-200 rounded-full" />
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{voice.language}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-              {voice.isPremium && (
-                <div className="p-1.5 bg-amber-50 text-amber-500 rounded-lg">
-                  <Crown size={14} />
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {voice.isPremium && (
+                  <div className="p-1.5 bg-amber-50 text-amber-500 rounded-lg">
+                    <Crown size={14} />
+                  </div>
+                )}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreview(voice);
+                  }}
+                  className={`p-2 rounded-xl transition-all shadow-sm active:scale-95 ${playingId === voice.id ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                >
+                  {playingId === voice.id ? (
+                    isLoading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Pause size={16} fill="currentColor" />
+                    )
+                  ) : (
+                    <Volume2 size={16} />
+                  )}
+                </button>
+              </div>
             </div>
             
             <p className="text-zinc-500 text-xs leading-relaxed mb-4 line-clamp-2">

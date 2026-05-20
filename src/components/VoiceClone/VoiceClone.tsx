@@ -30,7 +30,7 @@ interface ClonedVoice {
   createdAt: any;
 }
 
-const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneCreated: (voice: any) => void, currentUser: User | null, onNavigateToTTS: () => void }) => {
+const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS, onLogin }: { onCloneCreated: (voice: any) => void, currentUser: User | null, onNavigateToTTS: () => void, onLogin?: () => void }) => {
   const [file, setFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -429,7 +429,7 @@ const VoiceClone = ({ onCloneCreated, currentUser, onNavigateToTTS }: { onCloneC
                     <p className="text-[10px] text-amber-600">You can use this voice now, but to save it permanently in your library, you'll need to login later.</p>
                   </div>
                   <button 
-                    onClick={handleLogin}
+                    onClick={onLogin || handleLogin}
                     disabled={isLoggingIn}
                     className="px-4 py-2 bg-white text-amber-600 rounded-xl text-[10px] font-bold border border-amber-200 hover:bg-amber-100 transition-all flex items-center gap-2"
                   >

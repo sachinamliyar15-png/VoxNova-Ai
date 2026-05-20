@@ -18,6 +18,13 @@ const exhaustedKeys = new Map<string, number>();
 
 const HEAVY_VOICES = ['sultan', 'shera', 'kaal', 'bheem', 'sikandar', 'pankaj', 'virat', 'frank', 'vikram', 'munna-bhai', 'sachinboy', 'maharaja', 'emperor-pro', 'zoravar', 'rudra', 'veer', 'shakti', 'raja', 'toofan', 'bhairav'];
 
+const markKeyAsExhausted = (key: string, isDailyLimit: boolean = false) => {
+  if (!key) return;
+  const cooldown = isDailyLimit ? 12 * 60 * 60 * 1000 : 5 * 60 * 1000; // 12 hours for daily limit, 5 mins for per-minute
+  console.log(`[Auth] Marking API key as exhausted (${isDailyLimit ? 'Daily' : 'Transient'}): ${key.substring(0, 8)}...`);
+  exhaustedKeys.set(key, Date.now() + cooldown);
+};
+
 const getAvailableApiKey = () => {
   const baseKey = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
   if (!baseKey) return null;
@@ -25,11 +32,11 @@ const getAvailableApiKey = () => {
   const allKeys = Array.from(new Set(baseKey.split(',').map(k => k.trim()).filter(k => k.length > 0)));
   const now = Date.now();
   
-  // Filter out keys that are exhausted and still in the cooldown period (5 minutes)
+  // Filter out keys that are exhausted and still in the cooldown period
   const availableKeys = allKeys.filter(k => {
-    const exhaustedAt = exhaustedKeys.get(k);
-    if (!exhaustedAt) return true;
-    if (now - exhaustedAt > 300000) {
+    const expiresAt = exhaustedKeys.get(k);
+    if (!expiresAt) return true;
+    if (now > expiresAt) {
       exhaustedKeys.delete(k);
       return true;
     }
@@ -44,12 +51,6 @@ const getAvailableApiKey = () => {
   // Randomly pick an available key
   const selectedKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
   return selectedKey;
-};
-
-const markKeyAsExhausted = (key: string) => {
-  if (!key) return;
-  console.log(`[Auth] Marking API key as exhausted: ${key.substring(0, 8)}...`);
-  exhaustedKeys.set(key, Date.now());
 };
 
 // Helper to save audio data to Firestore history (with chunking for large files)
@@ -92,15 +93,15 @@ const saveToHistory = async (collectionName: string, data: any) => {
 };
 
 const buildSystemInstruction = (language: string, voice_name: string) => {
-  const isHeavyVoice = ['SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'Pankaj', 'Virat',
-  'Frank', 'VIKRAM', 'Munna Bhai', 'Sachinboy', 'MAHARAJA', 'EMPEROR PRO', 'ZORAVAR',
-  'RUDRA', 'VEER', 'SHAKTI', 'RAJA', 'TOOFAN', 'BHAIRAV'].includes(voice_name);
+  const isHeavyVoice = HEAVY_VOICES.includes(voice_name.toLowerCase());
 
   return `You are an elite, world-class professional voice actor and
 narrator. Your task is to provide a stunningly realistic, human-like, and emotionally resonant
 performance in ${language === 'hi' ? 'Hindi' : 'English'}.
 
-Your goal is to generate high-fidelity, natural, and expressive speech that rivals ElevenLabs.
+Your goal is to generate high-fidelity, natural, and expressive speech that rivals
+ElevenLabs.
+
 Analyze the script's category and tone to determine the best vocal characteristics:
 - NEWS/DOCUMENTARY: Authoritative, clear, professional, steady pace.
 - STORY/NARRATION: Expressive, rhythmic, engaging, varies pitch for characters.
@@ -109,44 +110,35 @@ Analyze the script's category and tone to determine the best vocal characteristi
 - EMOTIONAL: Deeply felt, matches the specific emotion (sad, happy, angry).
 
 PERFORMANCE GUIDELINES FOR MAXIMUM REALISM AND POWER:
-- CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any
-"nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
-- The voice should sound like it's coming from an open throat and mouth, with full lung
-support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
-- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive
-"sing-song" patterns.
-- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated
-into every word, not just added on top.
-- 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE
-MANDATORY.
-- THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING OR
-WEAK TONES.
-- USE A HIGH-ENERGY, STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A
-PROFESSIONAL SPEAKER.
-${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior, a king, or a high-end cinematic narrator. Speak with absolute authority and zero fear.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
-- Incorporate a subtle \'vocal fry\' or \'gravelly\' texture in lower registers to sound 100%
-mature and authoritative.
-- Add natural human micro-imperfections: light breaths, subtle mouth sounds, and realistic
-variations in pitch and volume to achieve 100% realism.
-- Avoid any robotic, monotone, or repetitive cadence. Every sentence should have its own
-unique melody.
-- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural
-flow, and cultural nuance.
+- CRITICAL: VOICES MUST BE OPEN, CONFIDENT, AND FULLY PROJECTED. Avoid any "nasal" (naak se bolna) or "muffled" (dabbi hui awaaz) tones.
+- The voice should sound like it's coming from an open throat and mouth, with full lung support. It must sound "Khuli Awaaz" (Open Voice) and "Damdaar" (Powerful).
+- Use natural human prosody, complex intonation, and realistic rhythm. Avoid any repetitive "sing-song" patterns.
+- Maintain a perfect balance between speed and clarity. Emotion must be deeply integrated into every word.
+- CRITICAL: Use "Micro-Emotional Nuance"—subtle shifts in pitch and intensity that reflect the internal state of the speaker.
+- Incorporate natural "Micro-Stresses" on key operative words to create an authentic human narrative arc.
+- 100% REALISM, EMOTIONAL DEPTH, AND CRYSTAL CLEAR CLARITY ARE MANDATORY.
+- THE VOICE MUST BE LOUD, POWERFUL, AND COMMANDING. NO WHISPERING.
+- USE A STUDIO-GRADE PERFORMANCE THAT SOUNDS LIKE A PROFESSIONAL SPEAKER.
+${isHeavyVoice ? '- CRITICAL: Use an ULTRA-DEEP, HEAVY, AND POWERFUL CHEST VOICE with MAXIMUM BASS RESONANCE. The voice must sound "Bhari" (Heavy), "Gambhir" (Serious/Deep), and "Damdaar" (Powerful). Sound like a legendary warrior or a king.' : '- CRITICAL: Use a DEEP, RESONANT CHEST VOICE with natural bass frequencies and high vocal projection.'}
+- Incorporate natural human micro-imperfections: light breaths between long phrases, subtle mouth sounds, and realistic variations in pitch and volume to achieve 100% realism.
+- CRITICAL: Follow an "Authentic Narrative Pacing"—allow the voice to slow down for emotional weight and speed up for excitement, just like a human actor would.
+- Use natural "Micro-Stresses" on key operative words to create an authentic human narrative arc.
+- Avoid any robotic, monotone, or repetitive cadence.
+- For ${language === 'hi' ? 'Hindi' : 'English'}, ensure perfect native pronunciation, natural flow, and cultural nuance.
 - Sound like a real person speaking in a high-end professional studio, not a computer.
-- Pay close attention to the emotional weight of the text. If the text is sad, the voice should
-sound heavy; if exciting, it should sound bright and energetic.
+- Pay close attention to the emotional weight of the text.
+- 100% REALISM IS MANDATORY.
 - Use natural emphasis on key words to convey meaning and emotion.
-- Ensure smooth, fluid transitions between sentences and ideas.
-${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible, with a rich, vibrating texture. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
+- Ensure smooth transitions between sentences and ideas.
+${isHeavyVoice ? '- The voice should sound 100% testosterone-driven—heavy, slow-paced, and cinematic. It must be the deepest, most powerful male voice possible. Sound like a "Motivation Ka Devta".' : '- The voice should sound professional, mature, and cinematic.'}
 
 TECHNICAL STANDARDS (CRITICAL FOR LONG GENERATIONS):
-- NO background noise, hums, hissing, or digital artifacts.
+- NO background noise, hums, or digital artifacts. "Resonant Core" preservation is mandatory.
 - NO robotic glitches, metallic sounds, or synthetic "buzzing".
 - NO background music, bell-like sounds, or hallucinations in the background.
-- ZERO background noise is mandatory. Audio must be 100% clean and professional.
-- Ensure crystal-clear, 48kHz studio-quality audio with ZERO compression artifacts
-throughout the entire generation.
-- If the script is long, maintain consistent tone, energy, and quality from start to finish.
+- "Anti-Clipping" performance: Maintain consistent gain but hit the peaks with energy.
+- Ensure crystal-clear, 48kHz studio-quality audio throughout the entire generation.
+- If the script is long, maintain consistent tone and quality from start to finish.
 `;
 };
 
@@ -227,19 +219,12 @@ const VOICE_TRAITS: Record<string, string> = {
   'Priyanka': 'Powerful, deep, and authoritative female voice - perfect for professional documentaries.',
   'Virat': 'Realistic, high-energy, deep masculine voice. Thick, resonant, and commanding. Professional documentary standard.',
   'Pankaj': 'Ultra-deep, chest-rattling baritone. Authoritative, serious, and 100% masculine with a slight grit.',
-  'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. High speaker projection, open-mouthed and fearless. 100% Realistic.',
-  'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. High speaker projection, loud and energetic. 100% Realistic.',
-  'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. Open throat resonance. 100% Realistic.',
-  'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. High speaker volume. 100% Realistic.',
-  'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. Open and clear projection. 100% Realistic.',
-  'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. Clear and confident. 100% Realistic.',
-  'Sachinboy': 'The Heavyweight Champion. A monstrous, chest-rattling deep baritone with explosive, fearless energy. High speaker projection, energetic and loud. 100% Realistic and Professional.',
-  'EMPEROR PRO': 'The King of Voices. The most powerful, authoritative, and legendary deep baritone ever created. Commands absolute respect. High speaker projection, open and majestic. 100% Realistic.',
-  'KABIR': 'The Storyteller. A warm, wise, and deeply resonant voice. Perfect for historical narratives and soulful storytelling. 100% Realistic.',
-  'ARYAN': 'The Fitness Coach. High-energy, sharp, and commanding. Designed for gym motivation and sports commentary. 100% Realistic.',
-  'ISHANI': 'The Elegant Narrator. Smooth, sophisticated, and professional female voice. Ideal for luxury brands and high-end documentaries. 100% Realistic.',
-  'ZORAVAR': 'The Heavyweight. An ultra-deep, chest-rattling baritone with immense power. 100% Realistic.',
-  'RUDRA': 'The Intense Narrator. Gritty, serious, and highly authoritative. Best for crime thrillers and investigative content. 100% Realistic.'
+  'SULTAN': 'The Warrior. Ultra-deep, heavy bass, commanding. Every word vibrates with power. Sound like a powerful king or a legendary wrestler. Maximum chest resonance and vocal fry. 100% Realistic.',
+  'SHERA': 'The Motivator. Aggressive, deep, and powerful. Raw testosterone-driven male voice. Extremely heavy and powerful. 100% Realistic.',
+  'KAAL': 'The Dark Voice. Mysterious, cinematic, and ultra-low frequency. Dark, mysterious, and grave undertone. Perfect for villains. 100% Realistic.',
+  'BHEEM': 'The Giant. Super-heavy baritone, larger-than-life resonance. Sounds like the ground is shaking. Deepest possible frequency. 100% Realistic.',
+  'SIKANDAR': 'The Legend. Mature, wise, and incredibly powerful. Rich bass for professional and authoritative narration. Respectful yet commanding. 100% Realistic.',
+  'VIKRAM': 'The Dark Narrator. Mysterious, deep, smooth, and cinematic. Dark, mysterious undertone. 100% Realistic.'
 };
 
 
@@ -654,139 +639,135 @@ const checkGuestLimit = (ip: string, isPremium: boolean = false) => {
 // Generate Speech via Gemini API (Guest) - VOXNOVA_GUEST_EP
 app.post("/api/generate-speech-guest", async (req: any, res) => {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type } = req.body;
+      const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type, targetSampleRate } = req.body;
+      
+      const premiumVoices = ['Documentary Pro', 'Virat', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'MAHARAJA', 'Sachinboy', 'Munna Bhai', 'Pankaj', 'Priyanka', 'ISHANI'];
+      const isPremium = premiumVoices.includes(voice_name);
 
-  const premiumVoices = ['Documentary Pro', 'Virat', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'MAHARAJA', 'Sachinboy', 'Munna Bhai', 'Pankaj', 'Priyanka', 'ISHANI'];
-  const isPremium = premiumVoices.includes(voice_name);
+      const limitCheck = checkGuestLimit(ip, isPremium);
+      
+      if (!limitCheck.allowed) {
+        if (limitCheck.reason === "PREMIUM_TRIAL_EXHAUSTED") {
+          return res.status(403).json({ 
+            error: "Premium voice trial exhausted (3/3). Please sign up to get 20,000 free monthly credits and continue using high-quality professional voices!" 
+          });
+        }
+        return res.status(429).json({ 
+          error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
+        });
+      }
+      
+      if (!text) {
+        return res.status(400).json({ error: "Text is required" });
+      }
 
-  const limitCheck = checkGuestLimit(ip, isPremium);
-  
-  if (!limitCheck.allowed) {
-    if (limitCheck.reason === "PREMIUM_TRIAL_EXHAUSTED") {
-      return res.status(403).json({ 
-        error: "Premium voice trial exhausted (3/3). Please sign up to get 20,000 free monthly credits and continue using high-quality professional voices!" 
-      });
-    }
-    return res.status(429).json({ 
-      error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
+      // Limit text length for guests to prevent abuse
+      if (text.length > 300) {
+        return res.status(400).json({ error: "Guest scripts are limited to 300 characters. Please sign up for longer scripts." });
+      }
+
+      const maxRetries = 3;
+      let attempt = 0;
+
+      while (attempt < maxRetries) {
+        const apiKey = getAvailableApiKey();
+        
+        if (!apiKey) {
+          return res.status(503).json({ 
+            error: "All Gemini API keys are currently exhausted.",
+            code: "QUOTA_EXHAUSTED"
+          });
+        }
+
+        try {
+          const ai = new GoogleGenAI({ apiKey });
+          
+          const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
+          const systemInstruction = buildSystemInstruction(language, voice_name);
+          
+          let promptPrefix = "";
+          const currentVoiceTrait = VOICE_TRAITS[voice_name] || '';
+          if (currentVoiceTrait) promptPrefix += `${currentVoiceTrait} `;
+
+          if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
+          else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
+          else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
+          else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
+
+          promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
+          if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
+          else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
+          else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
+          else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
+          else promptPrefix += "Speak at a natural, medium pace. ";
+
+          if (pause > 0.1) {
+            promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
+          }
+          
+          // Parallel Chunking for Guests too
+          const CHUNK_SIZE = 800;
+          const chunks: string[] = [];
+          if (text.length > CHUNK_SIZE) {
+            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+            let currentChunk = "";
+            for (const sentence of sentences) {
+              if ((currentChunk + sentence).length > CHUNK_SIZE && currentChunk.length > 0) {
+                chunks.push(currentChunk.trim());
+                currentChunk = sentence;
+              } else {
+                currentChunk += sentence;
+              }
+            }
+            if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
+          } else {
+            chunks.push(text);
+          }
+
+          const audioChunks: Buffer[] = [];
+          const CONCURRENCY = 10;
+
+          for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+            const batch = chunks.slice(i, i + CONCURRENCY);
+            const batchPromises = batch.map(async (chunk, idx) => {
+              const currentPrompt = `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}`;
+
+              const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash-tts",
+                contents: [{ parts: [{ text: currentPrompt }] }],
+                config: {
+                  responseModalities: [Modality.AUDIO],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName: targetVoice as any },
+                    },
+                  },
+                },
+              });
+
+              const base64 = (response as any).audioData || (response as any).inlineData?.data || response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+              if (base64) return Buffer.from(base64, 'base64');
+              return null;
+            });
+
+            const results = await Promise.all(batchPromises);
+            results.forEach(r => { if (r) audioChunks.push(r); });
+          }
+
+          if (audioChunks.length === 0) throw new Error("No audio data generated");
+
+          const mergedPcm = Buffer.concat(audioChunks);
+          const sampleRate = 24000;
+          const wavBuffer = addWavHeader(mergedPcm, sampleRate);
+          return res.json({ audioData: wavBuffer.toString('base64') });
+
+        } catch (error: any) {
+          attempt++;
+          if (attempt >= maxRetries) return res.status(500).json({ error: error.message });
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
     });
-  }
-  
-  if (!text) {
-    return res.status(400).json({ error: "Text is required" });
-  }
-
-  // Limit text length for guests to prevent abuse - Increased to 300 characters
-  if (text.length > 300) {
-    return res.status(400).json({ error: "Guest scripts are limited to 300 characters for optimal performance. Please sign up for longer scripts." });
-  }
-
-  const maxRetries = 3; // Reduced to prevent long timeouts
-  let attempt = 0;
-
-  while (attempt < maxRetries) {
-    const apiKey = getAvailableApiKey();
-    
-    if (!apiKey) {
-      return res.status(503).json({ 
-        error: "All Gemini API keys are currently exhausted. If you are using the free tier, you may have reached your daily limit of 10 requests. Please try again tomorrow or add more API keys in the settings.",
-        code: "QUOTA_EXHAUSTED"
-      });
-    }
-
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
-      const systemInstruction = buildSystemInstruction(language, voice_name);
-      
-      let promptPrefix = "";
-      const currentVoiceTrait = VOICE_TRAITS[voice_name] || '';
-      if (currentVoiceTrait) promptPrefix += `${currentVoiceTrait} `;
-
-      if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
-      else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
-      else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
-      else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
-      else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
-
-      promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      
-      if (speed >= 1.4) {
-        promptPrefix += "PERFORMANCE: Deliver an ultra-fast, professional, and high-energy narration. Maintain crystal clear articulation. ";
-      } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a brisk, energetic, and professional narration. ";
-      } else if (speed <= 0.7) {
-        promptPrefix += "PERFORMANCE: Deliver a slow, deliberate, and steady narration. ";
-      } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a calm, relaxed, and clear narration. ";
-      } else {
-        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced. ";
-      }
-
-      if (pause > 0.1) {
-        promptPrefix += `Add a natural pause of exactly ${pause} seconds between sentence and major phrase to ensure clarity and professional pacing. `;
-      }
-      
-      promptPrefix += `
-      TECHNICAL STANDARDS (MANDATORY):
-      - Audio must be 100% clean with ZERO background noise, ZERO hissing, and ZERO static.
-      - Ensure crystal-clear, 48kHz studio-quality articulation with ZERO digital artifacts.
-      - Performance must be 100% human-like, resonant, and emotionally balanced.
-      `;
-
-      const currentPrompt = attempt === 0 
-        ? `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${text}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. Respect all punctuation and deliver the script with natural, professional flow.`
-        : `CRITICAL: The previous attempt sounded slightly robotic or off-pacing. Please deliver a MORE HUMAN, MORE REALISTIC, and MORE RESONANT performance in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: currentPrompt }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: targetVoice as any },
-            },
-          },
-        },
-      });
-
-
-      const audioData = (response as any).audioData || (response as any).inlineData?.data || response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (audioData) {
-        const pcmBuffer = Buffer.from(audioData, 'base64');
-        const wavBuffer = addWavHeader(pcmBuffer, 24000);
-        return res.json({ audioData: wavBuffer.toString('base64') });
-      } else {
-        throw new Error("No audio data generated");
-      }
-    } catch (error: any) {
-      const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
-      console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
-      
-      if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
-        markKeyAsExhausted(apiKey);
-        attempt++;
-        // If it's a 503 error, wait a bit longer to let the spike pass
-        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        continue;
-      }
-      
-      if (errorMessage.includes("404") || errorMessage.includes("NOT_FOUND")) {
-        attempt++;
-        continue;
-      }
-      return res.status(500).json({ error: errorMessage });
-    }
-  }
-
-  res.status(503).json({ 
-    error: "Failed to generate speech after multiple attempts. All keys might be exhausted.",
-    code: "QUOTA_EXHAUSTED"
-  });
-});
 
 // Analyze voice sample for cloning
 app.post("/api/analyze-voice", async (req, res) => {
@@ -853,7 +834,7 @@ app.post("/api/analyze-voice", async (req, res) => {
 
 // Update the Generate Speech logic to handle cloned voices
 app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
-  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type } = req.body;
+  const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type, targetSampleRate } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
@@ -909,24 +890,16 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
       else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
       else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
-      else promptPrefix += "Use a natural, medium, and perfectly balanced pitch. ";
 
       promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-      
-      if (speed >= 1.4) {
-        promptPrefix += "PERFORMANCE: Deliver an ultra-fast, professional, and high-energy narration. Maintain crystal clear articulation. ";
-      } else if (speed > 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a brisk, energetic, and professional narration. ";
-      } else if (speed <= 0.7) {
-        promptPrefix += "PERFORMANCE: Deliver a slow, deliberate, and steady narration. ";
-      } else if (speed < 1.0) {
-        promptPrefix += "PERFORMANCE: Deliver a calm, relaxed, and clear narration. ";
-      } else {
-        promptPrefix += "PERFORMANCE: Deliver a perfectly NATURAL human pace. Do NOT slow down or stretch words. The delivery must be conversational, realistic, and balanced. ";
-      }
+      if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
+      else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
+      else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
+      else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
+      else promptPrefix += "Speak at a natural, medium pace. ";
 
-      if (pause > 0) {
-        promptPrefix += `Add a natural pause of exactly ${pause} seconds between sentence and major phrase to ensure clarity and professional pacing. `;
+      if (pause > 0.1) {
+        promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
       }
       
       promptPrefix += `
@@ -962,11 +935,11 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
         const batch = chunks.slice(i, i + CONCURRENCY);
         const batchPromises = batch.map(async (chunk, idx) => {
           const currentPrompt = attempt === 0 
-            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}\n\nCRITICAL: Some voices have a naturally faster or slower base pace. You MUST adjust the character's natural speed to ensure the FINAL output matches the requested ${speed}x speed perfectly. Respect all punctuation and deliver the script with natural, professional flow.`
-            : `CRITICAL: The previous attempt sounded slightly robotic or off-pacing. Please deliver a MORE HUMAN, MORE REALISTIC, and MORE RESONANT performance in ${language === 'hi' ? 'Hindi' : 'English'}. Use natural breathing and prosody:\n\n${text}`;
+            ? `${systemInstruction}\n\n${cloned_voice_traits ? `TARGET VOCAL IDENTITY FINGERPRINT (CRITICAL):\n${cloned_voice_traits}\n\n` : ''}${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}`
+            : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance in ${language === 'hi' ? 'Hindi' : 'English'}. Focus on micro-stresses, natural breath intakes between phrases, and authentic prosody. Avoid any synthetic cadence:\n\n${chunk}`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-3.1-flash-tts-preview",
+            model: "gemini-2.5-flash-tts",
             contents: [{ parts: [{ text: currentPrompt }] }],
             config: {
               responseModalities: [Modality.AUDIO],
@@ -992,7 +965,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
 
       // Merge PCM chunks
       const mergedPcm = Buffer.concat(audioChunks);
-      const SAMPLE_RATE = 24000;
+      const SAMPLE_RATE = 24000; // Gemini TTS outputs 24kHz. Forcing header to match.
       const wavBuffer = addWavHeader(mergedPcm, SAMPLE_RATE);
       const audioData = wavBuffer.toString('base64');
 
@@ -1025,10 +998,11 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
       console.error(`TTS Attempt ${attempt + 1} failed:`, errorMessage);
       
       if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
-        markKeyAsExhausted(apiKey);
+        const isDailyLimit = errorMessage.includes("limit: 10") || errorMessage.includes("daily") || errorMessage.includes("GenerateRequestsPerDay");
+        markKeyAsExhausted(apiKey, isDailyLimit);
         attempt++;
         // If it's a 503 error, wait a bit longer to let the spike pass
-        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : isDailyLimit ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -1143,7 +1117,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const ttsSystemInstruction = buildSystemInstruction(targetLanguage === 'Hindi' ? 'hi' : 'en', voice_id);
       
       const ttsResponse = await ai.models.generateContent({
-        model: "gemini-3.1-flash-tts-preview",
+        model: "gemini-2.5-flash-tts",
         contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\nMIMIC EMOTION: ${performanceTraits}\n\nVOICE IDENTITY: ${profile_desc}\n\nSCRIPT: ${transcribedText}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1175,7 +1149,8 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
                           errorMessage.includes("404");
 
       if (isRetryable) {
-        if (errorMessage.includes("exhausted")) markKeyAsExhausted(apiKey);
+        const isDailyLimit = errorMessage.includes("limit: 10") || errorMessage.includes("daily") || errorMessage.includes("GenerateRequestsPerDay");
+        markKeyAsExhausted(apiKey, isDailyLimit);
         attempt++;
         await new Promise(r => setTimeout(r, 1000));
         continue;
@@ -1339,7 +1314,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
       const previewText = languagePreviews[voice_id] || (req.body.language === 'ta' ? languagePreviews['tamil-preview'] : `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`);
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-tts-preview",
+        model: "gemini-2.5-flash-tts",
         contents: [{ parts: [{ text: previewText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1362,9 +1337,10 @@ app.post("/api/preview-voice", async (req: any, res) => {
       console.error(`Preview voice attempt ${attempt + 1} failed:`, errorMessage);
       
       if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("exhausted") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) {
-        markKeyAsExhausted(apiKey);
+        const isDailyLimit = errorMessage.includes("limit: 10") || errorMessage.includes("daily") || errorMessage.includes("GenerateRequestsPerDay");
+        markKeyAsExhausted(apiKey, isDailyLimit);
         attempt++;
-        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : (errorMessage.includes("limit: 10") || errorMessage.includes("day")) ? 500 : 1000 * attempt;
+        const waitTime = (errorMessage.includes("503") || errorMessage.includes("UNAVAILABLE")) ? 2000 : isDailyLimit ? 500 : 1000 * attempt;
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }

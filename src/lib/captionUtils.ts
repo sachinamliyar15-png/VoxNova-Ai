@@ -132,6 +132,10 @@ export const generateASS = (words: CaptionWord[], style: CaptionStyle, videoWidt
   const baseResY = 720;
   const scaledSize = Math.round(style.fontSize * (videoHeight / baseResY) * 1.3);
 
+  // Calculate vertical margin from bottom (Alignment 2)
+  const yPosPercent = style.yPos || 85; 
+  const marginV = Math.round(videoHeight * (1 - yPosPercent / 100)) - (scaledSize / 2);
+
   let ass = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${videoWidth}
@@ -141,10 +145,10 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColor, SecondaryColor, OutlineColor, BackColor, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer3,${fontName},${scaledSize},${assColor},&H000000FF,${c3},&H00000000,1,0,0,0,100,100,${spacing},0,1,4.5,0,${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer2,${fontName},${scaledSize},${assColor},&H000000FF,${c2},&H00000000,1,0,0,0,100,100,${spacing},0,1,2.5,0,${alignment},20,20,${isPortrait ? 80 : 40},1
-Style: Layer1,${fontName},${scaledSize},${assColor},&H000000FF,${c1},&H00000000,1,0,0,0,100,100,${spacing},0,1,1.0,0,${alignment},20,20,${isPortrait ? 80 : 40},1
+Style: Default,${fontName},${scaledSize},${assColor},&H000000FF,${assOutlineColor},${assShadowColor},1,0,0,0,100,100,${spacing},0,1,${outline},${shadow},${alignment},20,20,${marginV},1
+Style: Layer3,${fontName},${scaledSize},${assColor},&H000000FF,${c3},&H00000000,1,0,0,0,100,100,${spacing},0,1,4.5,0,${alignment},20,20,${marginV},1
+Style: Layer2,${fontName},${scaledSize},${assColor},&H000000FF,${c2},&H00000000,1,0,0,0,100,100,${spacing},0,1,2.5,0,${alignment},20,20,${marginV},1
+Style: Layer1,${fontName},${scaledSize},${assColor},&H000000FF,${c1},&H00000000,1,0,0,0,100,100,${spacing},0,1,1.0,0,${alignment},20,20,${marginV},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -194,7 +198,8 @@ export const burnCaptions = async (
     'Poppins': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf',
     'Montserrat': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat-Bold.ttf',
     'Rajdhani': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/rajdhani/Rajdhani-Bold.ttf',
-    'Bangers': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bangers/Bangers-Regular.ttf'
+    'Bangers': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bangers/Bangers-Regular.ttf',
+    'Luckiest Guy': 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/luckiestguy/LuckiestGuy-Regular.ttf'
   };
 
   try {
@@ -202,16 +207,18 @@ export const burnCaptions = async (
     try {
       await ffmpeg.deleteFile('input.mp4');
       await ffmpeg.deleteFile('output.mp4');
-      await ffmpeg.deleteFile('captions.ass');
+      await ffmpeg.deleteFile('subtitles.ass');
       await ffmpeg.deleteFile('font.ttf');
     } catch (e) { /* ignore */ }
 
     // 2. Write video file
-    await ffmpeg.writeFile('input.mp4', await fetchFile(videoFile));
+    const videoData = await fetchFile(videoFile);
+    await ffmpeg.writeFile('input.mp4', videoData);
     
     // 3. Download and write font
     const fontUrl = fontMapping[fontName] || fontMapping['Inter'];
     const fontRes = await fetch(fontUrl);
+    if (!fontRes.ok) throw new Error(`Failed to download font: ${fontName}`);
     const fontData = new Uint8Array(await fontRes.arrayBuffer());
     await ffmpeg.writeFile('font.ttf', fontData);
     
@@ -235,24 +242,28 @@ export const burnCaptions = async (
     // 6. Progress monitoring
     let currentProgress = 0;
     const logHandler = ({ message }: { message: string }) => {
+      // console.log("FFmpeg Log:", message);
       const timeMatch = message.match(/time=(\d+:\d+:\d+.\d+)/);
       if (timeMatch && onProgress) {
-        currentProgress = Math.min(95, currentProgress + 0.2);
+        currentProgress = Math.min(95, currentProgress + 0.5);
         onProgress(currentProgress);
       }
     };
     ffmpeg.on('log', logHandler);
 
     // 7. Execute burn
-    // Use subtitles filter with fontsdir for highest compatibility in WASM
+    // Use FONTCONFIG_FILE env variable for the ass filter
     await ffmpeg.exec([
       '-i', 'input.mp4',
-      '-vf', 'subtitles=subtitles.ass:fontsdir=.',
+      '-vf', 'ass=subtitles.ass',
       '-preset', 'ultrafast',
       '-c:v', 'libx264',
       '-c:a', 'copy',
       'output.mp4'
-    ]);
+    ], {
+      // @ts-ignore
+      env: { FONTCONFIG_FILE: '/fonts.conf' }
+    });
 
     ffmpeg.off('log', logHandler);
     if (onProgress) onProgress(100);

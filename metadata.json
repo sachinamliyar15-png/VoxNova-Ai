@@ -3,5 +3,8 @@
   "description": "Professional AI Voice Generator for high-quality, studio-grade narrations in Hindi and English. Create viral content with advanced speech synthesis.",
   "requestFramePermissions": [
     "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }

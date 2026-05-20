@@ -54,7 +54,7 @@ import AboutSections from './components/AboutSections';
 // Firebase
 import { collection, query, orderBy, getDocs, doc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db, auth, googleProvider } from './firebase';
-import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -111,7 +111,7 @@ const App: React.FC = () => {
   const [style, setStyle] = useState('normal');
   const [speed, setSpeed] = useState(1);
   const [pitch, setPitch] = useState(1);
-  const [pause, setPause] = useState(0);
+  const [pause, setPause] = useState(0.5);
   const [audioFormat, setAudioFormat] = useState<'wav' | 'mp3'>('wav');
   const [targetSampleRate, setTargetSampleRate] = useState(44100);
   const [language, setLanguage] = useState('hi');
@@ -154,6 +154,7 @@ const App: React.FC = () => {
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [voiceChangingFile, setVoiceChangingFile] = useState<File | null>(null);
   const [voiceChangingResult, setVoiceChangingResult] = useState<any>(null);
@@ -179,7 +180,7 @@ const App: React.FC = () => {
   const handleResetSettings = () => {
     setSpeed(1);
     setPitch(1);
-    setPause(0);
+    setPause(0.5);
     setStyle('normal');
     setAudioFormat('wav');
     setTargetSampleRate(44100);
@@ -246,8 +247,9 @@ const App: React.FC = () => {
   const ffmpegRef = useRef<any>(null);
 
   const handlePreviewVoice = async (voice: Voice) => {
-    if (previewingVoiceId) return;
+    if (previewingVoiceId || isPreviewLoading) return;
     setPreviewingVoiceId(voice.id);
+    setIsPreviewLoading(true);
     try {
       const response = await fetch('/api/preview-voice', {
         method: 'POST',
@@ -260,13 +262,17 @@ const App: React.FC = () => {
       });
       if (!response.ok) throw new Error("Preview failed");
       const { audioData } = await response.json();
+      setIsPreviewLoading(false);
       if (audioData) {
         const audio = new Audio(`data:audio/wav;base64,${audioData}`);
         audio.onended = () => setPreviewingVoiceId(null);
         audio.play();
+      } else {
+        setPreviewingVoiceId(null);
       }
     } catch (err) {
       setPreviewingVoiceId(null);
+      setIsPreviewLoading(false);
     }
   };
 
@@ -291,9 +297,34 @@ const App: React.FC = () => {
 
   // Auth Observer
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    // Check for redirect result in case popup was blocked/redirect used
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          console.log("Logged in via redirect");
+        }
+      } catch (err: any) {
+        if (err.code === 'auth/popup-blocked') {
+          setError("Sign-in popup blocked. Please allow popups or try again.");
+        }
+      }
+    };
+    checkRedirect();
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
+        // Ensure profile exists on backend
+        try {
+          const token = await user.getIdToken();
+          await fetch('/api/user/profile', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        } catch (e) {
+          console.error("Failed to ensure profile creation", e);
+        }
+        
         fetchUserProfile(user);
         fetchHistory(user);
       } else {
@@ -333,11 +364,27 @@ const App: React.FC = () => {
 
   // Handlers
   const handleLogin = async () => {
+    setIsAuthLoading(true);
     try {
+      // Try popup first
       await signInWithPopup(auth, googleProvider);
-    } catch (err) {
-      console.error('Login failed', err);
+    } catch (err: any) {
+      console.error('Login failed with popup, trying redirect...', err);
+      // Support fallback if popups are blocked by browser/iframe
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (reErr: any) {
+          console.error('Redirect login also failed', reErr);
+          setError(`Login failed: ${reErr.message}`);
+          setIsAuthLoading(false);
+        }
+      } else {
+        setError(`Login failed: ${err.message}`);
+        setIsAuthLoading(false);
+      }
     }
+    // isAuthLoading will be set to false by onAuthStateChanged if successful
   };
 
   const handleLogout = async () => {
@@ -357,19 +404,20 @@ const App: React.FC = () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch('/api/generate', {
+      const response = await fetch('/api/generate-speech', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           text,
-          voice_id: selectedVoice.id,
           voice_name: selectedVoice.name,
           style,
           speed,
           pitch,
           language,
-          studio_clarity: studioClarity,
-          is_guest: !currentUser
+          pause,
+          audioFormat,
+          targetSampleRate,
+          studioClarity: studioClarity,
         })
       });
 
@@ -378,17 +426,28 @@ const App: React.FC = () => {
         throw new Error(errData.error || "Generation failed");
       }
 
-      const { audioData, historyId } = await response.json();
-      setCurrentAudio(audioData);
-      setLastGeneration({
-        id: historyId,
+      const { audioData } = await response.json();
+      const audioUrl = `data:audio/wav;base64,${audioData}`;
+      setCurrentAudio(audioUrl);
+      
+      // Initialize and play audio element
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.load();
+        audioRef.current.play().catch(e => console.warn("Auto-play blocked by browser:", e));
+      }
+      
+      const newGeneration = {
+        id: Date.now(),
         text,
         voice_name: selectedVoice.name,
         voice_color: selectedVoice.color,
         style,
         language,
         created_at: new Date().toISOString()
-      });
+      };
+      
+      setLastGeneration(newGeneration);
       fetchHistory();
     } catch (err: any) {
       setError(err.message);
@@ -409,25 +468,17 @@ const App: React.FC = () => {
       
       if (audioRef.current) {
         audioRef.current.pause();
+        // Since server already adds RIFF header, we just use it directly
+        const audioUrl = data.startsWith('data:') ? data : `data:audio/wav;base64,${data}`;
+        audioRef.current.src = audioUrl;
+        audioRef.current.load();
+        setPlayingId(item.id);
+        setCurrentAudio(audioUrl);
+        audioRef.current.play();
+        audioRef.current.onended = () => {
+          setPlayingId(null);
+        };
       }
-      
-      const pcmBuffer = base64ToArrayBuffer(data);
-      const wavHeader = createWavHeader(pcmBuffer, 24000);
-      const combined = new Uint8Array(wavHeader.byteLength + pcmBuffer.byteLength);
-      combined.set(new Uint8Array(wavHeader), 0);
-      combined.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
-      
-      const blob = new Blob([combined], { type: 'audio/wav' });
-      const url = URL.createObjectURL(blob);
-      
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      setPlayingId(item.id);
-      audio.play();
-      audio.onended = () => {
-        setPlayingId(null);
-        URL.revokeObjectURL(url);
-      };
     } catch (err) {
       console.error("Playback failed", err);
     }
@@ -573,7 +624,51 @@ const App: React.FC = () => {
     setTimeout(() => setShowShareToast(false), 3000);
   };
 
-  const isWhitelisted = (email: string) => email === 'pankajchoudhary.pc71@gmail.com';
+  const isWhitelisted = (email: string) => ['sachinamliyar15@gmail.com', 'amliyarsachin248@gmail.com'].includes(email);
+
+  // Audio event listeners for tracking time and duration
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => setAudioCurrentTime(audio.currentTime);
+    const handleDurationChange = () => {
+      if (!isNaN(audio.duration) && audio.duration !== Infinity) {
+        setAudioDuration(audio.duration);
+      }
+    };
+    const handleLoadedMetadata = () => {
+      if (!isNaN(audio.duration) && audio.duration !== Infinity) {
+        setAudioDuration(audio.duration);
+      }
+    };
+    const handleCanPlay = () => {
+      if (!isNaN(audio.duration) && audio.duration !== Infinity) {
+        setAudioDuration(audio.duration);
+      }
+    };
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('durationchange', handleDurationChange);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('durationchange', handleDurationChange);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, []);
 
   return (
     <ErrorBoundary>
@@ -583,7 +678,7 @@ const App: React.FC = () => {
             key="auth-loading"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-6 text-center overflow-hidden"
+            className="fixed inset-0 z-[1000] bg-white flex flex-col items-center justify-center p-6 text-center overflow-hidden"
           >
             {/* Background Soundwave Patterns */}
             <div className="absolute inset-0 flex items-center justify-center opacity-10">
@@ -611,9 +706,9 @@ const App: React.FC = () => {
               transition={{ duration: 1, ease: [0.23, 1, 0.32, 1] }}
               className="relative mb-12"
             >
-              <div className="absolute inset-x-[-150px] inset-y-[-150px] bg-emerald-500/15 blur-[100px] rounded-full" />
-              <div className="w-32 h-32 bg-gradient-to-br from-emerald-600/20 to-black rounded-[3rem] flex items-center justify-center relative z-10 shadow-[0_0_80px_rgba(16,185,129,0.4)] border border-emerald-500/30">
-                <Mic className="text-white w-16 h-16 filter drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]" />
+              <div className="absolute inset-x-[-150px] inset-y-[-150px] bg-emerald-500/5 blur-[100px] rounded-full" />
+              <div className="w-32 h-32 bg-zinc-900 rounded-[3rem] flex items-center justify-center relative z-10 shadow-2xl shadow-emerald-500/10 border border-zinc-100">
+                <Mic className="text-white w-16 h-16" />
               </div>
             </motion.div>
             
@@ -623,10 +718,10 @@ const App: React.FC = () => {
               transition={{ delay: 0.5, duration: 0.8 }}
               className="space-y-4"
             >
-              <h2 className="text-7xl font-display font-black text-white tracking-tighter filter drop-shadow-2xl">
+              <h2 className="text-7xl font-display font-black text-zinc-900 tracking-tighter">
                 VoxNova <span className="text-emerald-500">PRO</span>
               </h2>
-              <p className="text-emerald-500/60 font-mono text-xs uppercase tracking-[0.8em]">Ultra High Fidelity Studio</p>
+              <p className="text-emerald-600 font-mono text-xs uppercase tracking-[0.8em] font-bold">Ultra High Fidelity Studio</p>
             </motion.div>
             
             <motion.div
@@ -718,6 +813,7 @@ const App: React.FC = () => {
                     setLastGeneration={setLastGeneration}
                     setCurrentAudio={setCurrentAudio}
                     handlePreviewVoice={handlePreviewVoice}
+                    isPreviewLoading={isPreviewLoading}
                   />
                 )}
                 {activeTab === 'captions' && (
@@ -766,11 +862,15 @@ const App: React.FC = () => {
                     onSelect={(v) => { setSelectedVoice(v); setActiveTab('generate'); setShowVoiceLibrary(false); }}
                     selectedVoiceId={selectedVoice.id}
                     voices={VOICES}
+                    onPreview={handlePreviewVoice}
+                    playingId={previewingVoiceId}
+                    isLoading={isPreviewLoading}
                   />
                 )}
                 {activeTab === 'voice-clone' && (
                   <VoiceClone 
                     currentUser={currentUser}
+                    onLogin={handleLogin}
                     onCloneCreated={(voice) => {
                       setClonedVoices(prev => [voice, ...prev]);
                       setSelectedVoice(voice);
@@ -841,6 +941,35 @@ const App: React.FC = () => {
               playingId={playingId} playFromHistory={playFromHistory}
               deleteHistoryItem={(id) => {}} downloadAudio={downloadAudioLocal}
             />
+
+            <AnimatePresence>
+              {showVoiceLibrary && (
+                <div className="fixed inset-0 z-[1001] bg-white flex flex-col md:p-8">
+                  <div className="flex justify-between items-center p-6 border-b border-zinc-100">
+                    <h2 className="text-xl font-bold">Voice Library</h2>
+                    <button 
+                      onClick={() => setShowVoiceLibrary(false)}
+                      className="p-2 hover:bg-zinc-100 rounded-full transition-all"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                    <VoiceLibrary 
+                      onSelect={(v) => { 
+                        setSelectedVoice(v); 
+                        setShowVoiceLibrary(false); 
+                      }}
+                      selectedVoiceId={selectedVoice.id}
+                      voices={VOICES}
+                      onPreview={handlePreviewVoice}
+                      playingId={previewingVoiceId}
+                      isLoading={isPreviewLoading}
+                    />
+                  </div>
+                </div>
+              )}
+            </AnimatePresence>
             
             <AnimatePresence>
               {isPricingModalOpen && (
@@ -877,6 +1006,8 @@ const App: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+            {/* Hidden Audio Element */}
+            <audio ref={audioRef} className="hidden" />
           </div>
         )}
       </AnimatePresence>

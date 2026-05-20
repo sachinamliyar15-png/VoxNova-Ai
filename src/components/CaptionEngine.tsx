@@ -201,7 +201,7 @@ const CaptionEngine: React.FC<CaptionEngineProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-4 md:p-6 rounded-[2.5rem] md:rounded-[3rem] border border-zinc-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all relative">
+          <div className="bg-white p-4 md:p-6 rounded-[2.5rem] md:rounded-[3rem] border border-zinc-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all relative">
             {videoFile && (
               <div className="flex justify-between items-center mb-6 px-2">
                 <div className="flex items-center gap-3">
@@ -337,7 +337,7 @@ const CaptionEngine: React.FC<CaptionEngineProps> = ({
           </div>
 
           <div className="space-y-4">
-            <div className="bg-white p-6 rounded-[2.5rem] border border-zinc-100 shadow-sm flex items-center justify-between">
+            <div className="bg-white p-6 rounded-[2.5rem] border border-zinc-200 shadow-sm flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
                   <Languages size={24} />
@@ -365,7 +365,7 @@ const CaptionEngine: React.FC<CaptionEngineProps> = ({
             </button>
           </div>
 
-          <div className="bg-white p-6 rounded-[2.5rem] border border-zinc-100 shadow-sm space-y-6">
+          <div className="bg-white p-6 rounded-[2.5rem] border border-zinc-200 shadow-sm space-y-6">
             <div className="flex items-center gap-2.5 px-1">
               <div className="w-5 h-5 text-[#22C55E]">
                 <Globe size={18} />
@@ -471,15 +471,25 @@ const CaptionEngine: React.FC<CaptionEngineProps> = ({
                         className={`flex flex-col items-center gap-2 p-1.5 rounded-3xl border-2 transition-all group relative ${
                           selectedPresetId === preset.id 
                             ? 'border-emerald-500 bg-emerald-50/80 shadow-md scale-[1.02]' 
-                            : 'bg-white border-zinc-100 hover:border-emerald-100'
+                            : 'bg-white border-zinc-200 hover:border-emerald-100'
                         }`}
                       >
                         <div className="w-full aspect-[1.7/1] bg-zinc-950 rounded-xl flex items-center justify-center p-2.5 relative overflow-hidden shadow-lg border border-zinc-800">
                             <motion.div 
-                              animate={preset.animation === 'glow' ? { opacity: [1, 0.7, 1] } : 
-                                       preset.animation === 'pop' ? { scale: [0.9, 1.1, 0.9] } : 
-                                       preset.animation === 'bounce' ? { y: [0, -3, 0] } : {}}
-                              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                              animate={{
+                                scale: preset.animation === 'pop' ? [1, 1.2, 1] : 
+                                       preset.animation === 'bounce' ? [1, 1.1, 1] :
+                                       [1, 1.05, 1],
+                                y: preset.animation === 'bounce' ? [0, -4, 0] : 
+                                   preset.animation === 'slide' ? [0, -2, 0] : 0,
+                                opacity: preset.animation === 'glow' ? [1, 0.6, 1] : 1,
+                                rotate: [0, 1, -1, 0]
+                              }}
+                              transition={{ 
+                                duration: preset.animation === 'pop' ? 0.8 : 2, 
+                                repeat: Infinity, 
+                                ease: "easeInOut" 
+                              }}
                               className="text-center uppercase font-black text-[11px] select-none leading-tight transition-all"
                               style={{
                                 color: preset.style.color || '#FFFFFF',
@@ -503,101 +513,150 @@ const CaptionEngine: React.FC<CaptionEngineProps> = ({
                 </div>
               </details>
 
-              <details open className="group bg-white border border-emerald-50 rounded-[2rem] overflow-hidden shadow-[0_8px_25px_rgb(16,185,129,0.05)]">
-                <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none border-b border-emerald-50 bg-emerald-50/30">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <details open className="group bg-white border border-zinc-100 rounded-[2rem] overflow-hidden shadow-[0_4px_20px_rgb(0,0,0,0.03)]">
+                <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none border-b border-zinc-50 bg-zinc-50/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center shadow-sm">
                       <Type size={18} />
                     </div>
                     <div>
                         <span className="text-sm font-bold text-zinc-900 block">Typography & Layout</span>
-                        <span className="text-[10px] text-blue-600 font-medium">Font, size and layout</span>
+                        <span className="text-[10px] text-blue-500 font-bold uppercase tracking-tight opacity-60">Font, size and layout</span>
                     </div>
                   </div>
                   <ChevronDown size={20} className="text-zinc-400 group-open:rotate-180 transition-transform" />
                 </summary>
-                <div className="p-6 pt-0 space-y-6">
-                  <div className="space-y-4 pt-6">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">
-                      <span>FONT SIZE</span>
-                      <span className="text-emerald-500 font-bold">{captionStyle.fontSize}px</span>
-                    </div>
-                    <input 
-                      type="range" min="16" max="150" 
-                      value={captionStyle.fontSize} 
-                      onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
-                      className="w-full accent-zinc-900 h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Words Per Line</label>
-                      <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-100 shadow-sm">
-                        {[1, 2, 3].map(n => (
-                          <button 
-                            key={`wpl-${n}`}
-                            onClick={() => setCaptionStyle({...captionStyle, wordsPerLine: n})}
-                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${captionStyle.wordsPerLine === n ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
-                          >
-                            {n}
-                          </button>
-                        ))}
+                
+                <div className="p-6 space-y-8">
+                  {/* Font Family Selector */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">FONT FAMILY</label>
+                    <div className="relative group">
+                      <select 
+                        value={captionStyle.font}
+                        onChange={(e) => setCaptionStyle({...captionStyle, font: e.target.value})}
+                        className="w-full p-5 bg-zinc-50 border border-zinc-100 rounded-2xl text-lg font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/5 appearance-none shadow-sm transition-all hover:bg-zinc-100/50"
+                      >
+                        <option value="Inter">Inter</option>
+                        <option value="Poppins">Poppins</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Rajdhani">Rajdhani (Hindi)</option>
+                        <option value="Bangers">Bangers (Impact)</option>
+                        <option value="Luckiest Guy">Luckiest Guy</option>
+                      </select>
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+                        <ChevronDown size={18} />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Case</label>
-                       <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-100 shadow-sm">
+                  </div>
+
+                  {/* Case & Style Controls */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">CASE</label>
+                      <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-300 shadow-sm">
                         {(['original', 'uppercase'] as const).map(c => (
                           <button 
                             key={c}
                             onClick={() => setCaptionStyle({...captionStyle, case: c})}
                             className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${captionStyle.case === c ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
                           >
-                            {c === 'original' ? 'Orgl' : 'Up'}
+                            {c === 'original' ? 'Original' : 'Uppercase'}
                           </button>
                         ))}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Font Family</label>
-                    <select 
-                      value={captionStyle.font}
-                      onChange={(e) => setCaptionStyle({...captionStyle, font: e.target.value})}
-                      className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
-                    >
-                      <option value="Inter">Inter</option>
-                      <option value="Poppins">Poppins</option>
-                      <option value="Montserrat">Montserrat</option>
-                      <option value="Rajdhani">Rajdhani (Hindi)</option>
-                      <option value="Bangers">Bangers (Impact)</option>
-                    </select>
-                  </div>
-
-                  <div className="pt-6 border-t border-zinc-100 space-y-4">
-                      <div className="flex gap-3">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">STYLE</label>
+                      <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-300 shadow-sm">
                         <button 
-                          onClick={() => setCaptionScriptType(captionScriptType === 'hindi' ? 'hinglish' : 'hindi')}
-                          className={`flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${captionScriptType === 'hinglish' ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                          onClick={() => setCaptionStyle({...captionStyle, fontWeight: captionStyle.fontWeight === '900' ? '400' : '900'})}
+                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${captionStyle.fontWeight === '900' ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
                         >
-                          {captionScriptType === 'hinglish' ? 'Hinglish' : 'Hindi'}
+                          Bold
                         </button>
                         <button 
-                          onClick={() => setTranslateToEnglish(!translateToEnglish)}
-                          className={`flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${translateToEnglish ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                          onClick={() => setCaptionStyle({...captionStyle, italic: !captionStyle.italic})}
+                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${captionStyle.italic ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'}`}
                         >
-                          {translateToEnglish ? 'Translated' : 'Original'}
+                          Italic
                         </button>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Font Size & Words Per Line */}
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                        <span>FONT SIZE</span>
+                        <span className="text-emerald-500 font-bold">{captionStyle.fontSize}PX</span>
+                      </div>
+                      <input 
+                        type="range" min="16" max="150" 
+                        value={captionStyle.fontSize} 
+                        onChange={(e) => setCaptionStyle({...captionStyle, fontSize: parseInt(e.target.value)})}
+                        className="w-full accent-zinc-900 h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                        <span>WORDS PER LINE</span>
+                        <span className="text-emerald-500 font-bold">{captionStyle.wordsPerLine}</span>
+                      </div>
+                      <input 
+                        type="range" min="1" max="10" 
+                        value={captionStyle.wordsPerLine} 
+                        onChange={(e) => setCaptionStyle({...captionStyle, wordsPerLine: parseInt(e.target.value)})}
+                        className="w-full accent-zinc-900 h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Position Selector */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">POSITION</label>
+                    <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-300 shadow-sm">
+                      {(['top', 'middle', 'bottom'] as const).map(p => (
+                        <button 
+                          key={p}
+                          onClick={() => setCaptionStyle({...captionStyle, yPos: p === 'top' ? 20 : p === 'middle' ? 50 : 85})}
+                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize ${
+                            (p === 'top' && captionStyle.yPos <= 30) || (p === 'middle' && captionStyle.yPos > 30 && captionStyle.yPos < 70) || (p === 'bottom' && captionStyle.yPos >= 70)
+                              ? 'bg-zinc-900 text-white' : 'text-zinc-400 hover:text-zinc-600'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bottom Controls */}
+                  <div className="pt-6 border-t border-zinc-100 space-y-4">
+                    <div className="flex gap-3">
                       <button 
-                        onClick={() => setCaptionStyle({...captionStyle, isSmart: !captionStyle.isSmart})}
-                        className={`w-full py-4 rounded-3xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-3 ${captionStyle.isSmart ? 'bg-zinc-900 border-zinc-900 text-white shadow-xl' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                        onClick={() => setCaptionScriptType(captionScriptType === 'hindi' ? 'hinglish' : 'hindi')}
+                        className={`flex-1 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${captionScriptType === 'hindi' ? 'bg-white border-zinc-100 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-900'}`}
                       >
-                        <Sparkles size={14} className={captionStyle.isSmart ? 'text-emerald-400' : ''} />
-                        {captionStyle.isSmart ? 'Smart Highlights: ON' : 'Smart Highlights: OFF'}
+                        {captionScriptType === 'hindi' ? 'Hindi Script' : 'Hinglish Script'}
                       </button>
+                      <button 
+                        onClick={() => setTranslateToEnglish(!translateToEnglish)}
+                        className={`flex-1 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${translateToEnglish ? 'bg-white border-zinc-200 text-zinc-900' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                      >
+                        {translateToEnglish ? 'Translated' : 'Original Lang'}
+                      </button>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setCaptionStyle({...captionStyle, isSmart: !captionStyle.isSmart})}
+                      className={`w-full py-4 rounded-3xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${captionStyle.isSmart ? 'bg-zinc-900 text-white shadow-xl' : 'bg-white border-2 border-zinc-100 text-zinc-300'}`}
+                    >
+                      <Sparkles size={14} className={captionStyle.isSmart ? 'text-emerald-400' : ''} />
+                      {captionStyle.isSmart ? 'Smart Highlights: ON' : 'Smart Highlights: OFF'}
+                    </button>
                   </div>
                 </div>
               </details>
@@ -617,7 +676,7 @@ const CaptionEngine: React.FC<CaptionEngineProps> = ({
                       <button
                         key={anim}
                         onClick={() => setCaptionAnimation(anim)}
-                        className={`py-2 px-1 rounded-lg border text-[8px] font-black uppercase tracking-widest border-2 transition-all ${captionAnimation === anim ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'}`}
+                        className={`py-2 px-1 rounded-lg border text-[8px] font-black uppercase tracking-widest border-2 transition-all ${captionAnimation === anim ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'bg-white border-zinc-200 text-zinc-400 hover:border-zinc-300'}`}
                       >
                         {anim}
                       </button>
@@ -625,46 +684,155 @@ const CaptionEngine: React.FC<CaptionEngineProps> = ({
                 </div>
               </details>
 
-              <details className="group bg-white border border-zinc-100 rounded-[2rem] overflow-hidden shadow-[0_4px_15px_rgb(0,0,0,0.03)]">
-                <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#FFF7ED] text-[#F97316] rounded-xl flex items-center justify-center">
+              <details className="group bg-white border border-zinc-200 rounded-[2rem] overflow-hidden shadow-[0_4px_20px_rgb(0,0,0,0.03)]" open>
+                <summary className="flex items-center justify-between p-6 cursor-pointer transition-all list-none select-none border-b border-zinc-50 bg-zinc-50/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#FFF7ED] text-[#F97316] rounded-xl flex items-center justify-center shadow-sm">
                       <Palette size={18} />
                     </div>
-                    <span className="text-sm font-bold text-zinc-900">Colors & Effects</span>
+                    <div>
+                      <span className="text-sm font-bold text-zinc-900 block">Colors & Effects</span>
+                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-tight opacity-60">Hue, shadows and outline</span>
+                    </div>
                   </div>
                   <ChevronDown size={20} className="text-zinc-400 group-open:rotate-180 transition-transform" />
                 </summary>
-                <div className="p-6 pt-0 space-y-6">
-                    <div className="grid grid-cols-5 gap-2.5 p-3.5 bg-zinc-50 rounded-2xl border border-zinc-100 shadow-inner">
-                      {CAPTION_COLORS.map(c => (
+                
+                <div className="p-6 space-y-8">
+                  {/* Structure Selector */}
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">STRUCTURE</label>
+                    <div className="flex bg-zinc-100/50 p-1 rounded-xl gap-1 border border-zinc-300">
+                      {(['none', 'thin', 'thick'] as const).map(b => (
                         <button
-                          key={`preset-color-${c}`}
-                          onClick={() => setCaptionStyle({...captionStyle, color: c})}
-                          className={`w-full aspect-square rounded-full border-2 transition-all relative group ${captionStyle.color === c ? 'border-zinc-900 scale-110 shadow-md ring-2 ring-emerald-100' : 'border-white hover:scale-105 shadow-sm'}`}
-                          style={{ backgroundColor: c }}
+                          key={b}
+                          onClick={() => setCaptionStyle({ ...captionStyle, border: b })}
+                          className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${captionStyle.border === b ? 'bg-emerald-500 text-white shadow-md' : 'text-zinc-400 hover:text-zinc-600'}`}
                         >
-                          {captionStyle.color === c && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <Check size={12} className={c === '#ffffff' ? 'text-zinc-900' : 'text-white'} strokeWidth={4} />
-                            </div>
-                          )}
+                          {b}
                         </button>
                       ))}
                     </div>
+                  </div>
 
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Shadow Color</label>
-                      <div className="relative h-12 w-full group">
-                        <input 
-                          type="color" 
-                          value={shadowColor}
-                          onChange={(e) => setShadowColor(e.target.value)}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                        />
-                        <div className="w-full h-full rounded-2xl border-2 border-zinc-100 shadow-sm" style={{ backgroundColor: shadowColor }} />
+                  {/* Main Color Grid */}
+                  <div className="bg-zinc-50/50 p-6 rounded-[2rem] border border-zinc-200 shadow-inner">
+                    <div className="grid grid-cols-5 gap-3">
+                      {CAPTION_COLORS.slice(0, 19).map(c => (
+                        <div key={`main-color-container-${c}`} className="flex justify-center">
+                          <button
+                            onClick={() => setCaptionStyle({ ...captionStyle, color: c })}
+                            className={`w-9 h-9 rounded-full border-2 transition-all relative flex items-center justify-center ${captionStyle.color === c ? 'border-zinc-900 scale-110 shadow-lg' : 'border-zinc-200 hover:border-zinc-400 hover:scale-105 shadow-sm'}`}
+                            style={{ backgroundColor: c }}
+                          >
+                            {captionStyle.color === c && (
+                              <Check size={14} className={c.toLowerCase() === '#ffffff' ? 'text-zinc-900' : 'text-white'} strokeWidth={4} />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex justify-center">
+                        <button className="w-9 h-9 rounded-full border-2 border-dashed border-zinc-300 flex items-center justify-center text-zinc-400 hover:border-emerald-400 transition-all bg-white shadow-sm">
+                          <Plus size={16} />
+                        </button>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Outline Section */}
+                  <div className="bg-white p-5 rounded-[2rem] border border-zinc-200 shadow-sm space-y-6">
+                    <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                      <span>OUTLINE</span>
+                      <div className="flex items-center gap-2">
+                        <span className="opacity-50">THICKNESS</span>
+                        <span className="text-zinc-900 font-black">{captionStyle.strokeWidth || 1}PX</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="flex gap-2">
+                         {['#000000', '#ffffff', '#ff0000', '#00ff00'].map(c => (
+                           <button 
+                             key={`outline-${c}`}
+                             onClick={() => setCaptionStyle({...captionStyle, outlineColor: c})}
+                             className={`w-9 h-9 rounded-xl border-2 transition-all ${captionStyle.outlineColor === c ? 'border-zinc-900 scale-105 border-zinc-900' : 'border-zinc-200 shadow-sm opacity-80'}`}
+                             style={{ backgroundColor: c }}
+                           />
+                         ))}
+                      </div>
+                      <div className="flex-1">
+                        <input 
+                          type="range" min="0" max="15" 
+                          value={captionStyle.strokeWidth || 1}
+                          onChange={(e) => setCaptionStyle({...captionStyle, strokeWidth: parseInt(e.target.value)})}
+                          className="w-full accent-zinc-900 h-1.5 bg-zinc-100 rounded-full appearance-none cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Auto-Coloring */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center">
+                          <Sparkles size={16} />
+                        </div>
+                        <span className="text-xs font-black text-zinc-900 tracking-wider uppercase">AUTO-COLORING</span>
+                      </div>
+                      <button 
+                        onClick={() => setCaptionStyle({...captionStyle, alternatingColors: !captionStyle.alternatingColors})}
+                        className={`w-12 h-7 rounded-full transition-all relative ${captionStyle.alternatingColors ? 'bg-emerald-500' : 'bg-zinc-200'}`}
+                      >
+                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all shadow-md ${captionStyle.alternatingColors ? 'left-6' : 'left-1'}`} />
+                      </button>
+                    </div>
+                    
+                    <p className="text-[10px] text-zinc-400 font-bold leading-relaxed px-1">Alternates colors every word for a professional viral look.</p>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">COLOR 1</label>
+                        <div className="h-12 w-full bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden relative group hover:border-zinc-300 transition-all">
+                          <input 
+                            type="color" 
+                            value={captionStyle.color1 || '#ffffff'}
+                            onChange={(e) => setCaptionStyle({...captionStyle, color1: e.target.value})}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                          />
+                          <div className="w-full h-full" style={{ backgroundColor: captionStyle.color1 || '#ffffff' }} />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">ACCENT</label>
+                        <div className="h-12 w-full bg-[#ffff00] border border-zinc-200 rounded-2xl shadow-sm overflow-hidden relative group hover:border-zinc-300 transition-all" style={{ backgroundColor: captionStyle.color2 || '#ffff00' }}>
+                          <input 
+                            type="color" 
+                            value={captionStyle.color2 || '#ffff00'}
+                            onChange={(e) => setCaptionStyle({...captionStyle, color2: e.target.value})}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Effects */}
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <button 
+                      onClick={() => setCaptionStyle({...captionStyle, glow: !captionStyle.glow})}
+                      className={`py-4 rounded-[1.5rem] transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest border-2 ${captionStyle.glow ? 'bg-blue-600 text-white shadow-lg border-blue-600' : 'bg-white border-zinc-300 text-zinc-400'}`}
+                    >
+                      <Sparkles size={16} className={captionStyle.glow ? 'text-white' : 'text-blue-600'} />
+                      GLOW EFFECT
+                    </button>
+                    <button 
+                      onClick={() => setCaptionStyle({...captionStyle, shadow: !captionStyle.shadow})}
+                      className={`py-4 rounded-[1.5rem] transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest border-2 ${captionStyle.shadow ? 'bg-blue-600 text-white shadow-lg border-blue-600' : 'bg-white border-zinc-300 text-zinc-400'}`}
+                    >
+                      <Monitor size={16} />
+                      3D SHADOW
+                    </button>
+                  </div>
                 </div>
               </details>
 

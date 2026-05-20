@@ -70,6 +70,7 @@ interface VoiceEngineProps {
   setLastGeneration: (item: any) => void;
   setCurrentAudio: (val: string | null) => void;
   handlePreviewVoice: (voice: Voice) => void;
+  isPreviewLoading?: boolean;
 }
 
 const VoiceEngine: React.FC<VoiceEngineProps> = ({
@@ -122,7 +123,8 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
   handleDownload,
   setLastGeneration,
   setCurrentAudio,
-  handlePreviewVoice
+  handlePreviewVoice,
+  isPreviewLoading
 }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -241,17 +243,37 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
                 <Library size={12} /> Browse
               </button>
             </div>
-            <div 
-              onClick={() => setShowVoiceLibrary(true)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all"
-            >
+            <div className="w-full bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-all transition-colors group/voice" onClick={() => setShowVoiceLibrary(true)}>
               <div className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-[10px] font-bold text-white`}>
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${selectedVoice.color} flex items-center justify-center text-sm font-bold text-white shadow-sm`}>
                   {selectedVoice.name[0]}
                 </div>
-                <span className="text-sm font-medium">{selectedVoice.name}</span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-zinc-900 group-hover/voice:text-emerald-600 transition-colors">{selectedVoice.name}</span>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePreviewVoice(selectedVoice);
+                      }}
+                      className={`p-1.5 rounded-lg transition-all ${playingId === selectedVoice.id ? 'bg-emerald-500 text-white' : 'hover:bg-emerald-50 text-zinc-400 hover:text-emerald-600'}`}
+                      title="Preview Voice Sample"
+                    >
+                      {playingId === selectedVoice.id ? (
+                        isPreviewLoading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Pause size={14} className="fill-current" />
+                        )
+                      ) : (
+                        <Volume2 size={14} />
+                      )}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{selectedVoice.gender}</span>
+                </div>
               </div>
-              <ChevronDown size={14} className="text-zinc-500" />
+              <ChevronDown size={14} className="text-zinc-400 group-hover/voice:translate-y-0.5 transition-transform" />
             </div>
           </div>
 
@@ -345,26 +367,26 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
                   <span className="font-bold text-emerald-600">{pause}s</span>
                 </div>
                 <input 
-                  type="range" min="0.1" max="2.0" step="0.1" 
+                  type="range" min="0" max="2.0" step="0.1" 
                   value={pause} onChange={(e) => setPause(parseFloat(e.target.value))}
                   className="w-full accent-emerald-500 h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer"
                 />
               </div>
 
-              <div className="space-y-1 pt-2 border-t border-zinc-100">
+              <div className="space-y-1">
                 <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
                   <span>Output Format</span>
                 </div>
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setAudioFormat('wav')}
-                    className={`flex-1 py-1 rounded-md text-[10px] border ${audioFormat === 'wav' ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                    className={`flex-1 py-1 rounded-md text-[10px] border transition-all ${audioFormat === 'wav' ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                   >
                     WAV
                   </button>
                   <button 
                     onClick={() => setAudioFormat('mp3')}
-                    className={`flex-1 py-1 rounded-md text-[10px] border ${audioFormat === 'mp3' ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                    className={`flex-1 py-1 rounded-md text-[10px] border transition-all ${audioFormat === 'mp3' ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
                   >
                     MP3
                   </button>
@@ -378,19 +400,19 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
                 <div className="flex gap-2">
                   <button 
                     onClick={() => setTargetSampleRate(24000)}
-                    className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 24000 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                    className={`flex-1 py-1 rounded-md text-[8px] border transition-all ${targetSampleRate === 24000 ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-900'}`}
                   >
                     24kHz
                   </button>
                   <button 
                     onClick={() => setTargetSampleRate(44100)}
-                    className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 44100 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                    className={`flex-1 py-1 rounded-md text-[8px] border transition-all ${targetSampleRate === 44100 ? 'bg-zinc-900 border-zinc-900 text-white shadow-md active:scale-95' : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-900'}`}
                   >
                     44.1kHz
                   </button>
                   <button 
                     onClick={() => setTargetSampleRate(48000)}
-                    className={`flex-1 py-1 rounded-md text-[8px] border ${targetSampleRate === 48000 ? 'bg-zinc-900 border-zinc-900 text-white' : 'border-zinc-200 text-zinc-500 hover:text-zinc-900'}`}
+                    className={`flex-1 py-1 rounded-md text-[8px] border transition-all ${targetSampleRate === 48000 ? 'bg-zinc-900 border-zinc-900 text-white shadow-md active:scale-95' : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-900'}`}
                   >
                     48kHz
                   </button>
@@ -401,10 +423,20 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
         </div>
 
         <div className="pt-4">
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
             onClick={handleGenerate}
             disabled={isGenerating || !text || !selectedVoice}
-            className="w-full py-5 px-6 bg-black text-white rounded-3xl font-bold text-xl flex items-center justify-center gap-3 hover:bg-zinc-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-black/20 group relative overflow-hidden"
+            animate={isGenerating ? { 
+              backgroundColor: ["#000000", "#10b981", "#000000"],
+              scale: [1, 1.02, 1],
+              transition: { repeat: Infinity, duration: 2, ease: "easeInOut" }
+            } : { 
+              backgroundColor: "#000000",
+              scale: 1 
+            }}
+            className={`w-full py-5 px-6 rounded-3xl font-bold text-xl flex items-center justify-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-black/20 group relative overflow-hidden ${isGenerating ? 'text-white' : 'text-white hover:bg-zinc-800'}`}
           >
             <div className="absolute inset-0 gemini-shimmer opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
             {isGenerating ? (
@@ -421,7 +453,7 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
                 <span>Generate Voice</span>
               </div>
             )}
-          </button>
+          </motion.button>
         </div>
 
       {lastGeneration && currentAudio && !isGenerating && (
@@ -453,7 +485,14 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
 
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-5">
-                <button 
+                <motion.button 
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  animate={isPlaying ? { 
+                    scale: [1, 1.1, 1],
+                    backgroundColor: ["#10b981", "#059669", "#10b981"],
+                    transition: { repeat: Infinity, duration: 1.5 } 
+                  } : {}}
                   onClick={() => {
                     if (audioRef.current) {
                       if (isPlaying) {
@@ -463,14 +502,14 @@ const VoiceEngine: React.FC<VoiceEngineProps> = ({
                       }
                     }
                   }}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 shadow-lg ${isPlaying ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-black hover:bg-zinc-800'}`}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 shadow-lg ${isPlaying ? 'bg-emerald-500 hover:bg-emerald-600 ring-4 ring-emerald-500/20' : 'bg-black hover:bg-zinc-800'}`}
                 >
                   {isPlaying ? (
                     <Pause size={24} className="text-white fill-white" />
                   ) : (
                     <Play size={24} className="text-white ml-1 fill-white" />
                   )}
-                </button>
+                </motion.button>
 
                 <div className="flex-1 space-y-2">
                   <div className="flex justify-between items-end mb-1">

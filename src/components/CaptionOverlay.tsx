@@ -45,6 +45,9 @@ const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
   if (!currentWord) return null;
 
   const getDynamicColor = (index: number, word: CaptionWord) => {
+    if (style.alternatingColors) {
+      return (index % 2 === 0) ? (style.color1 || '#ffffff') : (style.color2 || '#ffff00');
+    }
     if (style.isDynamic) {
       const colors = style.threeColors || ['#ffffff', '#ffff00', '#00ff1a'];
       const stableIndex = Math.floor((word.start * 10) % colors.length);
@@ -308,6 +311,12 @@ const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
     
     if (style.background === 'box') {
       baseStyle.backgroundColor = 'rgba(0,0,0,0.85)';
+    }
+
+    if (style.background === 'pill') {
+      baseStyle.backgroundColor = style.backgroundColor || 'rgba(0,0,0,0.85)';
+      baseStyle.borderRadius = '2rem';
+      baseStyle.padding = '0.4em 1em';
     }
 
     if (word.isHighlighted) {

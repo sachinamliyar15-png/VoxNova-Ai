@@ -7,6 +7,7 @@ export interface Voice {
   isPremium?: boolean;
   isCloned?: boolean;
   fingerprint?: string;
+  language?: string;
   color: string;
   tags?: string[];
 }
