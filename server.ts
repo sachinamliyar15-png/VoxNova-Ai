@@ -681,7 +681,7 @@ app.post("/api/analyze-voice", async (req, res) => {
 
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.5-flash",
         contents: [
           { parts: [{ text: prompt }, { inlineData: { data: audioData, mimeType: mimeType || 'audio/wav' } }] }
         ]
@@ -825,7 +825,7 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
             : `CRITICAL: The previous attempt sounded slightly robotic. Please deliver a MORE HUMAN, MORE REALISTIC performance in ${language === 'hi' ? 'Hindi' : 'English'}. Focus on micro-stresses, natural breath intakes between phrases, and authentic prosody. Avoid any synthetic cadence:\n\n${chunk}`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-tts",
+            model: "gemini-3.1-flash-tts-preview",
             contents: [{ parts: [{ text: currentPrompt }] }],
             config: {
               responseModalities: [Modality.AUDIO],
@@ -986,7 +986,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const ai = new GoogleGenAI({ apiKey });
       
       // Smart Model Switching: Try preview first, then stable flash for transcription
-      const currentModel = attempt < 3 ? "gemini-3-flash-preview" : "gemini-1.5-flash-pro";
+      const currentModel = attempt < 3 ? "gemini-3.5-flash" : "gemini-3.1-pro-preview";
       
       const prompt = `Transcribe the following audio/video exactly. 
       Analyze vocal DNA:
@@ -1019,7 +1019,7 @@ app.post("/api/voice-changer", maybeAuthenticate, async (req: any, res) => {
       const ttsSystemInstruction = buildSystemInstruction(targetLanguage === 'Hindi' ? 'hi' : 'en', voice_id);
       
       const ttsResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash-tts",
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: `${ttsSystemInstruction}\n\nMIMIC EMOTION: ${performanceTraits}\n\nVOICE IDENTITY: ${profile_desc}\n\nSCRIPT: ${transcribedText}` }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1217,7 +1217,7 @@ app.post("/api/preview-voice", async (req: any, res) => {
       const previewText = languagePreviews[voice_id] || (req.body.language === 'ta' ? languagePreviews['tamil-preview'] : `Say: Hi, I'm ${voice_name}. I'm one of the professional voices at VoxNova.`);
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-tts",
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text: previewText }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -1276,7 +1276,7 @@ app.post("/api/classify-script", maybeAuthenticate, async (req: any, res) => {
     Return ONLY the category name.`;
 
     const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
@@ -1485,7 +1485,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
       console.log(`[Captions] Processing with Gemini 3 for ${language}...`);
 
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview", 
+        model: "gemini-3.5-flash", 
         contents: [
           {
             role: "user",
