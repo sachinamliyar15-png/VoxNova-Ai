@@ -422,8 +422,20 @@ const App: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Generation failed");
+        let errorMsg = "Generation failed";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+          } else {
+            const rawBody = await response.text();
+            errorMsg = `Server Error (${response.status}): ${rawBody.slice(0, 100)}`;
+          }
+        } catch (e) {
+          errorMsg = `Server Error (${response.status})`;
+        }
+        throw new Error(errorMsg);
       }
 
       const { audioData } = await response.json();

@@ -320,14 +320,20 @@ const app = express();
 const PORT = 3000;
 
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
 });
 
-app.use(express.json({ limit: '500mb' })); // Increased limit for video and audio files to match frontend expectations
+app.use(express.json({ limit: '500mb' }));
 app.use(cookieParser());
+
+// Request logger for API
+app.use('/api', (req, res, next) => {
+  console.log(`[API] ${req.method} ${req.url}`);
+  next();
+});
 
 // Initialize Database
 let db: Database.Database;
@@ -636,139 +642,6 @@ const checkGuestLimit = (ip: string, isPremium: boolean = false) => {
   return { allowed: true };
 };
 
-// Generate Speech via Gemini API (Guest) - VOXNOVA_GUEST_EP
-app.post("/api/generate-speech-guest", async (req: any, res) => {
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-      const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type, targetSampleRate } = req.body;
-      
-      const premiumVoices = ['Documentary Pro', 'Virat', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'MAHARAJA', 'Sachinboy', 'Munna Bhai', 'Pankaj', 'Priyanka', 'ISHANI'];
-      const isPremium = premiumVoices.includes(voice_name);
-
-      const limitCheck = checkGuestLimit(ip, isPremium);
-      
-      if (!limitCheck.allowed) {
-        if (limitCheck.reason === "PREMIUM_TRIAL_EXHAUSTED") {
-          return res.status(403).json({ 
-            error: "Premium voice trial exhausted (3/3). Please sign up to get 20,000 free monthly credits and continue using high-quality professional voices!" 
-          });
-        }
-        return res.status(429).json({ 
-          error: "Guest limit reached (10 generations per day). Please sign up for unlimited access and 20,000 free monthly credits!" 
-        });
-      }
-      
-      if (!text) {
-        return res.status(400).json({ error: "Text is required" });
-      }
-
-      // Limit text length for guests to prevent abuse
-      if (text.length > 300) {
-        return res.status(400).json({ error: "Guest scripts are limited to 300 characters. Please sign up for longer scripts." });
-      }
-
-      const maxRetries = 3;
-      let attempt = 0;
-
-      while (attempt < maxRetries) {
-        const apiKey = getAvailableApiKey();
-        
-        if (!apiKey) {
-          return res.status(503).json({ 
-            error: "All Gemini API keys are currently exhausted.",
-            code: "QUOTA_EXHAUSTED"
-          });
-        }
-
-        try {
-          const ai = new GoogleGenAI({ apiKey });
-          
-          const targetVoice = INTERNAL_VOICE_MAPPING[voice_name] || 'Puck';
-          const systemInstruction = buildSystemInstruction(language, voice_name);
-          
-          let promptPrefix = "";
-          const currentVoiceTrait = VOICE_TRAITS[voice_name] || '';
-          if (currentVoiceTrait) promptPrefix += `${currentVoiceTrait} `;
-
-          if (pitch > 1.3) promptPrefix += "Use a very high, bright, and sharp pitch. ";
-          else if (pitch > 1.1) promptPrefix += "Use a slightly higher, more youthful and energetic pitch. ";
-          else if (pitch < 0.7) promptPrefix += "Use a very deep, bassy, and low-frequency pitch. ";
-          else if (pitch < 0.9) promptPrefix += "Use a slightly deeper, more mature and resonant pitch. ";
-
-          promptPrefix += `CRITICAL: Speak at exactly ${speed}x speed. `;
-          if (speed > 1.5) promptPrefix += "Speak at a very fast, rapid-fire pace. ";
-          else if (speed > 1.1) promptPrefix += "Speak at a brisk, energetic pace. ";
-          else if (speed < 0.7) promptPrefix += "Speak at a very slow, drawn-out, and deliberate pace. ";
-          else if (speed < 0.9) promptPrefix += "Speak at a slightly slower, more measured pace. ";
-          else promptPrefix += "Speak at a natural, medium pace. ";
-
-          if (pause > 0.1) {
-            promptPrefix += `Add a natural pause of approximately ${pause} seconds between sentences and major phrases to ensure clarity and professional pacing. `;
-          }
-          
-          // Parallel Chunking for Guests too
-          const CHUNK_SIZE = 800;
-          const chunks: string[] = [];
-          if (text.length > CHUNK_SIZE) {
-            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-            let currentChunk = "";
-            for (const sentence of sentences) {
-              if ((currentChunk + sentence).length > CHUNK_SIZE && currentChunk.length > 0) {
-                chunks.push(currentChunk.trim());
-                currentChunk = sentence;
-              } else {
-                currentChunk += sentence;
-              }
-            }
-            if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
-          } else {
-            chunks.push(text);
-          }
-
-          const audioChunks: Buffer[] = [];
-          const CONCURRENCY = 10;
-
-          for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-            const batch = chunks.slice(i, i + CONCURRENCY);
-            const batchPromises = batch.map(async (chunk, idx) => {
-              const currentPrompt = `${systemInstruction}\n\n${promptPrefix}\n\nSCRIPT TO PERFORM:\n${chunk}`;
-
-              const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash-tts",
-                contents: [{ parts: [{ text: currentPrompt }] }],
-                config: {
-                  responseModalities: [Modality.AUDIO],
-                  speechConfig: {
-                    voiceConfig: {
-                      prebuiltVoiceConfig: { voiceName: targetVoice as any },
-                    },
-                  },
-                },
-              });
-
-              const base64 = (response as any).audioData || (response as any).inlineData?.data || response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-              if (base64) return Buffer.from(base64, 'base64');
-              return null;
-            });
-
-            const results = await Promise.all(batchPromises);
-            results.forEach(r => { if (r) audioChunks.push(r); });
-          }
-
-          if (audioChunks.length === 0) throw new Error("No audio data generated");
-
-          const mergedPcm = Buffer.concat(audioChunks);
-          const sampleRate = 24000;
-          const wavBuffer = addWavHeader(mergedPcm, sampleRate);
-          return res.json({ audioData: wavBuffer.toString('base64') });
-
-        } catch (error: any) {
-          attempt++;
-          if (attempt >= maxRetries) return res.status(500).json({ error: error.message });
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      }
-    });
-
 // Analyze voice sample for cloning
 app.post("/api/analyze-voice", async (req, res) => {
   const { audioData, mimeType } = req.body;
@@ -832,7 +705,7 @@ app.post("/api/analyze-voice", async (req, res) => {
   res.status(503).json({ error: "Failed to analyze voice after multiple attempts." });
 });
 
-// Update the Generate Speech logic to handle cloned voices
+// Generate Speech via Gemini API
 app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
   const { text, voice_name, style, speed, pitch, language, studioClarity, pause, cloned_voice_traits, script_type, targetSampleRate } = req.body;
   
@@ -840,11 +713,14 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
     return res.status(400).json({ error: "Text is required" });
   }
 
-  // Rate limit for guests
+  // Unified Rate Limit Logic
   if (!req.user) {
     const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
     const premiumVoices = ['Documentary Pro', 'Virat', 'SULTAN', 'SHERA', 'KAAL', 'BHEEM', 'SIKANDAR', 'EMPEROR PRO', 'ZORAVAR', 'RUDRA', 'MAHARAJA', 'Sachinboy', 'Munna Bhai', 'Pankaj', 'Priyanka', 'ISHANI'];
-    const isPremium = premiumVoices.includes(voice_name);
+    const voiceToIsPremium: Record<string, boolean> = {};
+    premiumVoices.forEach(v => voiceToIsPremium[v] = true);
+    
+    const isPremium = voiceToIsPremium[voice_name] || false;
     const limitCheck = checkGuestLimit(ip as string, isPremium);
     
     if (!limitCheck.allowed) {
@@ -853,7 +729,11 @@ app.post("/api/generate-speech", maybeAuthenticate, async (req: any, res) => {
           error: "Premium voice trial exhausted (3/3). Please sign up to get 20,000 free monthly credits and continue using high-quality professional voices!" 
         });
       }
-      return res.status(429).json({ error: "Daily limit reached for guest users. Please sign up for more." });
+      return res.status(429).json({ error: "Daily limit reached for guest users (10/10). Please sign up for more credits." });
+    }
+
+    if (text.length > 300) {
+      return res.status(400).json({ error: "Guest scripts are limited to 300 characters. Please sign up for longer scripts (up to 5,000 chars)." });
     }
   }
 
@@ -1720,6 +1600,7 @@ app.post("/api/generate-captions", maybeAuthenticate, async (req: any, res) => {
   res.status(503).json({ error: "Failed to generate captions after multiple attempts." });
 });
 
+// History Endpoints
 app.get(["/api/history", "/api/history/"], authenticate, async (req: any, res) => {
   const userId = req.user.uid;
   try {
@@ -1818,6 +1699,16 @@ app.delete("/api/history/:id", authenticate, async (req: any, res) => {
     console.error("[History] Delete error:", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// 404 for API routes - RETURN JSON NOT HTML
+app.use("/api/*", (req, res) => {
+  console.log(`[API] 404 Not Found: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ 
+    error: "API route not found", 
+    message: `The endpoint ${req.originalUrl} does not exist on this server.`,
+    path: req.originalUrl
+  });
 });
 
 // Error Handler (Always return JSON for API requests)
